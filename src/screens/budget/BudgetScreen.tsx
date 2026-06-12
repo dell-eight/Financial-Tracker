@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle } from 'react-native-svg';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
-import { useTheme } from '../../hooks/ui/useTheme';
+import { useTheme }    from '../../hooks/ui/useTheme';
+import { useBudgets }  from '../../hooks/queries/useBudgets';
 import { BudgetCard, SectionHeader } from '../../components';
 import type { MainTabParamList } from '../../navigation/types';
 import type { CategoryKey } from '../../theme';
@@ -31,9 +32,7 @@ type Props = BottomTabScreenProps<MainTabParamList, 'Budget'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const MONTHLY_BUDGET = 5000;
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface BudgetItem {
   id:       string;
@@ -45,23 +44,7 @@ interface BudgetItem {
   color:    string;
 }
 
-const BUDGET_ITEMS: BudgetItem[] = [
-  { id: 'b1', category: 'food',          label: 'Food & Dining',    icon: '🍔', spent: 620.00, limit: 800.00, color: '#F97316' },
-  { id: 'b2', category: 'transport',     label: 'Transport',         icon: '🚗', spent: 245.00, limit: 300.00, color: '#3B82F6' },
-  { id: 'b3', category: 'shopping',      label: 'Shopping',          icon: '🛍', spent: 890.00, limit: 700.00, color: '#EC4899' },
-  { id: 'b4', category: 'bills',         label: 'Bills & Utilities', icon: '📄', spent: 480.00, limit: 500.00, color: '#EF4444' },
-  { id: 'b5', category: 'entertainment', label: 'Entertainment',     icon: '🎬', spent: 180.00, limit: 250.00, color: '#A855F7' },
-  { id: 'b6', category: 'health',        label: 'Health',            icon: '💊', spent: 220.00, limit: 300.00, color: '#22C55E' },
-  { id: 'b7', category: 'education',     label: 'Education',         icon: '📚', spent: 95.00,  limit: 150.00, color: '#14B8A6' },
-  { id: 'b8', category: 'other',         label: 'Other',             icon: '💰', spent: 117.50, limit: 200.00, color: '#6B7280' },
-];
-
-const TOTAL_ALLOCATED = BUDGET_ITEMS.reduce((s, b) => s + b.limit, 0);   // 3200
-const TOTAL_SPENT     = BUDGET_ITEMS.reduce((s, b) => s + b.spent, 0);   // 2847.50
-
-const OVER_BUDGET = BUDGET_ITEMS.filter(b => b.spent > b.limit);
-const WARNING_CAT = BUDGET_ITEMS.filter(b => b.spent <= b.limit && b.spent / b.limit >= 0.80);
-const ON_TRACK    = BUDGET_ITEMS.filter(b => b.spent / b.limit < 0.80);
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
                 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -134,7 +117,6 @@ function DonutChart({ segments, holeFill }: { segments: DonutSegment[]; holeFill
         angle       += sweep;
         return <Path key={i} d={d} fill={seg.color} />;
       })}
-      {/* Inner circle — shows bg color to make donut hole */}
       <Circle cx={cx} cy={cy} r={INNER_R - 1} fill={holeFill} />
     </Svg>
   );
@@ -142,12 +124,19 @@ function DonutChart({ segments, holeFill }: { segments: DonutSegment[]; holeFill
 
 // ─── BudgetOverviewCard ───────────────────────────────────────────────────────
 
-function BudgetOverviewCard({ month, year }: { month: string; year: number }) {
+interface OverviewCardProps {
+  month:          string;
+  year:           number;
+  totalAllocated: number;
+  totalSpent:     number;
+}
+
+function BudgetOverviewCard({ month, year, totalAllocated, totalSpent }: OverviewCardProps) {
   const theme = useTheme();
   const { spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
 
-  const ratio     = TOTAL_SPENT / MONTHLY_BUDGET;
-  const remaining = MONTHLY_BUDGET - TOTAL_SPENT;
+  const ratio     = totalAllocated > 0 ? totalSpent / totalAllocated : 0;
+  const remaining = totalAllocated - totalSpent;
 
   return (
     <View style={[{ borderRadius: borderRadius.cardLg, overflow: 'hidden' }, shadows.hero]}>
@@ -183,7 +172,7 @@ function BudgetOverviewCard({ month, year }: { month: string; year: number }) {
 
         {/* Total budget amount */}
         <Text style={{ fontSize: fontSize.displayXl, fontFamily: fontFamily.bold, color: '#FFFFFF', letterSpacing: -1, marginTop: spacing[1], lineHeight: 48 }}>
-          {fmt(MONTHLY_BUDGET)}
+          {fmt(totalAllocated)}
         </Text>
 
         {/* Progress track */}
@@ -200,14 +189,14 @@ function BudgetOverviewCard({ month, year }: { month: string; year: number }) {
         <View style={[heroStyles.statRow, { marginTop: spacing[4] }]}>
           <View style={heroStyles.statItem}>
             <Text style={heroStyles.statLabel}>Spent</Text>
-            <Text style={heroStyles.statValue}>{fmt(TOTAL_SPENT)}</Text>
+            <Text style={heroStyles.statValue}>{fmt(totalSpent)}</Text>
           </View>
 
           <View style={heroStyles.divider} />
 
           <View style={[heroStyles.statItem, { alignItems: 'center' }]}>
             <Text style={heroStyles.statLabel}>Allocated</Text>
-            <Text style={heroStyles.statValue}>{fmt(TOTAL_ALLOCATED)}</Text>
+            <Text style={heroStyles.statValue}>{fmt(totalAllocated)}</Text>
           </View>
 
           <View style={heroStyles.divider} />
@@ -226,7 +215,7 @@ function BudgetOverviewCard({ month, year }: { month: string; year: number }) {
 
 const heroStyles = StyleSheet.create({
   card: {
-    overflow: 'hidden',
+    overflow:  'hidden',
     minHeight: 0,
   },
   topRow: {
@@ -262,35 +251,41 @@ const heroStyles = StyleSheet.create({
   },
   statLabel: {
     fontSize:   11,
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Urbanist-Regular',
     color:      'rgba(255,255,255,0.58)',
     lineHeight: 16,
   },
   statValue: {
     fontSize:      14,
-    fontFamily:    'PlusJakartaSans-Bold',
+    fontFamily:    'Urbanist-Bold',
     color:         '#FFFFFF',
     letterSpacing: -0.2,
     marginTop:     2,
     lineHeight:    20,
   },
   divider: {
-    width:           1,
-    height:          36,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    width:            1,
+    height:           36,
+    backgroundColor:  'rgba(255,255,255,0.18)',
     marginHorizontal: 8,
   },
 });
 
 // ─── BudgetHealthRow ──────────────────────────────────────────────────────────
 
-function BudgetHealthRow() {
+interface HealthRowProps {
+  onTrackCount:   number;
+  nearLimitCount: number;
+  overBudgetCount: number;
+}
+
+function BudgetHealthRow({ onTrackCount, nearLimitCount, overBudgetCount }: HealthRowProps) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
 
   const chips = [
     {
-      count:  ON_TRACK.length,
+      count:  onTrackCount,
       label:  'On Track',
       icon:   '✓',
       bg:     `${colors.income}18`,
@@ -298,7 +293,7 @@ function BudgetHealthRow() {
       text:   colors.income,
     },
     {
-      count:  WARNING_CAT.length,
+      count:  nearLimitCount,
       label:  'Near Limit',
       icon:   '!',
       bg:     `${colors.warning}18`,
@@ -306,7 +301,7 @@ function BudgetHealthRow() {
       text:   colors.warning,
     },
     {
-      count:  OVER_BUDGET.length,
+      count:  overBudgetCount,
       label:  'Over Budget',
       icon:   '↑',
       bg:     `${colors.expense}18`,
@@ -346,11 +341,11 @@ function BudgetHealthRow() {
 
           <Text
             style={{
-              fontSize:      fontSize.headingMd,
-              fontFamily:    fontFamily.bold,
-              color:         chip.text,
-              marginTop:     spacing[2],
-              lineHeight:    26,
+              fontSize:   fontSize.headingMd,
+              fontFamily: fontFamily.bold,
+              color:      chip.text,
+              marginTop:  spacing[2],
+              lineHeight: 26,
             }}
           >
             {chip.count}
@@ -389,11 +384,16 @@ const healthStyles = StyleSheet.create({
 
 // ─── BudgetAllocationCard ─────────────────────────────────────────────────────
 
-function BudgetAllocationCard() {
+interface AllocationCardProps {
+  items:          BudgetItem[];
+  totalAllocated: number;
+}
+
+function BudgetAllocationCard({ items, totalAllocated }: AllocationCardProps) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
 
-  const segments = BUDGET_ITEMS.map(b => ({ value: b.limit, color: b.color }));
+  const segments = items.map(b => ({ value: b.limit, color: b.color }));
 
   return (
     <View
@@ -414,12 +414,12 @@ function BudgetAllocationCard() {
             Budget Allocation
           </Text>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
-            {fmt(TOTAL_ALLOCATED)} across {BUDGET_ITEMS.length} categories
+            {fmt(totalAllocated)} across {items.length} categories
           </Text>
         </View>
         <View style={[allocStyles.totalBadge, { backgroundColor: colors.accent.muted, borderRadius: borderRadius.full }]}>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.accent.primary }}>
-            {BUDGET_ITEMS.length} active
+            {items.length} active
           </Text>
         </View>
       </View>
@@ -428,20 +428,19 @@ function BudgetAllocationCard() {
       <View style={[allocStyles.chartRow, { marginTop: spacing[5] }]}>
         <View style={allocStyles.donutContainer}>
           <DonutChart segments={segments} holeFill={colors.bg.surface} />
-          {/* Center overlay */}
           <View style={allocStyles.donutCenter} pointerEvents="none">
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center' }}>
               Total
             </Text>
             <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: colors.text.primary, textAlign: 'center', letterSpacing: -0.3, marginTop: 1 }}>
-              {fmtShort(TOTAL_ALLOCATED)}
+              {fmtShort(totalAllocated)}
             </Text>
           </View>
         </View>
 
         {/* Legend — top 6 categories */}
         <View style={allocStyles.legend}>
-          {BUDGET_ITEMS.slice(0, 6).map((item, i) => (
+          {items.slice(0, 6).map((item, i) => (
             <View key={i} style={[allocStyles.legendItem, { marginBottom: i < 5 ? 10 : 0 }]}>
               <View style={[allocStyles.legendDot, { backgroundColor: item.color }]} />
               <Text
@@ -463,7 +462,7 @@ function BudgetAllocationCard() {
                   marginLeft: 4,
                 }}
               >
-                {Math.round((item.limit / TOTAL_ALLOCATED) * 100)}%
+                {Math.round((item.limit / totalAllocated) * 100)}%
               </Text>
             </View>
           ))}
@@ -472,7 +471,7 @@ function BudgetAllocationCard() {
 
       {/* Full legend grid (2 cols) */}
       <View style={[allocStyles.fullGrid, { marginTop: spacing[5], borderTopWidth: 1, borderTopColor: colors.border.subtle, paddingTop: spacing[4] }]}>
-        {BUDGET_ITEMS.map((item, i) => (
+        {items.map((item, i) => (
           <View key={i} style={allocStyles.gridItem}>
             <View style={[allocStyles.gridDot, { backgroundColor: item.color }]} />
             <View style={{ flex: 1 }}>
@@ -557,17 +556,25 @@ const allocStyles = StyleSheet.create({
 
 // ─── RemainingMetricsCard ─────────────────────────────────────────────────────
 
-function RemainingMetricsCard() {
+interface RemainingMetricsProps {
+  totalAllocated:   number;
+  totalSpent:       number;
+  daysInMonth:      number;
+  daysPassed:       number;
+  currentMonthName: string;
+}
+
+function RemainingMetricsCard({
+  totalAllocated, totalSpent, daysInMonth, daysPassed, currentMonthName,
+}: RemainingMetricsProps) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
 
-  const overallRemaining  = MONTHLY_BUDGET - TOTAL_SPENT;
-  const savingsRate        = Math.round(((MONTHLY_BUDGET - TOTAL_SPENT) / MONTHLY_BUDGET) * 100);
-  const daysInMonth        = 30;
-  const daysPassed         = 12; // June 12
+  const overallRemaining   = totalAllocated - totalSpent;
+  const savingsRate        = totalAllocated > 0 ? Math.round(((totalAllocated - totalSpent) / totalAllocated) * 100) : 0;
   const daysRemaining      = daysInMonth - daysPassed;
-  const avgDailyBudget     = MONTHLY_BUDGET / daysInMonth;
-  const avgDailySpent      = TOTAL_SPENT / daysPassed;
+  const avgDailyBudget     = totalAllocated / daysInMonth;
+  const avgDailySpent      = daysPassed > 0 ? totalSpent / daysPassed : 0;
   const projectedMonthSpend = avgDailySpent * daysInMonth;
 
   const metrics = [
@@ -590,7 +597,7 @@ function RemainingMetricsCard() {
     {
       label: 'Days Left',
       value: `${daysRemaining}`,
-      sub:   'in June',
+      sub:   `in ${currentMonthName}`,
       color: colors.text.primary,
       icon:  '📅',
       iconBg: `${colors.warning}18`,
@@ -622,8 +629,8 @@ function RemainingMetricsCard() {
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
           Remaining Budget
         </Text>
-        <View style={[remainStyles.projBadge, { backgroundColor: projectedMonthSpend > MONTHLY_BUDGET ? colors.expenseBg : colors.incomeBg, borderRadius: borderRadius.full }]}>
-          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: projectedMonthSpend > MONTHLY_BUDGET ? colors.expense : colors.income }}>
+        <View style={[remainStyles.projBadge, { backgroundColor: projectedMonthSpend > totalAllocated ? colors.expenseBg : colors.incomeBg, borderRadius: borderRadius.full }]}>
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: projectedMonthSpend > totalAllocated ? colors.expense : colors.income }}>
             Projected: {fmt(projectedMonthSpend)}
           </Text>
         </View>
@@ -690,8 +697,8 @@ function RemainingMetricsCard() {
         <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>
           Monthly projection
         </Text>
-        <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: projectedMonthSpend > MONTHLY_BUDGET ? colors.expense : colors.income }}>
-          {Math.round((projectedMonthSpend / MONTHLY_BUDGET) * 100)}% of budget
+        <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: projectedMonthSpend > totalAllocated ? colors.expense : colors.income }}>
+          {Math.round((projectedMonthSpend / totalAllocated) * 100)}% of budget
         </Text>
       </View>
 
@@ -700,14 +707,13 @@ function RemainingMetricsCard() {
           style={[
             remainStyles.projFill,
             {
-              width:           `${Math.min((projectedMonthSpend / MONTHLY_BUDGET) * 100, 100)}%`,
-              backgroundColor: projectedMonthSpend > MONTHLY_BUDGET ? colors.expense : colors.accent.primary,
+              width:           `${Math.min((projectedMonthSpend / totalAllocated) * 100, 100)}%`,
+              backgroundColor: projectedMonthSpend > totalAllocated ? colors.expense : colors.accent.primary,
               borderRadius:    99,
             },
           ]}
         />
-        {/* Budget limit marker */}
-        <View style={[remainStyles.limitMark, { left: `${(TOTAL_SPENT / projectedMonthSpend) * Math.min((projectedMonthSpend / MONTHLY_BUDGET) * 100, 100)}%` }]} />
+        <View style={[remainStyles.limitMark, { left: `${(totalSpent / projectedMonthSpend) * Math.min((projectedMonthSpend / totalAllocated) * 100, 100)}%` }]} />
       </View>
 
       <View style={[remainStyles.projLegend, { marginTop: spacing[2] }]}>
@@ -716,7 +722,7 @@ function RemainingMetricsCard() {
           <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted }}>Current spending</Text>
         </View>
         <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted }}>
-          Budget: {fmt(MONTHLY_BUDGET)}
+          Budget: {fmt(totalAllocated)}
         </Text>
       </View>
     </View>
@@ -728,11 +734,11 @@ const remainStyles = StyleSheet.create({
     width: '100%',
   },
   titleRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
+    flexDirection:  'row',
+    alignItems:     'center',
     justifyContent: 'space-between',
-    flexWrap:      'wrap',
-    gap:           8,
+    flexWrap:       'wrap',
+    gap:            8,
   },
   projBadge: {
     paddingHorizontal: 10,
@@ -794,13 +800,42 @@ export function BudgetScreen(_props: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
 
-  const [monthIdx, setMonthIdx] = useState(5); // June
+  const { data: budgetsData } = useBudgets();
+
+  const [monthIdx, setMonthIdx] = useState(new Date().getMonth());
   const year = 2026;
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
 
-  // Staggered entrance animations
+  // ── Derived budget data ───────────────────────────────────────────────────────
+
+  const budgetItems = useMemo<BudgetItem[]>(() => {
+    return (budgetsData ?? []).map(b => ({
+      id:       b.id,
+      category: b.category,
+      label:    b.label,
+      icon:     b.icon,
+      spent:    b.spent,
+      limit:    b.limit,
+      color:    b.color,
+    }));
+  }, [budgetsData]);
+
+  const totalAllocated = useMemo(() => budgetItems.reduce((s, b) => s + b.limit,  0), [budgetItems]);
+  const totalSpent     = useMemo(() => budgetItems.reduce((s, b) => s + b.spent, 0), [budgetItems]);
+
+  const overBudgetCount  = useMemo(() => budgetItems.filter(b => b.spent > b.limit).length, [budgetItems]);
+  const nearLimitCount   = useMemo(() => budgetItems.filter(b => b.spent <= b.limit && b.spent / b.limit >= 0.80).length, [budgetItems]);
+  const onTrackCount     = useMemo(() => budgetItems.filter(b => b.spent / b.limit < 0.80).length, [budgetItems]);
+
+  // Days for the metrics card
+  const today       = new Date();
+  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+  const daysPassed  = monthIdx === today.getMonth() ? today.getDate() : daysInMonth;
+
+  // ── Animations ───────────────────────────────────────────────────────────────
+
   const headerAnim  = useSharedValue(0);
   const heroAnim    = useSharedValue(0);
   const healthAnim  = useSharedValue(0);
@@ -950,17 +985,26 @@ export function BudgetScreen(_props: Props) {
 
         {/* ── 3. Budget Overview Hero ────────────────────────────────────────── */}
         <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[4] }, heroStyle]}>
-          <BudgetOverviewCard month={MONTHS[monthIdx]} year={year} />
+          <BudgetOverviewCard
+            month={MONTHS[monthIdx]}
+            year={year}
+            totalAllocated={totalAllocated}
+            totalSpent={totalSpent}
+          />
         </Animated.View>
 
         {/* ── 4. Budget Health Row ──────────────────────────────────────────── */}
         <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[4] }, healthStyle]}>
-          <BudgetHealthRow />
+          <BudgetHealthRow
+            onTrackCount={onTrackCount}
+            nearLimitCount={nearLimitCount}
+            overBudgetCount={overBudgetCount}
+          />
         </Animated.View>
 
         {/* ── 5. Budget Allocation Card ─────────────────────────────────────── */}
         <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[4] }, allocStyle]}>
-          <BudgetAllocationCard />
+          <BudgetAllocationCard items={budgetItems} totalAllocated={totalAllocated} />
         </Animated.View>
 
         {/* ── 6. Budget Categories List ─────────────────────────────────────── */}
@@ -973,7 +1017,7 @@ export function BudgetScreen(_props: Props) {
           />
 
           <View style={[screenStyles.catList, { paddingHorizontal: spacing[5], gap: spacing[3] }]}>
-            {BUDGET_ITEMS.map(item => (
+            {budgetItems.map(item => (
               <BudgetCard
                 key={item.id}
                 category={item.category}
@@ -988,7 +1032,13 @@ export function BudgetScreen(_props: Props) {
 
         {/* ── 7. Remaining Budget Metrics ───────────────────────────────────── */}
         <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[5] }, remainStyle]}>
-          <RemainingMetricsCard />
+          <RemainingMetricsCard
+            totalAllocated={totalAllocated}
+            totalSpent={totalSpent}
+            daysInMonth={daysInMonth}
+            daysPassed={daysPassed}
+            currentMonthName={MONTHS[monthIdx].substring(0, 3)}
+          />
         </Animated.View>
       </ScrollView>
     </View>
@@ -1008,8 +1058,8 @@ const screenStyles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   addBtn: {
-    flexDirection:   'row',
-    alignItems:      'center',
+    flexDirection:     'row',
+    alignItems:        'center',
     paddingHorizontal: 16,
     paddingVertical:   9,
   },

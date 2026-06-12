@@ -118,7 +118,7 @@ export function ExpenseItem({
         </View>
 
         {/* Amount + time */}
-        <View style={styles.amountBlock}>
+        <View style={[styles.amountBlock, { marginLeft: spacing[3] }]}>
           <Text
             style={{
               fontSize:      fontSize.bodyLg,
@@ -176,7 +176,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   amountBlock: {
-    marginLeft:     12,
     alignItems:     'flex-end',
     justifyContent: 'center',
     flexShrink:     0,

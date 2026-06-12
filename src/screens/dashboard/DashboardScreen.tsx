@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle } from 'react-native-svg';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
-import { useTheme } from '../../hooks/ui/useTheme';
+import { useTheme }                          from '../../hooks/ui/useTheme';
+import { useDashboard, useAccounts }         from '../../hooks/queries/useDashboard';
+import { useTransactions }                   from '../../hooks/queries/useTransactions';
+import { useAuthStore }                      from '../../store/auth.store';
 import {
   TransactionCard,
   StatCard,
@@ -31,49 +34,28 @@ import {
   ExpenseItem,
 } from '../../components';
 import type { MainTabParamList } from '../../navigation/types';
-import type { CategoryKey } from '../../theme';
 
 type Props = BottomTabScreenProps<MainTabParamList, 'Home'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const ACCOUNTS = [
-  { id: '1', institutionName: 'Chase',           maskedNumber: '•••• 4242', balance: '$12,922.84', accountType: 'Debit',   gradientIndex: 0 },
-  { id: '2', institutionName: 'Bank of America', maskedNumber: '•••• 8801', balance: '$8,450.00',  accountType: 'Savings', gradientIndex: 1 },
-  { id: '3', institutionName: 'Citi',            maskedNumber: '•••• 5599', balance: '$3,191.96',  accountType: 'Credit',  gradientIndex: 2 },
-];
-
-const WEEK_DATA = [
-  { day: 'Mon', amount: 45  },
-  { day: 'Tue', amount: 120 },
-  { day: 'Wed', amount: 80  },
-  { day: 'Thu', amount: 200 },
-  { day: 'Fri', amount: 160 },
-  { day: 'Sat', amount: 95  },
-  { day: 'Sun', amount: 60  },
-];
-
-interface TxData {
-  id:            string;
-  merchant:      string;
-  categoryKey:   CategoryKey;
-  categoryLabel: string;
-  icon:          string;
-  amount:        string;
-  type:          'income' | 'expense';
-  date:          string;
-  time:          string;
+function fmtUsd(n: number): string {
+  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-const TRANSACTIONS: TxData[] = [
-  { id: 't1', merchant: 'Starbucks',      categoryKey: 'food',          categoryLabel: 'Food & Dining',  icon: '☕', amount: '$6.50',     type: 'expense', date: 'Today',     time: '9:12 AM'  },
-  { id: 't2', merchant: 'Netflix',        categoryKey: 'entertainment', categoryLabel: 'Entertainment',  icon: '🎬', amount: '$15.99',    type: 'expense', date: 'Today',     time: '8:00 AM'  },
-  { id: 't3', merchant: 'Salary Deposit', categoryKey: 'other',         categoryLabel: 'Income',         icon: '💰', amount: '$4,200.00', type: 'income',  date: 'Yesterday', time: '12:00 PM' },
-  { id: 't4', merchant: 'Uber',           categoryKey: 'transport',     categoryLabel: 'Transport',      icon: '🚗', amount: '$12.40',    type: 'expense', date: 'Yesterday', time: '7:30 PM'  },
-  { id: 't5', merchant: 'Amazon',         categoryKey: 'shopping',      categoryLabel: 'Shopping',       icon: '🛍', amount: '$89.99',    type: 'expense', date: 'Jun 10',    time: '3:45 PM'  },
-];
+function formatDateLabel(dateStr: string): string {
+  const today     = new Date();
+  const todayStr  = today.toISOString().split('T')[0];
+  const yd        = new Date(today);
+  yd.setDate(yd.getDate() - 1);
+  const yesterStr = yd.toISOString().split('T')[0];
+  if (dateStr === todayStr)  return 'Today';
+  if (dateStr === yesterStr) return 'Yesterday';
+  const dt = new Date(dateStr + 'T12:00:00');
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 // ─── CategoryIcon ─────────────────────────────────────────────────────────────
 
@@ -83,12 +65,18 @@ function CategoryIcon({ icon }: { icon: string }) {
 
 // ─── BalanceHeroCard ──────────────────────────────────────────────────────────
 
-function BalanceHeroCard({ style }: { style?: object }) {
+interface HeroCardProps {
+  netWorth:     string;
+  delta:        string;
+  accountCount: number;
+}
+
+function BalanceHeroCard({ netWorth, delta, accountCount }: HeroCardProps) {
   const theme = useTheme();
   const { spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
 
   return (
-    <View style={[{ borderRadius: borderRadius.cardLg, overflow: 'hidden' }, shadows.hero, style]}>
+    <View style={[{ borderRadius: borderRadius.cardLg, overflow: 'hidden' }, shadows.hero]}>
       <LinearGradient
         colors={['#9B85FF', '#5B41D9']}
         start={{ x: 0, y: 0 }}
@@ -129,13 +117,13 @@ function BalanceHeroCard({ style }: { style?: object }) {
             lineHeight:    48,
           }}
         >
-          $24,563.80
+          {netWorth}
         </Text>
 
         <View style={heroCardStyles.changeBadge}>
           <View style={heroCardStyles.changeChip}>
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: '#4ADE80' }}>
-              ↑ +$342.50
+              ↑ {delta}
             </Text>
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: 'rgba(255,255,255,0.6)', marginLeft: 6 }}>
               this month
@@ -145,7 +133,7 @@ function BalanceHeroCard({ style }: { style?: object }) {
 
         <View style={[heroCardStyles.bottomRow, { marginTop: spacing[4] }]}>
           <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: 'rgba(255,255,255,0.62)' }}>
-            3 linked accounts
+            {accountCount} linked {accountCount === 1 ? 'account' : 'accounts'}
           </Text>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: 'rgba(255,255,255,0.45)' }}>
             Updated just now
@@ -183,38 +171,37 @@ const heroCardStyles = StyleSheet.create({
 
 // ─── SpendingBarChart ─────────────────────────────────────────────────────────
 
-// Available chart content width = SCREEN_W - 2*screenPad - 2*cardPad
-// screenPad (spacing[5]=20) × 2 = 40, cardPad (spacing[5]=20) × 2 = 40
+const WEEK_DAYS       = 7;
 const CHART_CONTENT_W = SCREEN_W - 80;
 const BAR_GAP         = 8;
 const BAR_H           = 108;
-const BAR_W           = Math.floor((CHART_CONTENT_W - BAR_GAP * (WEEK_DATA.length - 1)) / WEEK_DATA.length);
+const BAR_W           = Math.floor((CHART_CONTENT_W - BAR_GAP * (WEEK_DAYS - 1)) / WEEK_DAYS);
 
-function SpendingBarChart() {
+function SpendingBarChart({ data }: { data: { day: string; amount: number }[] }) {
   const theme  = useTheme();
   const { colors, spacing, fontSize, fontFamily } = theme;
 
-  const maxAmount   = Math.max(...WEEK_DATA.map(d => d.amount));
-  const [selected, setSelected] = useState(3); // Thu — peak day
+  const maxAmount            = Math.max(...data.map(d => d.amount), 1);
+  const [selected, setSelected] = useState(Math.max(data.length - 2, 0));
 
   return (
     <View>
       {/* Bar columns */}
       <View style={[barChartStyles.barsRow, { height: BAR_H }]}>
-        {WEEK_DATA.map((item, i) => {
+        {data.map((item, i) => {
           const ratio      = item.amount / maxAmount;
           const barHeight  = Math.max(6, Math.round(ratio * BAR_H));
           const isSelected = i === selected;
 
           return (
             <Pressable
-              key={item.day}
+              key={item.day + i}
               onPress={() => setSelected(i)}
               style={[
                 barChartStyles.barWrapper,
                 {
-                  width:       BAR_W,
-                  marginRight: i < WEEK_DATA.length - 1 ? BAR_GAP : 0,
+                  width:          BAR_W,
+                  marginRight:    i < data.length - 1 ? BAR_GAP : 0,
                   justifyContent: 'flex-end',
                 },
               ]}
@@ -237,16 +224,16 @@ function SpendingBarChart() {
 
       {/* X-axis labels */}
       <View style={[barChartStyles.barsRow, { marginTop: spacing[2] }]}>
-        {WEEK_DATA.map((item, i) => (
+        {data.map((item, i) => (
           <Text
-            key={item.day}
+            key={item.day + i}
             style={{
-              width:        BAR_W,
-              marginRight:  i < WEEK_DATA.length - 1 ? BAR_GAP : 0,
-              fontSize:     fontSize.micro,
-              fontFamily:   fontFamily.regular,
-              color:        i === selected ? colors.text.secondary : colors.text.muted,
-              textAlign:    'center',
+              width:       BAR_W,
+              marginRight: i < data.length - 1 ? BAR_GAP : 0,
+              fontSize:    fontSize.micro,
+              fontFamily:  fontFamily.regular,
+              color:       i === selected ? colors.text.secondary : colors.text.muted,
+              textAlign:   'center',
             }}
           >
             {item.day}
@@ -257,10 +244,10 @@ function SpendingBarChart() {
       {/* Selected value callout */}
       <View style={[barChartStyles.callout, { marginTop: spacing[3] }]}>
         <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>
-          {WEEK_DATA[selected].day}:{'  '}
+          {data[selected]?.day}:{'  '}
         </Text>
         <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>
-          ${WEEK_DATA[selected].amount}
+          {fmtUsd(data[selected]?.amount ?? 0)}
         </Text>
       </View>
     </View>
@@ -389,10 +376,58 @@ export function DashboardScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
 
+  const user                   = useAuthStore(s => s.user);
+  const { data: dashboard }    = useDashboard();
+  const { data: accountsData } = useAccounts();
+  const { data: txns }         = useTransactions();
+
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
 
-  // Staggered entrance animations
+  // ── Derived data ─────────────────────────────────────────────────────────────
+
+  const weekData = useMemo(() => {
+    const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const result: { day: string; amount: number }[] = [];
+    for (let i = WEEK_DAYS - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const amount  = (txns ?? [])
+        .filter(t => t.date === dateStr && t.type === 'expense')
+        .reduce((s, t) => s + t.amount, 0);
+      result.push({ day: DAY_NAMES[d.getDay()], amount });
+    }
+    return result;
+  }, [txns]);
+
+  const recentTxns = useMemo(() => {
+    return [...(txns ?? [])]
+      .sort((a, b) => {
+        const dc = b.date.localeCompare(a.date);
+        return dc !== 0 ? dc : b.time.localeCompare(a.time);
+      })
+      .slice(0, 5);
+  }, [txns]);
+
+  const accountCards = useMemo(() => {
+    const typeLabel: Record<string, string> = {
+      checking: 'Checking',
+      savings:  'Savings',
+      credit:   'Credit',
+    };
+    return (accountsData ?? []).map(acc => ({
+      id:              acc.id,
+      institutionName: acc.institutionName,
+      maskedNumber:    acc.maskedNumber,
+      balance:         fmtUsd(acc.balance),
+      accountType:     typeLabel[acc.type] ?? acc.type,
+      gradientIndex:   acc.gradientIndex,
+    }));
+  }, [accountsData]);
+
+  // ── Animations ───────────────────────────────────────────────────────────────
+
   const headerAnim  = useSharedValue(0);
   const heroAnim    = useSharedValue(0);
   const acctAnim    = useSharedValue(0);
@@ -441,6 +476,9 @@ export function DashboardScreen({ navigation }: Props) {
     transform: [{ translateY: interpolate(txAnim.value,      [0, 1], [18, 0]) }],
   }));
 
+  const firstName  = user?.name.split(' ')[0] ?? 'there';
+  const avatarInit = user?.avatarInitials?.[0] ?? 'W';
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
       <StatusBar style="light" />
@@ -479,7 +517,7 @@ export function DashboardScreen({ navigation }: Props) {
                 lineHeight:    30,
               }}
             >
-              John Doe 👋
+              {firstName} 👋
             </Text>
           </View>
 
@@ -517,7 +555,7 @@ export function DashboardScreen({ navigation }: Props) {
                   lineHeight: 20,
                 }}
               >
-                J
+                {avatarInit}
               </Text>
             </View>
           </View>
@@ -525,7 +563,11 @@ export function DashboardScreen({ navigation }: Props) {
 
         {/* ─── 2. Net Worth Hero Card ────────────────────────────────────────── */}
         <Animated.View style={[{ marginTop: spacing[5], paddingHorizontal: spacing[5] }, heroStyle]}>
-          <BalanceHeroCard />
+          <BalanceHeroCard
+            netWorth={dashboard ? fmtUsd(dashboard.netWorth) : '—'}
+            delta={dashboard ? fmtUsd(Math.abs(dashboard.balanceDelta)) : '—'}
+            accountCount={accountsData?.length ?? 0}
+          />
         </Animated.View>
 
         {/* ─── 3. Account Balance Overview ──────────────────────────────────── */}
@@ -544,7 +586,7 @@ export function DashboardScreen({ navigation }: Props) {
               paddingRight: spacing[5],
             }}
           >
-            {ACCOUNTS.map((acc, i) => (
+            {accountCards.map((acc, i) => (
               <TransactionCard
                 key={acc.id}
                 institutionName={acc.institutionName}
@@ -555,7 +597,7 @@ export function DashboardScreen({ navigation }: Props) {
                 style={{
                   width:       SCREEN_W * 0.68,
                   minWidth:    240,
-                  marginRight: i < ACCOUNTS.length - 1 ? spacing[3] : 0,
+                  marginRight: i < accountCards.length - 1 ? spacing[3] : 0,
                 }}
               />
             ))}
@@ -574,8 +616,16 @@ export function DashboardScreen({ navigation }: Props) {
             },
           ]}
         >
-          <StatCard type="income"  amount="$6,240.00" label="Total Income"   />
-          <StatCard type="expense" amount="$2,180.50" label="Total Expenses"  />
+          <StatCard
+            type="income"
+            amount={dashboard ? fmtUsd(dashboard.monthlyIncome) : '—'}
+            label="Total Income"
+          />
+          <StatCard
+            type="expense"
+            amount={dashboard ? fmtUsd(dashboard.monthlyExpenses) : '—'}
+            label="Total Expenses"
+          />
         </Animated.View>
 
         {/* ─── 5. Spending Chart ─────────────────────────────────────────────── */}
@@ -613,7 +663,7 @@ export function DashboardScreen({ navigation }: Props) {
               </Pressable>
             }
           >
-            <SpendingBarChart />
+            <SpendingBarChart data={weekData} />
           </ChartCard>
         </Animated.View>
 
@@ -630,7 +680,7 @@ export function DashboardScreen({ navigation }: Props) {
             <SummaryMiniCard
               icon="💳"
               label="Spending"
-              amount="$2,180"
+              amount={dashboard ? fmtUsd(dashboard.monthlyExpenses) : '—'}
               trend="8.2% vs last mo"
               trendUp={false}
               iconBg="rgba(239,68,68,0.15)"
@@ -638,7 +688,7 @@ export function DashboardScreen({ navigation }: Props) {
             <SummaryMiniCard
               icon="🏦"
               label="Savings"
-              amount="$8,450"
+              amount={dashboard ? fmtUsd(dashboard.totalBalance) : '—'}
               trend="12.5% growth"
               trendUp={true}
               iconBg="rgba(34,197,94,0.15)"
@@ -679,26 +729,26 @@ export function DashboardScreen({ navigation }: Props) {
               styles.txList,
               shadows.card,
               {
-                backgroundColor: colors.bg.surface,
-                borderRadius:    borderRadius.card,
+                backgroundColor:  colors.bg.surface,
+                borderRadius:     borderRadius.card,
                 marginHorizontal: spacing[5],
                 overflow:         'hidden',
               },
             ]}
           >
-            {TRANSACTIONS.map((tx, i) => (
+            {recentTxns.map((tx, i) => (
               <ExpenseItem
                 key={tx.id}
                 id={tx.id}
                 merchant={tx.merchant}
-                categoryKey={tx.categoryKey}
+                categoryKey={tx.category}
                 categoryLabel={tx.categoryLabel}
-                categoryIcon={<CategoryIcon icon={tx.icon} />}
-                amount={tx.amount}
+                categoryIcon={<CategoryIcon icon={tx.categoryIcon} />}
+                amount={fmtUsd(tx.amount)}
                 type={tx.type}
-                date={tx.date}
+                date={formatDateLabel(tx.date)}
                 time={tx.time}
-                showDivider={i < TRANSACTIONS.length - 1}
+                showDivider={i < recentTxns.length - 1}
               />
             ))}
           </View>

@@ -1,20 +1,55 @@
 import 'react-native-gesture-handler';
-import React from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { StyleSheet } from 'react-native';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { StyleSheet, View } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
+import {
+  useFonts,
+  Urbanist_400Regular,
+  Urbanist_500Medium,
+  Urbanist_600SemiBold,
+  Urbanist_700Bold,
+  Urbanist_800ExtraBold,
+} from '@expo-google-fonts/urbanist';
+import { queryClient } from './src/lib/queryClient';
 import { RootNavigator } from './src/navigation/RootNavigator';
 
+SplashScreen.preventAutoHideAsync();
+
 export default function App() {
+  const [fontsLoaded, fontError] = useFonts({
+    'Urbanist-Regular':   Urbanist_400Regular,
+    'Urbanist-Medium':    Urbanist_500Medium,
+    'Urbanist-SemiBold':  Urbanist_600SemiBold,
+    'Urbanist-Bold':      Urbanist_700Bold,
+    'Urbanist-ExtraBold': Urbanist_800ExtraBold,
+  });
+
+  const onLayoutRootView = useCallback(async () => {
+    if (fontsLoaded || fontError) {
+      await SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
+
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <SafeAreaProvider>
-        <NavigationContainer>
-          <RootNavigator />
-        </NavigationContainer>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <View style={styles.root} onLayout={onLayoutRootView}>
+      <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <QueryClientProvider client={queryClient}>
+            <NavigationContainer>
+              <RootNavigator />
+            </NavigationContainer>
+          </QueryClientProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </View>
   );
 }
 

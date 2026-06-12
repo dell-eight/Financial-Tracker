@@ -76,6 +76,19 @@ function TabItem({
       accessibilityLabel={TAB_A11Y[label] ?? label}
     >
       <Animated.View style={[styles.iconWrap, animStyle]}>
+        {/* Active pill background */}
+        {isActive && (
+          <View
+            style={[
+              styles.activePill,
+              {
+                backgroundColor: `${activeColor}18`,
+                borderRadius:    borderRadius.full,
+              },
+            ]}
+          />
+        )}
+
         {/* Icon */}
         <View style={{ position: 'relative' }}>
           <Text
@@ -106,26 +119,16 @@ function TabItem({
         {/* Label */}
         <Text
           style={{
-            fontSize:   10,
-            fontFamily: fontFamily.medium,
+            fontSize:      10,
+            fontFamily:    isActive ? fontFamily.semiBold : fontFamily.medium,
             color,
-            marginTop:  3,
-            lineHeight: 13,
+            marginTop:     3,
+            lineHeight:    13,
           }}
         >
           {label}
         </Text>
       </Animated.View>
-
-      {/* Active indicator dot */}
-      {isActive && (
-        <View
-          style={[
-            styles.indicator,
-            { backgroundColor: activeColor, borderRadius: borderRadius.full },
-          ]}
-        />
-      )}
     </Pressable>
   );
 }
@@ -210,13 +213,14 @@ const styles = StyleSheet.create({
   iconWrap: {
     alignItems:     'center',
     justifyContent: 'center',
+    position:       'relative',
   },
-  indicator: {
+  activePill: {
     position: 'absolute',
-    top:      0,
-    width:    4,
-    height:   4,
-    opacity:  0,   // reserved: animate in if you want a top-of-bar dot
+    top:      -6,
+    bottom:   -2,
+    left:     -14,
+    right:    -14,
   },
   badge: {
     position: 'absolute',

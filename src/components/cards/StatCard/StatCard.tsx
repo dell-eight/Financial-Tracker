@@ -13,13 +13,13 @@ export interface StatCardProps {
 
 export function StatCard({ type, amount, label, style }: StatCardProps) {
   const theme = useTheme();
-  const { colors, spacing, borderRadius, fontSize, fontFamily, layout, shadows } = theme;
+  const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
 
-  const isIncome   = type === 'income';
-  const color      = isIncome ? colors.income : colors.expense;
-  const bgColor    = isIncome ? colors.incomeBg : colors.expenseBg;
-  const arrowGlyph = isIncome ? '↑' : '↓';
+  const isIncome     = type === 'income';
+  const accentColor  = isIncome ? colors.income : colors.expense;
+  const accentBg     = isIncome ? colors.incomeBg : colors.expenseBg;
   const displayLabel = label ?? (isIncome ? 'Income' : 'Expenses');
+  const arrowGlyph   = isIncome ? '↑' : '↓';
 
   return (
     <View
@@ -30,49 +30,41 @@ export function StatCard({ type, amount, label, style }: StatCardProps) {
           backgroundColor: colors.bg.surface,
           borderRadius:    borderRadius.lg,
           padding:         spacing[4],
-          minHeight:       layout.statChipH,
+          borderLeftWidth: 3,
+          borderLeftColor: accentColor,
         },
         style,
       ]}
     >
-      {/* Arrow indicator */}
-      <View
-        style={[
-          styles.iconWrap,
-          {
-            backgroundColor: bgColor,
-            borderRadius:    borderRadius.full,
-            width:           32,
-            height:          32,
-            marginBottom:    spacing[2],
-          },
-        ]}
-      >
-        <Text
-          style={{ fontSize: fontSize.bodyMd, color, fontFamily: fontFamily.bold }}
-          accessibilityLabel={isIncome ? 'Income indicator' : 'Expense indicator'}
+      {/* Label row with colored dot indicator */}
+      <View style={styles.labelRow}>
+        <View
+          style={[
+            styles.dot,
+            { backgroundColor: accentBg, borderRadius: borderRadius.full },
+          ]}
         >
-          {arrowGlyph}
-        </Text>
-      </View>
-
-      {/* Label */}
-      <Text
-        style={[
-          styles.label,
-          {
+          <Text
+            style={{ fontSize: 11, color: accentColor, fontFamily: fontFamily.bold }}
+            accessibilityElementsHidden
+          >
+            {arrowGlyph}
+          </Text>
+        </View>
+        <Text
+          style={{
             fontSize:   fontSize.bodySm,
             fontFamily: fontFamily.medium,
             color:      colors.text.secondary,
-            marginBottom: spacing[1],
-          },
-        ]}
-        numberOfLines={1}
-      >
-        {displayLabel}
-      </Text>
+            marginLeft: spacing[1],
+          }}
+          numberOfLines={1}
+        >
+          {displayLabel}
+        </Text>
+      </View>
 
-      {/* Amount */}
+      {/* Amount — prominent */}
       <Text
         style={[
           styles.amount,
@@ -80,11 +72,13 @@ export function StatCard({ type, amount, label, style }: StatCardProps) {
             fontSize:      fontSize.headingMd,
             fontFamily:    fontFamily.bold,
             color:         colors.text.primary,
-            letterSpacing: -0.3,
+            letterSpacing: -0.4,
+            marginTop:     spacing[2],
           },
         ]}
         numberOfLines={1}
         adjustsFontSizeToFit
+        minimumFontScale={0.75}
       >
         {amount}
       </Text>
@@ -94,17 +88,21 @@ export function StatCard({ type, amount, label, style }: StatCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    flex: 1,
+    flex:     1,
+    overflow: 'hidden',
   },
-  iconWrap: {
+  labelRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+  },
+  dot: {
+    width:          22,
+    height:         22,
     alignItems:     'center',
     justifyContent: 'center',
   },
-  label: {
-    lineHeight: 18,
-  },
   amount: {
-    lineHeight: 24,
+    lineHeight: 26,
   },
 });
 

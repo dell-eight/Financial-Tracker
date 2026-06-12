@@ -22,7 +22,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 
-import { useTheme } from '../../hooks/ui/useTheme';
+import { useTheme }        from '../../hooks/ui/useTheme';
+import { useTransactions } from '../../hooks/queries/useTransactions';
 import { ExpenseItem, SectionHeader } from '../../components';
 import { getCategoryBgColor } from '../../theme';
 import type { MainTabParamList } from '../../navigation/types';
@@ -50,56 +51,14 @@ interface Transaction {
 type Period     = 'week' | 'month' | 'year';
 type TypeFilter = 'all' | 'income' | 'expense';
 
-// ─── Mock data — 26 realistic transactions ────────────────────────────────────
+// ─── Dynamic date constants ───────────────────────────────────────────────────
 
-const TODAY     = '2026-06-12';
-const YESTERDAY = '2026-06-11';
-
-const ALL_TRANSACTIONS: Transaction[] = [
-  // ── June 12 · Today ──────────────────────────────────────────────────────
-  { id: 't01', merchant: 'Starbucks',          category: 'food',          label: 'Food & Dining',     icon: '☕', amount: 6.50,    type: 'expense', date: '2026-06-12', time: '9:12 AM',  note: 'Morning latte' },
-  { id: 't02', merchant: 'Netflix',            category: 'entertainment', label: 'Entertainment',     icon: '🎬', amount: 15.99,   type: 'expense', date: '2026-06-12', time: '8:01 AM'  },
-
-  // ── June 11 · Yesterday ──────────────────────────────────────────────────
-  { id: 't03', merchant: 'Salary Deposit',     category: 'other',         label: 'Income',            icon: '💼', amount: 4200.00, type: 'income',  date: '2026-06-11', time: '12:00 PM', note: 'June payroll' },
-  { id: 't04', merchant: 'Uber',               category: 'transport',     label: 'Transport',         icon: '🚗', amount: 12.40,   type: 'expense', date: '2026-06-11', time: '7:30 PM'  },
-  { id: 't05', merchant: 'Walmart',            category: 'shopping',      label: 'Shopping',          icon: '🛒', amount: 67.32,   type: 'expense', date: '2026-06-11', time: '4:15 PM',  note: 'Groceries & supplies' },
-  { id: 't06', merchant: 'Chipotle',           category: 'food',          label: 'Food & Dining',     icon: '🌯', amount: 11.25,   type: 'expense', date: '2026-06-11', time: '1:30 PM'  },
-
-  // ── June 10 ──────────────────────────────────────────────────────────────
-  { id: 't07', merchant: 'McDonald\'s',        category: 'food',          label: 'Food & Dining',     icon: '🍔', amount: 9.80,    type: 'expense', date: '2026-06-10', time: '12:30 PM' },
-  { id: 't08', merchant: 'Amazon',             category: 'shopping',      label: 'Shopping',          icon: '📦', amount: 34.99,   type: 'expense', date: '2026-06-10', time: '10:20 AM', note: 'USB-C cables' },
-  { id: 't09', merchant: 'Planet Fitness',     category: 'health',        label: 'Health',            icon: '🏋', amount: 45.00,   type: 'expense', date: '2026-06-10', time: '8:00 AM'  },
-
-  // ── June 9 ───────────────────────────────────────────────────────────────
-  { id: 't10', merchant: 'Lyft',               category: 'transport',     label: 'Transport',         icon: '🚕', amount: 8.90,    type: 'expense', date: '2026-06-09', time: '6:45 PM'  },
-  { id: 't11', merchant: 'Whole Foods',        category: 'food',          label: 'Food & Dining',     icon: '🥦', amount: 48.73,   type: 'expense', date: '2026-06-09', time: '5:30 PM',  note: 'Weekly groceries' },
-  { id: 't12', merchant: 'Electric Bill',      category: 'bills',         label: 'Bills & Utilities', icon: '⚡', amount: 127.50,  type: 'expense', date: '2026-06-09', time: '10:00 AM' },
-
-  // ── June 8 ───────────────────────────────────────────────────────────────
-  { id: 't13', merchant: 'Freelance — Acme',   category: 'other',         label: 'Income',            icon: '💻', amount: 850.00,  type: 'income',  date: '2026-06-08', time: '3:00 PM',  note: 'Website project' },
-  { id: 't14', merchant: 'H&M',                category: 'shopping',      label: 'Shopping',          icon: '👕', amount: 89.99,   type: 'expense', date: '2026-06-08', time: '2:15 PM'  },
-  { id: 't15', merchant: 'Spotify',            category: 'entertainment', label: 'Entertainment',     icon: '🎵', amount: 9.99,    type: 'expense', date: '2026-06-08', time: '8:01 AM'  },
-
-  // ── June 7 ───────────────────────────────────────────────────────────────
-  { id: 't16', merchant: 'CVS Pharmacy',       category: 'health',        label: 'Health',            icon: '💊', amount: 23.15,   type: 'expense', date: '2026-06-07', time: '4:30 PM'  },
-  { id: 't17', merchant: 'Subway',             category: 'food',          label: 'Food & Dining',     icon: '🥪', amount: 8.50,    type: 'expense', date: '2026-06-07', time: '12:00 PM' },
-  { id: 't18', merchant: 'Internet Bill',      category: 'bills',         label: 'Bills & Utilities', icon: '📡', amount: 79.99,   type: 'expense', date: '2026-06-07', time: '10:00 AM' },
-
-  // ── June 6 ───────────────────────────────────────────────────────────────
-  { id: 't19', merchant: 'Dividend Income',    category: 'other',         label: 'Income',            icon: '📈', amount: 42.50,   type: 'income',  date: '2026-06-06', time: '9:00 AM'  },
-  { id: 't20', merchant: 'Target',             category: 'shopping',      label: 'Shopping',          icon: '🎯', amount: 156.43,  type: 'expense', date: '2026-06-06', time: '3:45 PM'  },
-  { id: 't21', merchant: 'DoorDash',           category: 'food',          label: 'Food & Dining',     icon: '🛵', amount: 28.90,   type: 'expense', date: '2026-06-06', time: '7:30 PM'  },
-
-  // ── June 5 ───────────────────────────────────────────────────────────────
-  { id: 't22', merchant: 'Metro Transit',      category: 'transport',     label: 'Transport',         icon: '🚌', amount: 32.00,   type: 'expense', date: '2026-06-05', time: '8:30 AM'  },
-  { id: 't23', merchant: 'Coursera',           category: 'education',     label: 'Education',         icon: '📚', amount: 49.99,   type: 'expense', date: '2026-06-05', time: '8:00 AM'  },
-  { id: 't24', merchant: 'Walgreens',          category: 'health',        label: 'Health',            icon: '💉', amount: 18.45,   type: 'expense', date: '2026-06-05', time: '2:00 PM'  },
-
-  // ── June 4 ───────────────────────────────────────────────────────────────
-  { id: 't25', merchant: 'Rent Payment',       category: 'bills',         label: 'Bills & Utilities', icon: '🏠', amount: 1450.00, type: 'expense', date: '2026-06-04', time: '9:00 AM',  note: 'June rent' },
-  { id: 't26', merchant: 'Interest Income',    category: 'other',         label: 'Income',            icon: '🏦', amount: 28.75,   type: 'income',  date: '2026-06-04', time: '8:00 AM'  },
-];
+const _now      = new Date();
+const TODAY     = _now.toISOString().split('T')[0];
+const _yd       = new Date(_now); _yd.setDate(_yd.getDate() - 1);
+const YESTERDAY = _yd.toISOString().split('T')[0];
+const _ws       = new Date(_now); _ws.setDate(_ws.getDate() - 6);
+const WEEK_START = _ws.toISOString().split('T')[0];
 
 // ─── Category chip definitions ────────────────────────────────────────────────
 
@@ -134,9 +93,9 @@ function fmtCompact(n: number): string {
 }
 
 function isInPeriod(date: string, period: Period): boolean {
-  if (period === 'week')  return date >= '2026-06-06' && date <= TODAY;
-  if (period === 'month') return date.startsWith('2026-06');
-  return date.startsWith('2026');
+  if (period === 'week')  return date >= WEEK_START && date <= TODAY;
+  if (period === 'month') return date.startsWith(TODAY.substring(0, 7));
+  return date.startsWith(TODAY.substring(0, 4));
 }
 
 function formatDateLabel(date: string): string {
@@ -927,6 +886,24 @@ export function ExpenseScreen(_props: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
 
+  const { data: rawTxns } = useTransactions();
+
+  // Map seed Transaction shape → local Transaction shape
+  const allTransactions = useMemo<Transaction[]>(() => {
+    return (rawTxns ?? []).map(t => ({
+      id:       t.id,
+      merchant: t.merchant,
+      category: t.category,
+      label:    t.categoryLabel,
+      icon:     t.categoryIcon,
+      amount:   t.amount,
+      type:     t.type,
+      date:     t.date,
+      time:     t.time,
+      note:     t.note,
+    }));
+  }, [rawTxns]);
+
   // ── Filter state ────────────────────────────────────────────────────────────
   const [period,       setPeriod]       = useState<Period>('month');
   const [searchQuery,  setSearchQuery]  = useState('');
@@ -938,7 +915,7 @@ export function ExpenseScreen(_props: Props) {
 
   // ── Filtered transactions ───────────────────────────────────────────────────
   const filtered = useMemo<Transaction[]>(() => {
-    let result = ALL_TRANSACTIONS.filter(tx => isInPeriod(tx.date, period));
+    let result = allTransactions.filter(tx => isInPeriod(tx.date, period));
 
     if (typeFilter !== 'all') {
       result = result.filter(tx => tx.type === typeFilter);
@@ -955,7 +932,7 @@ export function ExpenseScreen(_props: Props) {
       );
     }
     return result;
-  }, [period, typeFilter, catFilter, searchQuery]);
+  }, [allTransactions, period, typeFilter, catFilter, searchQuery]);
 
   // ── Grouped by date ─────────────────────────────────────────────────────────
   const grouped = useMemo(() => {
@@ -984,18 +961,18 @@ export function ExpenseScreen(_props: Props) {
 
   // ── Category breakdown stats (expense only, period filter only) ─────────────
   const categoryStats = useMemo<CatStat[]>(() => {
-    const periodTxs = ALL_TRANSACTIONS.filter(t => t.type === 'expense' && isInPeriod(t.date, period));
+    const periodTxs = allTransactions.filter(t => t.type === 'expense' && isInPeriod(t.date, period));
     const map = new Map<CategoryKey, CatStat>();
     for (const tx of periodTxs) {
       const curr = map.get(tx.category) ?? { key: tx.category, label: tx.label, icon: tx.icon, amount: 0, count: 0 };
       map.set(tx.category, { ...curr, amount: curr.amount + tx.amount, count: curr.count + 1 });
     }
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
-  }, [period]);
+  }, [allTransactions, period]);
 
   // ── Chip counts (for current period + type filter, before cat filter) ────────
   const chipCounts = useMemo(() => {
-    const base = ALL_TRANSACTIONS.filter(t => {
+    const base = allTransactions.filter(t => {
       if (!isInPeriod(t.date, period)) return false;
       if (typeFilter !== 'all' && t.type !== typeFilter) return false;
       if (searchQuery.trim()) {
@@ -1010,7 +987,7 @@ export function ExpenseScreen(_props: Props) {
       map.set(tx.category, (map.get(tx.category) ?? 0) + 1);
     }
     return map;
-  }, [period, typeFilter, searchQuery]);
+  }, [allTransactions, period, typeFilter, searchQuery]);
 
   // ── Clear all filters ───────────────────────────────────────────────────────
   const clearFilters = useCallback(() => {
@@ -1077,7 +1054,7 @@ export function ExpenseScreen(_props: Props) {
               Expenses
             </Text>
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
-              {ALL_TRANSACTIONS.length} total transactions
+              {allTransactions.length} total transactions
             </Text>
           </View>
 

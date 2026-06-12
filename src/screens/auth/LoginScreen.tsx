@@ -22,6 +22,8 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { AppButton, AppInput } from '../../components';
 import { SocialAuthRow } from '../../components/auth/SocialAuthRow';
 import { useTheme } from '../../hooks/ui/useTheme';
+import { useAuthStore } from '../../store/auth.store';
+import { mockLogin } from '../../api/mock/auth.mock';
 import type { AuthStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<AuthStackParamList, 'Login'>;
@@ -39,8 +41,9 @@ function EyeIcon({ visible, color }: { visible: boolean; color: string }) {
 // ── LoginScreen ────────────────────────────────────────────────────────────────
 
 export function LoginScreen({ navigation }: Props) {
-  const theme  = useTheme();
-  const insets = useSafeAreaInsets();
+  const theme   = useTheme();
+  const insets  = useSafeAreaInsets();
+  const setUser = useAuthStore(s => s.setUser);
   const { colors, spacing, fontSize, fontFamily } = theme;
 
   // Form state
@@ -90,9 +93,15 @@ export function LoginScreen({ navigation }: Props) {
   async function handleLogin() {
     if (!validate()) return;
     setLoading(true);
-    // TODO: wire to auth store / API
-    await new Promise(r => setTimeout(r, 1000));
-    setLoading(false);
+    try {
+      const { user, token } = await mockLogin(email, password);
+      setUser(user, token);
+      // RootNavigator detects isAuthenticated and switches to Main automatically
+    } catch {
+      setErrors({ email: 'Invalid email or password.' });
+    } finally {
+      setLoading(false);
+    }
   }
 
   // ── Layout constants ────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,8 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { AppButton, AppInput } from '../../components';
 import { SocialAuthRow } from '../../components/auth/SocialAuthRow';
 import { useTheme } from '../../hooks/ui/useTheme';
+import { useAuthStore } from '../../store/auth.store';
+import { mockRegister } from '../../api/mock/auth.mock';
 import type { AuthStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<AuthStackParamList, 'SignUp'>;
@@ -39,11 +41,11 @@ function EyeIcon({ visible, color }: { visible: boolean; color: string }) {
 // ── SignUpScreen ───────────────────────────────────────────────────────────────
 
 export function SignUpScreen({ navigation }: Props) {
-  const theme  = useTheme();
-  const insets = useSafeAreaInsets();
+  const theme   = useTheme();
+  const insets  = useSafeAreaInsets();
+  const setUser = useAuthStore(s => s.setUser);
   const { colors, spacing, fontSize, fontFamily } = theme;
 
-  // Form state
   const [fullName,    setFullName]    = useState('');
   const [email,       setEmail]       = useState('');
   const [password,    setPassword]    = useState('');
@@ -59,7 +61,6 @@ export function SignUpScreen({ navigation }: Props) {
     confirmPass?: string;
   }>({});
 
-  // Entrance animation
   const enter = useSharedValue(0);
 
   useEffect(() => {
@@ -75,8 +76,6 @@ export function SignUpScreen({ navigation }: Props) {
     opacity:   enter.value,
     transform: [{ translateY: interpolate(enter.value, [0, 1], [32, 0]) }],
   }));
-
-  // ── Validation ──────────────────────────────────────────────────────────────
 
   function validate(): boolean {
     const next: typeof errors = {};
@@ -101,12 +100,17 @@ export function SignUpScreen({ navigation }: Props) {
   async function handleSignUp() {
     if (!validate()) return;
     setLoading(true);
-    // TODO: wire to auth store / API
-    await new Promise(r => setTimeout(r, 1200));
-    setLoading(false);
+    try {
+      const { user, token } = await mockRegister({ name: fullName, email, password });
+      setUser(user, token);
+      // RootNavigator detects isAuthenticated and switches to Main automatically
+    } catch {
+      setErrors({ email: 'Registration failed. Please try again.' });
+    } finally {
+      setLoading(false);
+    }
   }
 
-  // ── Layout constants ────────────────────────────────────────────────────────
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 20);
   const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
 
@@ -178,10 +182,9 @@ export function SignUpScreen({ navigation }: Props) {
         <Animated.View
           style={[styles.form, formStyle, { paddingHorizontal: spacing[5] }]}
         >
-          {/* Full Name */}
           <AppInput
             label="Full Name"
-            placeholder="John Doe"
+            placeholder="Wendell"
             value={fullName}
             onChangeText={t => { setFullName(t); setErrors(e => ({ ...e, fullName: undefined })); }}
             error={errors.fullName}
@@ -191,7 +194,6 @@ export function SignUpScreen({ navigation }: Props) {
             containerStyle={{ marginBottom: spacing[4] }}
           />
 
-          {/* Email */}
           <AppInput
             label="Email"
             placeholder="john@example.com"
@@ -205,7 +207,6 @@ export function SignUpScreen({ navigation }: Props) {
             containerStyle={{ marginBottom: spacing[4] }}
           />
 
-          {/* Password */}
           <AppInput
             label="Password"
             placeholder="Min. 8 characters"
@@ -220,7 +221,6 @@ export function SignUpScreen({ navigation }: Props) {
             containerStyle={{ marginBottom: spacing[4] }}
           />
 
-          {/* Confirm Password */}
           <AppInput
             label="Confirm Password"
             placeholder="Re-enter your password"
@@ -236,7 +236,6 @@ export function SignUpScreen({ navigation }: Props) {
             containerStyle={{ marginBottom: spacing[5] }}
           />
 
-          {/* Submit */}
           <AppButton
             label="Create Account"
             onPress={handleSignUp}
@@ -246,14 +245,12 @@ export function SignUpScreen({ navigation }: Props) {
             loading={loading}
           />
 
-          {/* Social auth */}
           <SocialAuthRow
             onGooglePress={() => {/* TODO */}}
             onApplePress={() => {/* TODO */}}
             style={{ marginTop: spacing[5] }}
           />
 
-          {/* Sign In link */}
           <Pressable
             onPress={() => navigation.navigate('Login')}
             style={{ marginTop: spacing[5], alignItems: 'center' }}

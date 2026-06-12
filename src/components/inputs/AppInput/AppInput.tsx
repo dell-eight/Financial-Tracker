@@ -105,10 +105,8 @@ export function AppInput({
           animatedContainerStyle,
           {
             height:          theme.layout.inputHeight,
-            borderRadius:    borderRadius.md,
-            backgroundColor: disabled
-              ? colors.bg.surfaceMuted
-              : colors.bg.surfaceMuted,
+            borderRadius:    borderRadius.input,
+            backgroundColor: disabled ? colors.bg.surfaceMuted : colors.bg.surface,
             borderWidth,
             paddingHorizontal: spacing[4],
             opacity: disabled ? theme.animation.disabledOpacity : 1,

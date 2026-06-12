@@ -83,7 +83,7 @@ export function AnalyticsCard({
                     borderRadius: pillToggleConfig.segmentBorderRadius,
                     paddingHorizontal: spacing[3],
                     backgroundColor: isActive
-                      ? colors.bg.surfaceRaised
+                      ? colors.accent.primary
                       : colors.transparent,
                   },
                 ]}
@@ -94,9 +94,9 @@ export function AnalyticsCard({
                 <Text
                   style={{
                     fontSize:   pillToggleConfig.labelFontSize,
-                    fontFamily: pillToggleConfig.labelFontFamily,
+                    fontFamily: isActive ? fontFamily.semiBold : pillToggleConfig.labelFontFamily,
                     fontWeight: pillToggleConfig.labelFontWeight,
-                    color:      isActive ? colors.text.primary : colors.text.muted,
+                    color:      isActive ? colors.text.inverse : colors.text.muted,
                   }}
                 >
                   {label}
