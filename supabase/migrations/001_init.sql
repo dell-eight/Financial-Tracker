@@ -44,7 +44,7 @@ CREATE TABLE expense_categories (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   description TEXT,
-  color HEX DEFAULT '#FF6E52',
+  color TEXT DEFAULT '#FF6E52',
   icon TEXT,
   is_recurring BOOLEAN DEFAULT FALSE,
   budget_limit DECIMAL(15, 2),
@@ -52,8 +52,7 @@ CREATE TABLE expense_categories (
   display_order INT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  deleted_at TIMESTAMP WITH TIME ZONE,
-  UNIQUE(user_id, name) WHERE deleted_at IS NULL
+  deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE expenses (
@@ -86,13 +85,12 @@ CREATE TABLE income_sources (
   type TEXT NOT NULL, -- 'salary', 'freelance', 'investment', 'passive', 'other'
   is_recurring BOOLEAN DEFAULT FALSE,
   recurring_frequency TEXT, -- 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'
-  color HEX DEFAULT '#00C318',
+  color TEXT DEFAULT '#00C318',
   icon TEXT,
   display_order INT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  deleted_at TIMESTAMP WITH TIME ZONE,
-  UNIQUE(user_id, name) WHERE deleted_at IS NULL
+  deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE income_records (
@@ -123,13 +121,12 @@ CREATE TABLE savings_goals (
   target_date DATE,
   category TEXT, -- 'emergency_fund', 'vacation', 'home', 'education', 'retirement', 'other'
   priority INT DEFAULT 5, -- 1-10 scale
-  color HEX DEFAULT '#755DEF',
+  color TEXT DEFAULT '#755DEF',
   icon TEXT,
   is_active BOOLEAN DEFAULT TRUE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  deleted_at TIMESTAMP WITH TIME ZONE,
-  UNIQUE(user_id, name) WHERE deleted_at IS NULL
+  deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE savings_goal_contributions (
@@ -157,12 +154,11 @@ CREATE TABLE investment_accounts (
   account_number TEXT,
   balance DECIMAL(15, 2) DEFAULT 0,
   currency TEXT DEFAULT 'USD',
-  color HEX DEFAULT '#4F46E5',
+  color TEXT DEFAULT '#4F46E5',
   icon TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  deleted_at TIMESTAMP WITH TIME ZONE,
-  UNIQUE(user_id, name) WHERE deleted_at IS NULL
+  deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE investment_holdings (
@@ -217,8 +213,7 @@ CREATE TABLE asset_accounts (
   institution TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  deleted_at TIMESTAMP WITH TIME ZONE,
-  UNIQUE(user_id, name) WHERE deleted_at IS NULL
+  deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE debt_accounts (
@@ -238,8 +233,7 @@ CREATE TABLE debt_accounts (
   institution TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  deleted_at TIMESTAMP WITH TIME ZONE,
-  UNIQUE(user_id, name) WHERE deleted_at IS NULL
+  deleted_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE net_worth_snapshots (
@@ -257,6 +251,33 @@ CREATE TABLE net_worth_snapshots (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(user_id, snapshot_date)
 );
+
+-- ============================================================================
+-- UNIQUEINDEXES FOR PERFORMANCE
+-- ============================================================================
+CREATE UNIQUE INDEX uq_expense_categories_user_name
+ON expense_categories(user_id, name)
+WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX uq_income_sources_user_name
+ON income_sources(user_id, name)
+WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX uq_savings_goals_user_name
+ON savings_goals(user_id, name)
+WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX uq_investment_accounts_user_name
+ON investment_accounts(user_id, name)
+WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX uq_asset_accounts_user_name
+ON asset_accounts(user_id, name)
+WHERE deleted_at IS NULL;
+
+CREATE UNIQUE INDEX uq_debt_accounts_user_name
+ON debt_accounts(user_id, name)
+WHERE deleted_at IS NULL;
 
 -- ============================================================================
 -- INDEXES FOR PERFORMANCE
@@ -317,6 +338,32 @@ CREATE TRIGGER update_investment_accounts_updated_at BEFORE UPDATE ON investment
 CREATE TRIGGER update_asset_accounts_updated_at BEFORE UPDATE ON asset_accounts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_debt_accounts_updated_at BEFORE UPDATE ON debt_accounts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- Sync auth.users → public.users on sign-up
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.users (id, email, display_name, avatar_url, created_at, updated_at)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(
+      NEW.raw_user_meta_data->>'display_name',
+      NEW.raw_user_meta_data->>'full_name',
+      NEW.raw_user_meta_data->>'name'
+    ),
+    NEW.raw_user_meta_data->>'avatar_url',
+    NOW(),
+    NOW()
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
 -- Calculate user net worth
 CREATE OR REPLACE FUNCTION calculate_user_net_worth(p_user_id UUID, p_date DATE DEFAULT CURRENT_DATE)
 RETURNS DECIMAL(15, 2) AS $$
@@ -324,16 +371,14 @@ DECLARE
   v_total_assets DECIMAL(15, 2) := 0;
   v_total_debts DECIMAL(15, 2) := 0;
 BEGIN
-  -- Sum all assets
+  -- Sum all assets: cash accounts + investment accounts + holding market value
   SELECT COALESCE(SUM(balance), 0) INTO v_total_assets
-  FROM asset_accounts
-  WHERE user_id = p_user_id AND deleted_at IS NULL;
-
-  SELECT COALESCE(SUM(balance), 0) + COALESCE(SUM(balance), 0) INTO v_total_assets
   FROM (
-    SELECT SUM(balance) as balance FROM investment_accounts WHERE user_id = p_user_id AND deleted_at IS NULL
+    SELECT balance FROM asset_accounts       WHERE user_id = p_user_id AND deleted_at IS NULL
     UNION ALL
-    SELECT SUM(shares * current_price) as balance FROM investment_holdings WHERE user_id = p_user_id AND deleted_at IS NULL
+    SELECT balance FROM investment_accounts  WHERE user_id = p_user_id AND deleted_at IS NULL
+    UNION ALL
+    SELECT shares * current_price FROM investment_holdings WHERE user_id = p_user_id AND deleted_at IS NULL
   ) t;
 
   -- Sum all debts

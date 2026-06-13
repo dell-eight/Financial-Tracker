@@ -28,7 +28,8 @@ LEFT JOIN expenses e ON u.id = e.user_id AND e.deleted_at IS NULL
 WHERE u.deleted_at IS NULL
 GROUP BY u.id;
 
-CREATE INDEX idx_mv_annual_summary_user_id ON mv_annual_summary(user_id);
+CREATE INDEX        idx_mv_annual_summary_user_id    ON mv_annual_summary(user_id);
+CREATE UNIQUE INDEX uidx_mv_annual_summary_user_id  ON mv_annual_summary(user_id);
 
 -- ============================================================================
 -- NET WORTH HISTORY MATERIALIZED VIEW
@@ -57,7 +58,8 @@ SELECT
 FROM net_worth_snapshots nws
 WHERE nws.snapshot_date >= CURRENT_DATE - INTERVAL '10 years';
 
-CREATE INDEX idx_mv_net_worth_history_user_date ON mv_net_worth_history(user_id, snapshot_date DESC);
+CREATE INDEX        idx_mv_net_worth_history_user_date  ON mv_net_worth_history(user_id, snapshot_date DESC);
+CREATE UNIQUE INDEX uidx_mv_net_worth_history_user_date ON mv_net_worth_history(user_id, snapshot_date);
 
 -- ============================================================================
 -- EXPENSE ANALYTICS MATERIALIZED VIEW
@@ -106,7 +108,8 @@ SELECT
 FROM rolling_average
 WHERE month >= CURRENT_DATE - INTERVAL '10 years';
 
-CREATE INDEX idx_mv_expense_analytics_user_month ON mv_expense_analytics(user_id, month DESC);
+CREATE INDEX        idx_mv_expense_analytics_user_month  ON mv_expense_analytics(user_id, month DESC);
+CREATE UNIQUE INDEX uidx_mv_expense_analytics_user_month ON mv_expense_analytics(user_id, category_id, month);
 
 -- ============================================================================
 -- BUDGET PERFORMANCE MATERIALIZED VIEW
@@ -135,7 +138,8 @@ SELECT
 FROM budget_vs_actual bva
 WHERE bva.month >= CURRENT_DATE - INTERVAL '10 years';
 
-CREATE INDEX idx_mv_budget_performance_user_month ON mv_budget_performance(user_id, month DESC);
+CREATE INDEX        idx_mv_budget_performance_user_month  ON mv_budget_performance(user_id, month DESC);
+CREATE UNIQUE INDEX uidx_mv_budget_performance_user_month ON mv_budget_performance(user_id, category_id, month);
 
 -- ============================================================================
 -- INVESTMENT PERFORMANCE MATERIALIZED VIEW
@@ -143,33 +147,43 @@ CREATE INDEX idx_mv_budget_performance_user_month ON mv_budget_performance(user_
 
 CREATE MATERIALIZED VIEW mv_investment_performance AS
 SELECT
-  user_id,
-  account_id,
-  account_name,
-  account_type,
-  symbol,
-  holding_name,
-  asset_class,
-  sector,
-  shares,
-  current_price,
-  purchase_price,
-  current_value,
-  cost_basis,
-  unrealized_gain_loss,
-  gain_loss_percent,
-  -- Calculate performance
+  ih.id                                            AS holding_id,
+  ih.user_id,
+  ia.id                                            AS account_id,
+  ia.name                                          AS account_name,
+  ia.account_type,
+  ih.symbol,
+  ih.name                                          AS holding_name,
+  ih.asset_class,
+  ih.sector,
+  ih.shares,
+  ih.current_price,
+  ih.purchase_price,
+  (ih.shares * ih.current_price)                   AS current_value,
+  (ih.shares * ih.purchase_price)                  AS cost_basis,
+  ((ih.shares * ih.current_price) - (ih.shares * ih.purchase_price)) AS unrealized_gain_loss,
   CASE
-    WHEN current_value > cost_basis THEN 'Gain'
-    WHEN current_value < cost_basis THEN 'Loss'
+    WHEN (ih.shares * ih.purchase_price) > 0
+    THEN (((ih.shares * ih.current_price) - (ih.shares * ih.purchase_price)) /
+          (ih.shares * ih.purchase_price) * 100)
+    ELSE 0
+  END                                              AS gain_loss_percent,
+  CASE
+    WHEN (ih.shares * ih.current_price) > (ih.shares * ih.purchase_price) THEN 'Gain'
+    WHEN (ih.shares * ih.current_price) < (ih.shares * ih.purchase_price) THEN 'Loss'
     ELSE 'Neutral'
-  END AS performance_status,
-  -- Percentage of portfolio
-  ROUND(current_value / SUM(current_value) OVER (PARTITION BY user_id) * 100, 2) AS portfolio_percent
-FROM investment_summary
-ORDER BY user_id, account_id, symbol;
+  END                                              AS performance_status,
+  ROUND(
+    (ih.shares * ih.current_price) /
+    NULLIF(SUM(ih.shares * ih.current_price) OVER (PARTITION BY ih.user_id), 0) * 100,
+    2
+  )                                                AS portfolio_percent
+FROM investment_holdings ih
+JOIN investment_accounts ia ON ih.account_id = ia.id
+WHERE ih.deleted_at IS NULL AND ia.deleted_at IS NULL;
 
-CREATE INDEX idx_mv_investment_performance_user ON mv_investment_performance(user_id);
+CREATE INDEX        idx_mv_investment_performance_user    ON mv_investment_performance(user_id);
+CREATE UNIQUE INDEX uidx_mv_investment_performance_holding ON mv_investment_performance(holding_id);
 
 -- ============================================================================
 -- ASSET ALLOCATION HISTORICAL MATERIALIZED VIEW
@@ -186,6 +200,8 @@ SELECT
     THEN ROUND(COALESCE(nws.liquid_assets, 0) / nws.total_assets * 100, 2)
     ELSE 0
   END AS allocation_percent
+FROM net_worth_snapshots nws
+WHERE nws.snapshot_date >= CURRENT_DATE - INTERVAL '10 years'
 
 UNION ALL
 
@@ -200,6 +216,7 @@ SELECT
     ELSE 0
   END AS allocation_percent
 FROM net_worth_snapshots nws
+WHERE nws.snapshot_date >= CURRENT_DATE - INTERVAL '10 years'
 
 UNION ALL
 
@@ -214,10 +231,10 @@ SELECT
     ELSE 0
   END AS allocation_percent
 FROM net_worth_snapshots nws
-
 WHERE nws.snapshot_date >= CURRENT_DATE - INTERVAL '10 years';
 
-CREATE INDEX idx_mv_asset_allocation_history_user_date ON mv_asset_allocation_history(user_id, snapshot_date DESC);
+CREATE INDEX        idx_mv_asset_allocation_history_user_date  ON mv_asset_allocation_history(user_id, snapshot_date DESC);
+CREATE UNIQUE INDEX uidx_mv_asset_allocation_history_user_date ON mv_asset_allocation_history(user_id, snapshot_date, asset_type);
 
 -- ============================================================================
 -- INCOME ANALYSIS MATERIALIZED VIEW
@@ -265,7 +282,8 @@ FROM monthly_income
 WHERE month >= CURRENT_DATE - INTERVAL '10 years'
 ORDER BY user_id, month DESC;
 
-CREATE INDEX idx_mv_income_analysis_user_month ON mv_income_analysis(user_id, month DESC);
+CREATE INDEX        idx_mv_income_analysis_user_month  ON mv_income_analysis(user_id, month DESC);
+CREATE UNIQUE INDEX uidx_mv_income_analysis_user_month ON mv_income_analysis(user_id, source_id, month);
 
 -- ============================================================================
 -- FINANCIAL GOALS PROGRESS MATERIALIZED VIEW
@@ -294,7 +312,7 @@ SELECT
     WHEN sg.target_date IS NOT NULL AND sgs.days_remaining > 0
     THEN CASE
       WHEN sgs.progress_percent >= (100 - ((sgs.days_remaining /
-            (DATE_PART('day', sg.target_date - sg.created_at::DATE))::DECIMAL)) * 100))
+            (sg.target_date - sg.created_at::DATE)::DECIMAL)) * 100)
       THEN 'On Track'
       ELSE 'Behind'
     END
@@ -304,7 +322,8 @@ FROM savings_goals sg
 LEFT JOIN savings_goal_status sgs ON sg.id = sgs.id
 WHERE sg.deleted_at IS NULL;
 
-CREATE INDEX idx_mv_financial_goals_progress_user ON mv_financial_goals_progress(user_id);
+CREATE INDEX        idx_mv_financial_goals_progress_user    ON mv_financial_goals_progress(user_id);
+CREATE UNIQUE INDEX uidx_mv_financial_goals_progress_goal  ON mv_financial_goals_progress(goal_id);
 
 -- ============================================================================
 -- REFRESH FUNCTION FOR MATERIALIZED VIEWS

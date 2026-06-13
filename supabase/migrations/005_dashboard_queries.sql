@@ -54,7 +54,7 @@ CREATE OR REPLACE FUNCTION get_expense_breakdown_by_category(
 RETURNS TABLE (
   category_name TEXT,
   category_id UUID,
-  color HEX,
+  color TEXT,
   total_spent DECIMAL,
   transaction_count INT,
   average_transaction DECIMAL,
@@ -82,7 +82,7 @@ BEGIN
   SELECT
     name::TEXT,
     id::UUID,
-    color::HEX,
+    color::TEXT,
     total::DECIMAL,
     count::INT,
     avg::DECIMAL,
@@ -140,7 +140,7 @@ RETURNS TABLE (
   source_name TEXT,
   source_id UUID,
   income_type TEXT,
-  color HEX,
+  color TEXT,
   total_income DECIMAL,
   total_tax DECIMAL,
   net_income DECIMAL,
@@ -172,7 +172,7 @@ BEGIN
     name::TEXT,
     id::UUID,
     type::TEXT,
-    color::HEX,
+    color::TEXT,
     total::DECIMAL,
     tax::DECIMAL,
     net::DECIMAL,
@@ -279,7 +279,7 @@ RETURNS TABLE (
   daily_required_savings DECIMAL,
   status TEXT,
   is_active BOOLEAN,
-  color HEX
+  color TEXT
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -297,20 +297,20 @@ BEGIN
     sg.target_date,
     CASE
       WHEN sg.target_date IS NOT NULL
-      THEN (DATE_PART('day', sg.target_date - CURRENT_DATE))::INT
+      THEN (sg.target_date - CURRENT_DATE)
       ELSE NULL
     END,
     CASE
       WHEN sg.target_date IS NOT NULL
-        AND DATE_PART('day', sg.target_date - CURRENT_DATE) > 0
+        AND (sg.target_date - CURRENT_DATE) > 0
         AND sg.target_amount > 0
       THEN ((sg.target_amount - COALESCE(sgc.current_amount, 0)) /
-            DATE_PART('day', sg.target_date - CURRENT_DATE))::DECIMAL
+            (sg.target_date - CURRENT_DATE)::DECIMAL)
       ELSE NULL
     END,
     CASE
       WHEN NOT sg.is_active THEN 'Completed'
-      WHEN sg.target_date IS NOT NULL AND DATE_PART('day', sg.target_date - CURRENT_DATE) < 0 THEN 'Overdue'
+      WHEN sg.target_date IS NOT NULL AND (sg.target_date - CURRENT_DATE) < 0 THEN 'Overdue'
       WHEN sg.target_date IS NOT NULL THEN 'In Progress'
       ELSE 'No Target'
     END,
@@ -348,7 +348,7 @@ RETURNS TABLE (
   percent_of_budget NUMERIC,
   remaining_budget DECIMAL,
   status TEXT,
-  color HEX
+  color TEXT
 ) AS $$
 BEGIN
   RETURN QUERY

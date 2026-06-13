@@ -167,7 +167,7 @@ SELECT
   sg.target_date,
   CASE
     WHEN sg.target_date IS NOT NULL
-    THEN DATE_PART('day', sg.target_date - CURRENT_DATE)
+    THEN (sg.target_date - CURRENT_DATE)
     ELSE NULL
   END AS days_remaining,
   CASE
@@ -178,7 +178,7 @@ SELECT
   CASE
     WHEN sg.target_date IS NOT NULL AND sg.target_amount > 0
     THEN ((COALESCE(sgc.current_balance, 0) - 0) /
-          NULLIF(DATE_PART('day', sg.target_date - CURRENT_DATE), 0))
+          NULLIF((sg.target_date - CURRENT_DATE), 0))
     ELSE NULL
   END AS daily_required_savings,
   sg.is_active,

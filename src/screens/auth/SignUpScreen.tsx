@@ -22,8 +22,8 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { AppButton, AppInput } from '../../components';
 import { SocialAuthRow } from '../../components/auth/SocialAuthRow';
 import { useTheme } from '../../hooks/ui/useTheme';
-import { useAuthStore } from '../../store/auth.store';
-import { mockRegister } from '../../api/mock/auth.mock';
+import { useRegister } from '../../hooks/queries/useAuth';
+import { signInWithGoogle } from '../../services/auth.service';
 import type { AuthStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<AuthStackParamList, 'SignUp'>;
@@ -41,9 +41,9 @@ function EyeIcon({ visible, color }: { visible: boolean; color: string }) {
 // ── SignUpScreen ───────────────────────────────────────────────────────────────
 
 export function SignUpScreen({ navigation }: Props) {
-  const theme   = useTheme();
-  const insets  = useSafeAreaInsets();
-  const setUser = useAuthStore(s => s.setUser);
+  const theme    = useTheme();
+  const insets   = useSafeAreaInsets();
+  const register = useRegister();
   const { colors, spacing, fontSize, fontFamily } = theme;
 
   const [fullName,    setFullName]    = useState('');
@@ -52,7 +52,6 @@ export function SignUpScreen({ navigation }: Props) {
   const [confirmPass, setConfirmPass] = useState('');
   const [showPass,    setShowPass]    = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [loading,     setLoading]     = useState(false);
 
   const [errors, setErrors] = useState<{
     fullName?: string;
@@ -97,18 +96,16 @@ export function SignUpScreen({ navigation }: Props) {
     return Object.keys(next).length === 0;
   }
 
-  async function handleSignUp() {
+  function handleSignUp() {
     if (!validate()) return;
-    setLoading(true);
-    try {
-      const { user, token } = await mockRegister({ name: fullName, email, password });
-      setUser(user, token);
-      // RootNavigator detects isAuthenticated and switches to Main automatically
-    } catch {
-      setErrors({ email: 'Registration failed. Please try again.' });
-    } finally {
-      setLoading(false);
-    }
+    register.mutate({ name: fullName, email, password }, {
+      onError: () => setErrors({ email: 'Registration failed. Please try again.' }),
+      onSuccess: ({ error }) => {
+        if (error) setErrors({ email: error });
+        // On success, Supabase sends a confirmation email.
+        // onAuthStateChange in RootNavigator handles navigation once confirmed.
+      },
+    });
   }
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 20);
@@ -184,7 +181,7 @@ export function SignUpScreen({ navigation }: Props) {
         >
           <AppInput
             label="Full Name"
-            placeholder="Wendell"
+            placeholder="John Doe"
             value={fullName}
             onChangeText={t => { setFullName(t); setErrors(e => ({ ...e, fullName: undefined })); }}
             error={errors.fullName}
@@ -242,12 +239,11 @@ export function SignUpScreen({ navigation }: Props) {
             variant="primary"
             size="lg"
             fullWidth
-            loading={loading}
+            loading={register.isPending}
           />
 
           <SocialAuthRow
-            onGooglePress={() => {/* TODO */}}
-            onApplePress={() => {/* TODO */}}
+            onGooglePress={signInWithGoogle}
             style={{ marginTop: spacing[5] }}
           />
 

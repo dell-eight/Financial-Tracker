@@ -68,7 +68,8 @@ function getGreeting(): string {
   const h = new Date().getHours();
   if (h >= 5  && h < 12) return 'Good Morning';
   if (h >= 12 && h < 18) return 'Good Afternoon';
-  if (h >= 18 && h < 22) return 'Good Evening';
+  if (h >= 18 && h < 23) return 'Good Evening';
+  if (h >= 23 && h < 4) return 'Its Midnight';
   return 'Good Night';
 }
 
@@ -540,8 +541,13 @@ export function DashboardScreen({ navigation }: Props) {
     transform: [{ translateY: interpolate(aZ6.value, [0, 1], [16, 0]) }],
   }));
 
-  const firstName  = user?.name.split(' ')[0] ?? 'there';
-  const avatarInit = user?.avatarInitials?.[0] ?? 'W';
+  const displayName = (user?.user_metadata?.display_name as string | undefined)
+    ?? (user?.user_metadata?.full_name as string | undefined)
+    ?? (user?.user_metadata?.name as string | undefined)
+    ?? user?.email?.split('@')[0]
+    ?? '';
+  const firstName  = displayName.split(' ')[0] || 'there';
+  const avatarInit = displayName ? displayName[0].toUpperCase() : 'W';
 
   // Shared loading flag for hero zones
   const coreLoading = dashLoading || goalLoading;
@@ -570,11 +576,11 @@ export function DashboardScreen({ navigation }: Props) {
       >
         {/* ── Header ─────────────────────────────────────────────────────────── */}
         <Animated.View style={[styles.header, sHeader, { paddingHorizontal: spacing[5] }]}>
-          <View>
+          <View style={{ flex: 1, marginRight: spacing[3] }}>
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>
               {getGreeting()},
             </Text>
-            <Text style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: colors.text.primary, letterSpacing: -0.4, marginTop: 2, lineHeight: 30 }}>
+            <Text numberOfLines={1} ellipsizeMode="tail" style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: colors.text.primary, letterSpacing: -0.4, marginTop: 2, lineHeight: 30 }}>
               {firstName} 👋
             </Text>
           </View>

@@ -114,10 +114,10 @@ SELECT
   '00000000-0000-0000-0000-000000000001'::UUID,
   (SELECT id FROM income_sources WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID AND name = 'Salary' LIMIT 1),
   5000.00,
-  DATE_TRUNC('month', CURRENT_DATE - (INTERVAL '1 month' * GENERATE_SERIES(0, 23)))::DATE + 15,
+  DATE_TRUNC('month', CURRENT_DATE - (INTERVAL '1 month' * gs.n))::DATE + 15,
   1000.00,
   NOW()
-FROM generate_series(1, 24);
+FROM generate_series(0, 23) AS gs(n);
 
 -- Freelance income
 INSERT INTO income_records (user_id, source_id, amount, date, tax_withheld, created_at)
@@ -156,18 +156,18 @@ SELECT
   '00000000-0000-0000-0000-000000000001'::UUID,
   (SELECT id FROM savings_goals WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID AND name = 'Emergency Fund' LIMIT 1),
   500.00,
-  DATE_TRUNC('month', CURRENT_DATE - (INTERVAL '1 month' * GENERATE_SERIES(0, 23)))::DATE,
+  DATE_TRUNC('month', CURRENT_DATE - (INTERVAL '1 month' * gs.n))::DATE,
   NOW()
-FROM generate_series(1, 24);
+FROM generate_series(0, 23) AS gs(n);
 
 INSERT INTO savings_goal_contributions (user_id, goal_id, amount, date, created_at)
 SELECT
   '00000000-0000-0000-0000-000000000001'::UUID,
   (SELECT id FROM savings_goals WHERE user_id = '00000000-0000-0000-0000-000000000001'::UUID AND name = 'Vacation to Europe' LIMIT 1),
   400.00,
-  DATE_TRUNC('month', CURRENT_DATE - (INTERVAL '1 month' * GENERATE_SERIES(0, 11)))::DATE,
+  DATE_TRUNC('month', CURRENT_DATE - (INTERVAL '1 month' * gs.n))::DATE,
   NOW()
-FROM generate_series(1, 12);
+FROM generate_series(0, 11) AS gs(n);
 
 -- ============================================================================
 -- INVESTMENT ACCOUNTS
@@ -250,14 +250,15 @@ VALUES
 INSERT INTO net_worth_snapshots (user_id, snapshot_date, total_assets, total_debts, net_worth, liquid_assets, investments, real_estate)
 SELECT
   '00000000-0000-0000-0000-000000000001'::UUID,
-  DATE_TRUNC('month', CURRENT_DATE - (INTERVAL '1 month' * GENERATE_SERIES(0, 23)))::DATE,
-  (43000.00 + (GENERATE_SERIES(0, 23) * 1000))::DECIMAL,  -- gradually increasing assets
-  (17500.00 - (GENERATE_SERIES(0, 23) * 250))::DECIMAL,   -- gradually decreasing debt
-  (25500.00 + (GENERATE_SERIES(0, 23) * 1250))::DECIMAL,  -- net worth growing
-  (43000.00 + (GENERATE_SERIES(0, 23) * 500))::DECIMAL,
-  (50000.00 + (GENERATE_SERIES(0, 23) * 800))::DECIMAL,
+  DATE_TRUNC('month', CURRENT_DATE - (INTERVAL '1 month' * gs.n))::DATE,
+  (43000.00 + (gs.n * 1000))::DECIMAL,  -- gradually increasing assets
+  (17500.00 - (gs.n * 250))::DECIMAL,   -- gradually decreasing debt
+  (25500.00 + (gs.n * 1250))::DECIMAL,  -- net worth growing
+  (43000.00 + (gs.n * 500))::DECIMAL,
+  (50000.00 + (gs.n * 800))::DECIMAL,
   0.00
-FROM generate_series(0, 23);
+FROM generate_series(0, 23) AS gs(n)
+ON CONFLICT (user_id, snapshot_date) DO NOTHING;
 
 -- ============================================================================
 -- RE-ENABLE TRIGGERS

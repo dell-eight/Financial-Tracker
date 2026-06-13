@@ -295,9 +295,12 @@ export function ProfileScreen({ navigation }: Props) {
   const monthExpense  = React.useMemo(() => (txns ?? []).filter(t => t.type === 'expense' && t.date.startsWith(CURRENT_MONTH)).reduce((s, t) => s + t.amount, 0), [txns]);
   const savingsRate   = monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 1000) / 10 : 0;
 
-  const displayName = user?.name ?? 'User';
-  const initials    = user?.avatarInitials ?? displayName.slice(0, 2).toUpperCase();
-  const memberYear  = user?.memberSince ? new Date(user.memberSince).getFullYear() : 2024;
+  const displayName = (user?.user_metadata?.display_name as string | undefined)
+    ?? (user?.user_metadata?.full_name as string | undefined)
+    ?? (user?.user_metadata?.name as string | undefined)
+    ?? user?.email ?? 'User';
+  const initials    = displayName.slice(0, 2).toUpperCase();
+  const memberYear  = user?.created_at ? new Date(user.created_at).getFullYear() : 2024;
 
   // ── Entrance animations ──────────────────────────────────────────────────
   const a0 = useSharedValue(0);

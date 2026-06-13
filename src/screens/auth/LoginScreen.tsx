@@ -22,8 +22,8 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { AppButton, AppInput } from '../../components';
 import { SocialAuthRow } from '../../components/auth/SocialAuthRow';
 import { useTheme } from '../../hooks/ui/useTheme';
-import { useAuthStore } from '../../store/auth.store';
-import { mockLogin } from '../../api/mock/auth.mock';
+import { useLogin } from '../../hooks/queries/useAuth';
+import { signInWithGoogle } from '../../services/auth.service';
 import type { AuthStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<AuthStackParamList, 'Login'>;
@@ -41,16 +41,15 @@ function EyeIcon({ visible, color }: { visible: boolean; color: string }) {
 // ── LoginScreen ────────────────────────────────────────────────────────────────
 
 export function LoginScreen({ navigation }: Props) {
-  const theme   = useTheme();
-  const insets  = useSafeAreaInsets();
-  const setUser = useAuthStore(s => s.setUser);
+  const theme  = useTheme();
+  const insets = useSafeAreaInsets();
+  const login  = useLogin();
   const { colors, spacing, fontSize, fontFamily } = theme;
 
   // Form state
   const [email,    setEmail]    = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
-  const [loading,  setLoading]  = useState(false);
 
   const [errors, setErrors] = useState<{
     email?: string;
@@ -92,16 +91,14 @@ export function LoginScreen({ navigation }: Props) {
 
   async function handleLogin() {
     if (!validate()) return;
-    setLoading(true);
-    try {
-      const { user, token } = await mockLogin(email, password);
-      setUser(user, token);
-      // RootNavigator detects isAuthenticated and switches to Main automatically
-    } catch {
-      setErrors({ email: 'Invalid email or password.' });
-    } finally {
-      setLoading(false);
-    }
+    login.mutate({ email, password }, {
+      onError: () => setErrors({ email: 'Invalid email or password.' }),
+      onSuccess: ({ error }) => {
+        if (error) setErrors({ email: error });
+        // On success with no error, RootNavigator's onAuthStateChange
+        // listener sets isAuthenticated and switches to Main automatically.
+      },
+    });
   }
 
   // ── Layout constants ────────────────────────────────────────────────────────
@@ -234,13 +231,12 @@ export function LoginScreen({ navigation }: Props) {
             variant="primary"
             size="lg"
             fullWidth
-            loading={loading}
+            loading={login.isPending}
           />
 
           {/* Social auth */}
           <SocialAuthRow
-            onGooglePress={() => {/* TODO */}}
-            onApplePress={() => {/* TODO */}}
+            onGooglePress={signInWithGoogle}
             style={{ marginTop: spacing[5] }}
           />
 
