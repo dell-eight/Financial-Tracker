@@ -41,8 +41,8 @@ const { width: SCREEN_W } = Dimensions.get('window');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtUsd(n: number): string {
-  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function fmtPh(n: number): string {
+  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatDateLabel(dateStr: string): string {
@@ -54,7 +54,7 @@ function formatDateLabel(dateStr: string): string {
   if (dateStr === todayStr)  return 'Today';
   if (dateStr === yesterStr) return 'Yesterday';
   const dt = new Date(dateStr + 'T12:00:00');
-  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return dt.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
 }
 
 // ─── CategoryIcon ─────────────────────────────────────────────────────────────
@@ -247,7 +247,7 @@ function SpendingBarChart({ data }: { data: { day: string; amount: number }[] })
           {data[selected]?.day}:{'  '}
         </Text>
         <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>
-          {fmtUsd(data[selected]?.amount ?? 0)}
+          {fmtPh(data[selected]?.amount ?? 0)}
         </Text>
       </View>
     </View>
@@ -420,7 +420,7 @@ export function DashboardScreen({ navigation }: Props) {
       id:              acc.id,
       institutionName: acc.institutionName,
       maskedNumber:    acc.maskedNumber,
-      balance:         fmtUsd(acc.balance),
+      balance:         fmtPh(acc.balance),
       accountType:     typeLabel[acc.type] ?? acc.type,
       gradientIndex:   acc.gradientIndex,
     }));
@@ -564,8 +564,8 @@ export function DashboardScreen({ navigation }: Props) {
         {/* ─── 2. Net Worth Hero Card ────────────────────────────────────────── */}
         <Animated.View style={[{ marginTop: spacing[5], paddingHorizontal: spacing[5] }, heroStyle]}>
           <BalanceHeroCard
-            netWorth={dashboard ? fmtUsd(dashboard.netWorth) : '—'}
-            delta={dashboard ? fmtUsd(Math.abs(dashboard.balanceDelta)) : '—'}
+            netWorth={dashboard ? fmtPh(dashboard.netWorth) : '—'}
+            delta={dashboard ? fmtPh(Math.abs(dashboard.balanceDelta)) : '—'}
             accountCount={accountsData?.length ?? 0}
           />
         </Animated.View>
@@ -618,12 +618,12 @@ export function DashboardScreen({ navigation }: Props) {
         >
           <StatCard
             type="income"
-            amount={dashboard ? fmtUsd(dashboard.monthlyIncome) : '—'}
+            amount={dashboard ? fmtPh(dashboard.monthlyIncome) : '—'}
             label="Total Income"
           />
           <StatCard
             type="expense"
-            amount={dashboard ? fmtUsd(dashboard.monthlyExpenses) : '—'}
+            amount={dashboard ? fmtPh(dashboard.monthlyExpenses) : '—'}
             label="Total Expenses"
           />
         </Animated.View>
@@ -680,7 +680,7 @@ export function DashboardScreen({ navigation }: Props) {
             <SummaryMiniCard
               icon="💳"
               label="Spending"
-              amount={dashboard ? fmtUsd(dashboard.monthlyExpenses) : '—'}
+              amount={dashboard ? fmtPh(dashboard.monthlyExpenses) : '—'}
               trend="8.2% vs last mo"
               trendUp={false}
               iconBg="rgba(239,68,68,0.15)"
@@ -688,7 +688,7 @@ export function DashboardScreen({ navigation }: Props) {
             <SummaryMiniCard
               icon="🏦"
               label="Savings"
-              amount={dashboard ? fmtUsd(dashboard.totalBalance) : '—'}
+              amount={dashboard ? fmtPh(dashboard.totalBalance) : '—'}
               trend="12.5% growth"
               trendUp={true}
               iconBg="rgba(34,197,94,0.15)"
@@ -699,7 +699,7 @@ export function DashboardScreen({ navigation }: Props) {
             <SummaryMiniCard
               icon="📈"
               label="Investments"
-              amount="$6,890"
+              amount="₱6,890"
               trend="4.1% return"
               trendUp={true}
               iconBg="rgba(123,97,255,0.15)"
@@ -707,7 +707,7 @@ export function DashboardScreen({ navigation }: Props) {
             <SummaryMiniCard
               icon="🎯"
               label="Goals"
-              amount="$1,200"
+              amount="₱1,200"
               trend="60% complete"
               trendUp={true}
               iconBg="rgba(59,130,246,0.15)"
@@ -744,7 +744,7 @@ export function DashboardScreen({ navigation }: Props) {
                 categoryKey={tx.category}
                 categoryLabel={tx.categoryLabel}
                 categoryIcon={<CategoryIcon icon={tx.categoryIcon} />}
-                amount={fmtUsd(tx.amount)}
+                amount={fmtPh(tx.amount)}
                 type={tx.type}
                 date={formatDateLabel(tx.date)}
                 time={tx.time}

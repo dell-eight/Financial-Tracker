@@ -229,7 +229,7 @@ function ThemeToggle({ theme }: { theme: ReturnType<typeof useTheme> }) {
   ];
 
   return (
-    <View style={{ flexDirection: 'row', gap: spacing[1], flex: 1 }}>
+    <View style={{ flexDirection: 'row', gap: spacing[1], flex: 3 }}>
       {OPTIONS.map(opt => {
         const active = themePreference === opt.value;
         return (
@@ -239,7 +239,8 @@ function ThemeToggle({ theme }: { theme: ReturnType<typeof useTheme> }) {
             style={{
               flex:            1,
               height:          32,
-              borderRadius:    borderRadius.full,
+              width:           80,
+              borderRadius:    borderRadius.card,
               backgroundColor: active ? colors.accent.primary : colors.bg.surfaceMuted,
               alignItems:      'center',
               justifyContent:  'center',

@@ -109,7 +109,7 @@ export const SEED_BUDGETS: Budget[] = [
 
 export const SEED_DASHBOARD: DashboardSummary = {
   totalBalance:    17098.30,
-  netWorth:        15255.95,
+  netWorth:        440000.00,
   monthlyIncome:    6472.80,
   monthlyExpenses:  1428.14,
   savingsRate:        77.9,

@@ -24,7 +24,7 @@ export interface BudgetCardProps {
 }
 
 function formatAmount(value: number, symbol: string): string {
-  return `${symbol}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${symbol}${value.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export function BudgetCard({
@@ -33,7 +33,7 @@ export function BudgetCard({
   categoryIcon,
   spent,
   limit,
-  currencySymbol = '$',
+  currencySymbol = '₱',
   onPress,
   style,
 }: BudgetCardProps) {

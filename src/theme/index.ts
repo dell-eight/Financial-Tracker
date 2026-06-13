@@ -375,6 +375,8 @@ export const tabBarConfig = {
   labelFontFamily:       fontFamily.medium,
   topBorderRadius:       borderRadius.sm,
   topBorderWidth:        0.5,
+  rightBorderWidth:      0.5,
+  leftBorderWidth:       0.5,
   itemMinWidth:          layout.minTouchTarget,
   indicatorHeight:       3,
   indicatorBorderRadius: borderRadius.full,

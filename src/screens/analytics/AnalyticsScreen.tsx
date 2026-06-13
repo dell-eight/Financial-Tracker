@@ -129,17 +129,17 @@ interface PeriodMeta {
 
 const PERIOD_META: Record<Period, PeriodMeta> = {
   weekly: {
-    total: '$548.09',    income: '$5,121.25', net: '$4,573.16',
+    total: '₱548.09',    income: '₱5,121.25', net: '₱4,573.16',
     delta: '12.1% less', vsLabel: 'vs last week',
     savingsRate: 89.3, prevSavingsRate: 87.8,
   },
   monthly: {
-    total: '$2,335.77',  income: '$5,121.25', net: '$2,785.48',
+    total: '₱2,335.77',  income: '₱5,121.25', net: '₱2,785.48',
     delta: '16.3% less', vsLabel: 'vs May 2026',
     savingsRate: 54.4, prevSavingsRate: 44.8,
   },
   yearly: {
-    total: '$22,382.50', income: '$30,213.00', net: '$7,830.50',
+    total: '₱22,382.50', income: '₱30,213.00', net: '₱7,830.50',
     delta: '2.1% less',  vsLabel: 'vs same period 2025',
     savingsRate: 25.9, prevSavingsRate: 22.4,
   },
@@ -148,13 +148,13 @@ const PERIOD_META: Record<Period, PeriodMeta> = {
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtK(n: number): string {
-  if (n >= 10000) return `$${(n / 1000).toFixed(0)}k`;
-  if (n >= 1000)  return `$${(n / 1000).toFixed(1)}k`;
-  return `$${Math.round(n)}`;
+  if (n >= 10000) return `₱${(n / 1000).toFixed(0)}k`;
+  if (n >= 1000)  return `₱${(n / 1000).toFixed(1)}k`;
+  return `₱${Math.round(n)}`;
 }
 
 function fmtFull(n: number): string {
-  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 // Smooth cubic bezier through points
@@ -856,9 +856,9 @@ function SavingsCard({
         }}
       >
         {([
-          { label: 'This Month', value: `$${thisMonth.toLocaleString()}`, color: colors.income          },
-          { label: 'YTD Total',  value: `$${ytdSaved.toLocaleString()}`,  color: colors.accent.primary  },
-          { label: 'Monthly Avg',value: `$${avgSaved.toLocaleString()}`,  color: colors.text.secondary  },
+          { label: 'This Month', value: `₱${thisMonth.toLocaleString()}`, color: colors.income          },
+          { label: 'YTD Total',  value: `₱${ytdSaved.toLocaleString()}`,  color: colors.accent.primary  },
+          { label: 'Monthly Avg',value: `₱${avgSaved.toLocaleString()}`,  color: colors.text.secondary  },
         ] as const).map(({ label, value, color }) => (
           <View key={label} style={{ flex: 1 }}>
             <Text

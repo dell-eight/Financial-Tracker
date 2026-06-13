@@ -78,15 +78,7 @@ function TabItem({
       <Animated.View style={[styles.iconWrap, animStyle]}>
         {/* Active pill background */}
         {isActive && (
-          <View
-            style={[
-              styles.activePill,
-              {
-                backgroundColor: `${activeColor}18`,
-                borderRadius:    borderRadius.full,
-              },
-            ]}
-          />
+          <View />
         )}
 
         {/* Icon */}
@@ -150,11 +142,8 @@ export function BottomTabBar({ state, descriptors, navigation }: BottomTabBarPro
         {
           backgroundColor:  colors.tabBar.bg,
           paddingBottom:    bottomPad,
-          paddingTop:       spacing[2],
           borderTopWidth:   tabBarConfig.topBorderWidth,
           borderTopColor:   colors.tabBar.border,
-          borderTopLeftRadius:  tabBarConfig.topBorderRadius,
-          borderTopRightRadius: tabBarConfig.topBorderRadius,
         },
       ]}
       accessibilityRole="tablist"

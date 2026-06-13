@@ -52,12 +52,12 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(n: number) {
-  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function fmtShort(n: number) {
-  if (n >= 1000) return `$${(n / 1000).toFixed(1)}k`;
-  return `$${Math.round(n)}`;
+  if (n >= 1000) return `₱${(n / 1000).toFixed(1)}k`;
+  return `₱${Math.round(n)}`;
 }
 
 // ─── CategoryIcon ─────────────────────────────────────────────────────────────

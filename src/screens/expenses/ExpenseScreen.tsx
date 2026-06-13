@@ -83,12 +83,12 @@ const CATEGORY_CHIPS: ChipDef[] = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(n: number): string {
-  return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function fmtCompact(n: number): string {
-  if (n >= 10000) return `$${(n / 1000).toFixed(1)}k`;
-  if (n >= 1000)  return `$${(n / 1000).toFixed(2)}k`;
+  if (n >= 10000) return `₱${(n / 1000).toFixed(1)}k`;
+  if (n >= 1000)  return `₱${(n / 1000).toFixed(2)}k`;
   return fmt(n);
 }
 
@@ -102,7 +102,7 @@ function formatDateLabel(date: string): string {
   if (date === TODAY)     return 'Today';
   if (date === YESTERDAY) return 'Yesterday';
   const d = new Date(date + 'T12:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 // ─── TxIcon ───────────────────────────────────────────────────────────────────

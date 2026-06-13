@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "building-native-ui": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/building-native-ui/SKILL.md",
+      "computedHash": "1c46c05dfcd276872f9660f7795d15f7253f0f0be31c009953ba6ff8b40b3e2b"
+    },
+    "instantdb": {
+      "source": "instantdb/skills",
+      "sourceType": "github",
+      "skillPath": "skills/instantdb/SKILL.md",
+      "computedHash": "cc604d5bf065d1ccab278f11c9b96d0011bb1f14faed7fe672df6e4b4ff332ba"
+    }
+  }
+}
