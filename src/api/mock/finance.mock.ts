@@ -1,9 +1,12 @@
-import type { Account, Budget, DashboardSummary, SavingsGoal, Transaction } from '../../types/models';
+import type { Account, AssetItem, Budget, DashboardSummary, DebtItem, InvestmentHolding, SavingsGoal, Transaction } from '../../types/models';
 import {
   SEED_ACCOUNTS,
+  SEED_ASSETS,
   SEED_BUDGETS,
   SEED_DASHBOARD,
+  SEED_DEBTS,
   SEED_GOALS,
+  SEED_HOLDINGS,
   SEED_TRANSACTIONS,
 } from '../../data/seed';
 
@@ -34,4 +37,19 @@ export async function mockGetDashboard(): Promise<DashboardSummary> {
 export async function mockGetSavingsGoals(): Promise<SavingsGoal[]> {
   await delay(320);
   return SEED_GOALS;
+}
+
+export async function mockGetHoldings(): Promise<InvestmentHolding[]> {
+  await delay(350);
+  return SEED_HOLDINGS;
+}
+
+export async function mockGetAssets(): Promise<AssetItem[]> {
+  await delay(300);
+  return SEED_ASSETS;
+}
+
+export async function mockGetDebts(): Promise<DebtItem[]> {
+  await delay(300);
+  return SEED_DEBTS;
 }

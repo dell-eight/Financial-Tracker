@@ -1,4 +1,4 @@
-import type { Account, Budget, DashboardSummary, SavingsGoal, Transaction, User } from '../types/models';
+import type { Account, AssetItem, Budget, DashboardSummary, DebtItem, InvestmentHolding, SavingsGoal, Transaction, User } from '../types/models';
 
 // ── Mock user ─────────────────────────────────────────────────────────────────
 
@@ -111,6 +111,32 @@ export const SEED_GOALS: SavingsGoal[] = [
   { id: 'g1', name: 'House Down Payment', emoji: '🏠', targetAmount: 500000, savedAmount: 310000, color: '#755DEF', priority: 1 },
   { id: 'g2', name: 'Europe Trip',        emoji: '✈️', targetAmount:  50000, savedAmount:  40000, color: '#22C55E', priority: 2 },
   { id: 'g3', name: 'Emergency Fund',     emoji: '🆘', targetAmount: 150000, savedAmount:  67500, color: '#F97316', priority: 3 },
+];
+
+// ── Investment holdings ───────────────────────────────────────────────────────
+
+export const SEED_HOLDINGS: InvestmentHolding[] = [
+  { id: 'h1', accountId: 'inv1', symbol: 'VTI',   name: 'Vanguard Total Stock ETF',  assetType: 'etf',   shares: 310, avgCostPerShare: 161.29, currentPrice: 201.29, color: '#755DEF' },
+  { id: 'h2', accountId: 'inv1', symbol: 'BND',   name: 'Vanguard Total Bond ETF',   assetType: 'bond',  shares: 500, avgCostPerShare:  72.00, currentPrice:  77.40, color: '#3B82F6' },
+  { id: 'h3', accountId: 'inv1', symbol: 'VTSAX', name: 'Vanguard Total Stock Fund', assetType: 'fund',  shares: 245, avgCostPerShare:  89.80, currentPrice: 110.20, color: '#22C55E' },
+];
+
+// ── Asset items ───────────────────────────────────────────────────────────────
+
+export const SEED_ASSETS: AssetItem[] = [
+  { id: 'a1', name: 'Maya Savings',        category: 'cash',        balance: 100_000, icon: '🏦', color: '#755DEF' },
+  { id: 'a2', name: 'PNB Savings',         category: 'cash',        balance: 140_000, icon: '🏦', color: '#3B82F6' },
+  { id: 'a3', name: 'Maya Time Deposit',   category: 'cash',        balance: 200_000, icon: '🔒', color: '#22C55E' },
+  { id: 'a4', name: 'Investment Portfolio', category: 'investment',  balance: 128_300, icon: '📈', color: '#F97316' },
+  { id: 'a5', name: 'Honda City 2020',     category: 'vehicle',     balance: 380_000, icon: '🚗', color: '#EC4899' },
+];
+
+// ── Debt items ────────────────────────────────────────────────────────────────
+
+export const SEED_DEBTS: DebtItem[] = [
+  { id: 'd1', name: 'BDO Credit Card',   category: 'credit_card',   balance: 38_500, originalAmount:  50_000, interestRate: 24, monthlyPayment: 2_000, icon: '💳', color: '#EF4444' },
+  { id: 'd2', name: 'SSS Calamity Loan', category: 'personal_loan', balance: 12_200, originalAmount:  15_000, interestRate:  6, monthlyPayment:   600, icon: '📋', color: '#F97316' },
+  { id: 'd3', name: 'BPI Auto Loan',     category: 'auto_loan',     balance: 21_300, originalAmount:  80_000, interestRate:  8, monthlyPayment: 1_800, icon: '🚗', color: '#3B82F6' },
 ];
 
 // ── Dashboard summary ─────────────────────────────────────────────────────────

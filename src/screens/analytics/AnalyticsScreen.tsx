@@ -1025,7 +1025,7 @@ function BudgetPerformanceCard({ data }: { data: BudgetPerfItem[] }) {
 
 // ─── AnalyticsScreen ────────────────────────────────────────────────────────────
 
-export function AnalyticsScreen(_props: Props) {
+export function AnalyticsScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows, categoryColors } = theme;
@@ -1191,6 +1191,33 @@ export function AnalyticsScreen(_props: Props) {
           >
             <Text style={{ fontSize: 17, lineHeight: 20, color: colors.text.secondary }}>↗</Text>
           </Pressable>
+        </Animated.View>
+
+        {/* ── 0b. Deep-dive quick links ─────────────────────────────────────── */}
+        <Animated.View style={[s0, { paddingHorizontal: PAD, marginBottom: spacing[4] }]}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+            {([
+              { label: 'Spending Trends', icon: '📉', screen: 'SpendingTrends' },
+              { label: 'Income Analysis', icon: '💰', screen: 'IncomeAnalysis'  },
+              { label: 'Net Worth Growth',icon: '📈', screen: 'NetWorthGrowth'  },
+              { label: 'Forecast',        icon: '🔮', screen: 'Forecast'        },
+            ] as const).map(item => (
+              <Pressable
+                key={item.screen}
+                onPress={() => navigation.push(item.screen)}
+                style={({ pressed }) => [{
+                  flexDirection: 'row', alignItems: 'center', gap: spacing[1],
+                  paddingVertical: 7, paddingHorizontal: spacing[3],
+                  backgroundColor: pressed ? colors.bg.surfaceRaised : colors.bg.surface,
+                  borderRadius: borderRadius.full,
+                  borderWidth: 1, borderColor: colors.border.subtle,
+                }]}
+              >
+                <Text style={{ fontSize: 12 }}>{item.icon}</Text>
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.text.secondary }}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </View>
         </Animated.View>
 
         {/* ── 1. Total Spending (AnalyticsCard hero) ─────────────────────────── */}

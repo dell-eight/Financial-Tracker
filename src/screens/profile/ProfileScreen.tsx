@@ -23,6 +23,8 @@ import { useTheme } from '../../hooks/ui/useTheme';
 import { useAuthStore } from '../../store/auth.store';
 import { useAppStore } from '../../store/app.store';
 import type { ThemePreference } from '../../store/app.store';
+import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
+import { useTransactions } from '../../hooks/queries/useTransactions';
 import type { HomeStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<HomeStackParamList, 'Profile'>;
@@ -267,7 +269,7 @@ function ThemeToggle({ theme }: { theme: ReturnType<typeof useTheme> }) {
 
 // ── ProfileScreen ─────────────────────────────────────────────────────────────
 
-export function ProfileScreen(_props: Props) {
+export function ProfileScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
@@ -278,6 +280,20 @@ export function ProfileScreen(_props: Props) {
   const setNotif     = useAppStore(s => s.setNotificationsEnabled);
   const biometric    = useAppStore(s => s.biometricEnabled);
   const setBiometric = useAppStore(s => s.setBiometricEnabled);
+
+  const { data: assets } = useAssets();
+  const { data: debts  } = useDebts();
+  const { data: txns   } = useTransactions();
+
+  const totalAssets = React.useMemo(() => (assets ?? []).reduce((s, a) => s + a.balance, 0), [assets]);
+  const totalDebts  = React.useMemo(() => (debts  ?? []).reduce((s, d) => s + d.balance,  0), [debts]);
+  const netWorth    = totalAssets - totalDebts;
+
+  const CURRENT_MONTH = new Date().toISOString().substring(0, 7);
+  const monthTxCount  = React.useMemo(() => (txns ?? []).filter(t => t.date.startsWith(CURRENT_MONTH)).length, [txns]);
+  const monthIncome   = React.useMemo(() => (txns ?? []).filter(t => t.type === 'income' && t.date.startsWith(CURRENT_MONTH)).reduce((s, t) => s + t.amount, 0), [txns]);
+  const monthExpense  = React.useMemo(() => (txns ?? []).filter(t => t.type === 'expense' && t.date.startsWith(CURRENT_MONTH)).reduce((s, t) => s + t.amount, 0), [txns]);
+  const savingsRate   = monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 1000) / 10 : 0;
 
   const displayName = user?.name ?? 'User';
   const initials    = user?.avatarInitials ?? displayName.slice(0, 2).toUpperCase();
@@ -391,9 +407,9 @@ export function ProfileScreen(_props: Props) {
             },
           ]}
         >
-          <StatCard label="Balance"     value="$17,098"  sub="+2.1%"  theme={theme} />
-          <StatCard label="This Month"  value="30 txns"              theme={theme} />
-          <StatCard label="Savings"     value="77.9%"    sub="↑ great" theme={theme} />
+          <StatCard label="Net Worth"   value={netWorth >= 1000 ? `₱${(netWorth/1000).toFixed(0)}k` : `₱${Math.round(netWorth)}`} sub="+1.3%" theme={theme} />
+          <StatCard label="This Month"  value={`${monthTxCount} txns`}               theme={theme} />
+          <StatCard label="Savings"     value={`${savingsRate}%`} sub="↑ great"      theme={theme} />
         </Animated.View>
 
         {/* ── Settings sections ── */}
@@ -417,6 +433,34 @@ export function ProfileScreen(_props: Props) {
               onPress={() => Alert.alert('Currency', 'Coming soon')}
               theme={theme}
             />
+            <MenuItem
+              icon="📤" label="Export Data" chevron
+              onPress={() => navigation.push('DataExport')}
+              theme={theme}
+            />
+          </MenuGroup>
+
+          {/* Security */}
+          <SectionHeader title="Security" theme={theme} />
+          <MenuGroup theme={theme}>
+            <MenuItem
+              icon="🔐" label="Security Settings" chevron
+              onPress={() => navigation.push('SecuritySettings')}
+              theme={theme}
+            />
+            <MenuItem
+              icon="🔒"
+              label="Biometric Auth"
+              right={
+                <Switch
+                  value={biometric}
+                  onValueChange={setBiometric}
+                  trackColor={{ false: colors.bg.surfaceMuted, true: colors.accent.muted }}
+                  thumbColor={biometric ? colors.accent.primary : colors.text.muted}
+                />
+              }
+              theme={theme}
+            />
           </MenuGroup>
 
           {/* Preferences */}
@@ -437,19 +481,6 @@ export function ProfileScreen(_props: Props) {
                   onValueChange={setNotif}
                   trackColor={{ false: colors.bg.surfaceMuted, true: colors.accent.muted }}
                   thumbColor={notifEnabled ? colors.accent.primary : colors.text.muted}
-                />
-              }
-              theme={theme}
-            />
-            <MenuItem
-              icon="🔒"
-              label="Biometric Auth"
-              right={
-                <Switch
-                  value={biometric}
-                  onValueChange={setBiometric}
-                  trackColor={{ false: colors.bg.surfaceMuted, true: colors.accent.muted }}
-                  thumbColor={biometric ? colors.accent.primary : colors.text.muted}
                 />
               }
               theme={theme}

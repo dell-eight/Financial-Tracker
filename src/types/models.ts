@@ -66,6 +66,46 @@ export interface SavingsGoal {
   priority: number;
 }
 
+export type AssetCategory = 'cash' | 'investment' | 'real_estate' | 'vehicle' | 'other';
+
+export interface AssetItem {
+  id:       string;
+  name:     string;
+  category: AssetCategory;
+  balance:  number;
+  icon:     string;
+  color:    string;
+  note?:    string;
+}
+
+export type DebtCategory = 'credit_card' | 'personal_loan' | 'mortgage' | 'auto_loan' | 'student_loan';
+
+export interface DebtItem {
+  id:             string;
+  name:           string;
+  category:       DebtCategory;
+  balance:        number;
+  originalAmount: number;
+  interestRate:   number;
+  monthlyPayment: number;
+  icon:           string;
+  color:          string;
+}
+
+export type AssetType = 'stock' | 'etf' | 'fund' | 'bond' | 'crypto';
+
+export interface InvestmentHolding {
+  id:              string;
+  accountId:       string;
+  symbol:          string;
+  name:            string;
+  assetType:       AssetType;
+  shares:          number;
+  avgCostPerShare: number;
+  currentPrice:    number;
+  color:           string;
+}
+
 export interface AuthCredentials {
   email: string;
   password: string;

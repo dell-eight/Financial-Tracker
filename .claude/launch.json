@@ -1,6 +1,6 @@
 {
   "version": "0.0.1",
-  "autoPort": true,
+  "autoPort": false,
   "configurations": [
     {
       "name": "Expo Dev Server",
@@ -12,7 +12,7 @@
       "name": "Expo Web",
       "runtimeExecutable": "npx",
       "runtimeArgs": ["expo", "start", "--web"],
-      "port": 19006
+      "port": 8081
     },
     {
       "name": "Expo Android",
