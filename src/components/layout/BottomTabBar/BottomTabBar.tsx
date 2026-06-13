@@ -22,11 +22,11 @@ import type { RootStackParamList } from '../../../navigation/types';
 // ── Tab configuration ──────────────────────────────────────────────────────────
 
 const TAB_GLYPHS: Record<string, string> = {
-  Home:         '⌂',
-  Transactions: '↕',
-  Budget:       '◎',
-  Wealth:       '◈',
-  Analytics:    '↗',
+  Home: '⌂',
+  Transactions: '⇄',
+  Budget: '◔',
+  Wealth: '◈',
+  Analytics: '↗'
 };
 
 const TAB_A11Y: Record<string, string> = {
