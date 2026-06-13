@@ -12,37 +12,43 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { useNavigation } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import type { NavigationProp } from '@react-navigation/native';
 import { useTheme } from '../../../hooks/ui/useTheme';
+import type { RootStackParamList } from '../../../navigation/types';
 
-// ── Tab icon glyphs (swap with Phosphor/Heroicons when available) ─────────────
-// Each string maps to a route name. Replace these with <Icon> components.
+// ── Tab configuration ──────────────────────────────────────────────────────────
+
 const TAB_GLYPHS: Record<string, string> = {
-  Home:      '⌂',
-  Budget:    '◎',
-  Expenses:  '≡',
-  Analytics: '↗',
-  Profile:   '◉',
+  Home:         '⌂',
+  Transactions: '↕',
+  Budget:       '◎',
+  Wealth:       '◈',
+  Analytics:    '↗',
 };
 
 const TAB_A11Y: Record<string, string> = {
-  Home:      'Home tab',
-  Budget:    'Budget tab',
-  Expenses:  'Expenses tab',
-  Analytics: 'Analytics tab',
-  Profile:   'Profile tab',
+  Home:         'Home tab',
+  Transactions: 'Transactions tab',
+  Budget:       'Budget tab',
+  Wealth:       'Wealth tab',
+  Analytics:    'Analytics tab',
 };
+
+const FAB_SIZE = 52;
 
 // ── Animated tab item ──────────────────────────────────────────────────────────
 
 interface TabItemProps {
-  label:      string;
-  glyph:      string;
-  isActive:   boolean;
-  onPress:    () => void;
-  activeColor: string;
+  label:         string;
+  glyph:         string;
+  isActive:      boolean;
+  onPress:       () => void;
+  activeColor:   string;
   inactiveColor: string;
-  badgeCount?: number;
+  badgeCount?:   number;
 }
 
 function TabItem({
@@ -54,11 +60,10 @@ function TabItem({
   inactiveColor,
   badgeCount,
 }: TabItemProps) {
-  const theme  = useTheme();
+  const theme = useTheme();
   const { spacing, fontSize, fontFamily, borderRadius } = theme;
 
-  const scale = useSharedValue(1);
-
+  const scale    = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
@@ -76,46 +81,26 @@ function TabItem({
       accessibilityLabel={TAB_A11Y[label] ?? label}
     >
       <Animated.View style={[styles.iconWrap, animStyle]}>
-        {/* Active pill background */}
-        {isActive && (
-          <View />
-        )}
-
-        {/* Icon */}
         <View style={{ position: 'relative' }}>
           <Text
-            style={{
-              fontSize:  22,
-              color,
-              lineHeight: 26,
-            }}
+            style={{ fontSize: 22, color, lineHeight: 26 }}
             accessibilityElementsHidden
           >
             {glyph}
           </Text>
 
-          {/* Notification badge */}
           {(badgeCount ?? 0) > 0 && (
-            <View
-              style={[
-                styles.badge,
-                {
-                  backgroundColor: activeColor,
-                  borderRadius:    borderRadius.full,
-                },
-              ]}
-            />
+            <View style={[styles.badge, { backgroundColor: activeColor, borderRadius: borderRadius.full }]} />
           )}
         </View>
 
-        {/* Label */}
         <Text
           style={{
-            fontSize:      10,
-            fontFamily:    isActive ? fontFamily.semiBold : fontFamily.medium,
+            fontSize:   10,
+            fontFamily: isActive ? fontFamily.semiBold : fontFamily.medium,
             color,
-            marginTop:     3,
-            lineHeight:    13,
+            marginTop:  3,
+            lineHeight: 13,
           }}
         >
           {label}
@@ -125,67 +110,135 @@ function TabItem({
   );
 }
 
+// ── FAB ────────────────────────────────────────────────────────────────────────
+
+function FABButton() {
+  const theme   = useTheme();
+  const rootNav = useNavigation<NavigationProp<RootStackParamList>>();
+  const { colors, borderRadius, shadows } = theme;
+
+  const scale    = useSharedValue(1);
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  function handlePress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    rootNav.navigate('QuickAddSheet');
+  }
+
+  return (
+    <View style={styles.fabWrap} pointerEvents="box-none">
+      <Animated.View style={animStyle}>
+        <Pressable
+          onPress={handlePress}
+          onPressIn={() => { scale.value = withSpring(0.92, theme.animation.spring.bouncy); }}
+          onPressOut={() => { scale.value = withSpring(1,    theme.animation.spring.bouncy); }}
+          style={[
+            styles.fab,
+            shadows.fab,
+            {
+              backgroundColor: colors.accent.primary,
+              borderRadius:    borderRadius.full,
+              width:           FAB_SIZE,
+              height:          FAB_SIZE,
+            },
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel="Add transaction"
+        >
+          <Text style={{ fontSize: 26, color: '#FFFFFF', lineHeight: 30, marginTop: -2 }}>+</Text>
+        </Pressable>
+      </Animated.View>
+    </View>
+  );
+}
+
 // ── BottomTabBar ───────────────────────────────────────────────────────────────
 
 export function BottomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
-  const { colors, tabBarConfig, spacing, borderRadius, shadows } = theme;
+  const { colors, tabBarConfig, shadows } = theme;
 
   const bottomPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 20 : 8);
 
   return (
-    <View
-      style={[
-        styles.container,
-        shadows.modal,
-        {
-          backgroundColor:  colors.tabBar.bg,
-          paddingBottom:    bottomPad,
-          borderTopWidth:   tabBarConfig.topBorderWidth,
-          borderTopColor:   colors.tabBar.border,
-        },
-      ]}
-      accessibilityRole="tablist"
-    >
-      <View style={styles.tabs}>
-        {state.routes.map((route, index) => {
-          const { options }   = descriptors[route.key];
-          const isActive      = state.index === index;
-          const label         = (options.tabBarLabel as string | undefined) ?? route.name;
-          const glyph         = TAB_GLYPHS[route.name] ?? '•';
-          const badgeCount    = (options.tabBarBadge as number | undefined) ?? 0;
+    <View style={styles.wrapper} pointerEvents="box-none">
+      {/* FAB floats above the tab bar */}
+      <FABButton />
 
-          const onPress = () => {
-            const event = navigation.emit({
-              type:   'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!isActive && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          };
+      {/* Tab bar surface */}
+      <View
+        style={[
+          styles.container,
+          shadows.modal,
+          {
+            backgroundColor: colors.tabBar.bg,
+            paddingBottom:   bottomPad,
+            borderTopWidth:  tabBarConfig.topBorderWidth,
+            borderTopColor:  colors.tabBar.border,
+          },
+        ]}
+        accessibilityRole="tablist"
+      >
+        <View style={styles.tabs}>
+          {state.routes.map((route, index) => {
+            const { options } = descriptors[route.key];
+            const isActive    = state.index === index;
+            const label       = (options.tabBarLabel as string | undefined) ?? route.name;
+            const glyph       = TAB_GLYPHS[route.name] ?? '•';
+            const badgeCount  = (options.tabBarBadge as number | undefined) ?? 0;
 
-          return (
-            <TabItem
-              key={route.key}
-              label={label}
-              glyph={glyph}
-              isActive={isActive}
-              onPress={onPress}
-              activeColor={colors.tabBar.active}
-              inactiveColor={colors.tabBar.inactive}
-              badgeCount={badgeCount}
-            />
-          );
-        })}
+            const onPress = () => {
+              Haptics.selectionAsync();
+              const event = navigation.emit({
+                type:              'tabPress',
+                target:            route.key,
+                canPreventDefault: true,
+              });
+              if (!isActive && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
+            };
+
+            return (
+              <TabItem
+                key={route.key}
+                label={label}
+                glyph={glyph}
+                isActive={isActive}
+                onPress={onPress}
+                activeColor={colors.tabBar.active}
+                inactiveColor={colors.tabBar.inactive}
+                badgeCount={badgeCount}
+              />
+            );
+          })}
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    width:    '100%',
+    overflow: 'visible',
+  },
+  fabWrap: {
+    position:   'absolute',
+    bottom:     '100%',
+    left:       0,
+    right:      0,
+    alignItems: 'center',
+    paddingBottom: 8,
+  },
+  fab: {
+    alignItems:     'center',
+    justifyContent: 'center',
+    elevation:      8,
+  },
   container: {
     width: '100%',
   },
@@ -202,14 +255,6 @@ const styles = StyleSheet.create({
   iconWrap: {
     alignItems:     'center',
     justifyContent: 'center',
-    position:       'relative',
-  },
-  activePill: {
-    position: 'absolute',
-    top:      -6,
-    bottom:   -2,
-    left:     -14,
-    right:    -14,
   },
   badge: {
     position: 'absolute',

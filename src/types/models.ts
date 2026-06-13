@@ -51,6 +51,19 @@ export interface DashboardSummary {
   savingsRate: number;
   balanceDelta: number;
   balanceDeltaPct: number;
+  totalAssets: number;
+  totalDebts: number;
+  investmentValue: number;
+}
+
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  emoji: string;
+  targetAmount: number;
+  savedAmount: number;
+  color: string;
+  priority: number;
 }
 
 export interface AuthCredentials {

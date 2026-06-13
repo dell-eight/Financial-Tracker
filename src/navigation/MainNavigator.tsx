@@ -1,12 +1,12 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { DashboardScreen }  from '../screens/dashboard/DashboardScreen';
-import { BudgetScreen }     from '../screens/budget/BudgetScreen';
-import { ExpenseScreen }    from '../screens/expenses/ExpenseScreen';
-import { AnalyticsScreen }  from '../screens/analytics/AnalyticsScreen';
-import { ProfileScreen }    from '../screens/profile/ProfileScreen';
-import { BottomTabBar }     from '../components';
+import { BottomTabBar } from '../components';
 import type { MainTabParamList } from './types';
+import { HomeStack }         from './stacks/HomeStack';
+import { TransactionsStack } from './stacks/TransactionsStack';
+import { BudgetStack }       from './stacks/BudgetStack';
+import { WealthStack }       from './stacks/WealthStack';
+import { AnalyticsStack }    from './stacks/AnalyticsStack';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -16,11 +16,11 @@ export function MainNavigator() {
       tabBar={props => <BottomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Home"      component={DashboardScreen} />
-      <Tab.Screen name="Budget"    component={BudgetScreen} />
-      <Tab.Screen name="Expenses"  component={ExpenseScreen} />
-      <Tab.Screen name="Analytics" component={AnalyticsScreen} />
-      <Tab.Screen name="Profile"   component={ProfileScreen} />
+      <Tab.Screen name="Home"         component={HomeStack} />
+      <Tab.Screen name="Transactions" component={TransactionsStack} />
+      <Tab.Screen name="Budget"       component={BudgetStack} />
+      <Tab.Screen name="Wealth"       component={WealthStack} />
+      <Tab.Screen name="Analytics"    component={AnalyticsStack} />
     </Tab.Navigator>
   );
 }

@@ -5,4 +5,5 @@ export {
   mockGetAccounts,
   mockGetBudgets,
   mockGetDashboard,
+  mockGetSavingsGoals,
 } from './mock/finance.mock';

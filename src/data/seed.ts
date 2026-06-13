@@ -1,4 +1,4 @@
-import type { Account, Budget, DashboardSummary, Transaction, User } from '../types/models';
+import type { Account, Budget, DashboardSummary, SavingsGoal, Transaction, User } from '../types/models';
 
 // ── Mock user ─────────────────────────────────────────────────────────────────
 
@@ -105,6 +105,14 @@ export const SEED_BUDGETS: Budget[] = [
   { id: 'b08', category: 'other',         label: 'Other',           icon: '📦', color: '#6B7280', limit: 150, spent: 100.00, month: 6, year: 2026 },
 ];
 
+// ── Savings goals ─────────────────────────────────────────────────────────────
+
+export const SEED_GOALS: SavingsGoal[] = [
+  { id: 'g1', name: 'House Down Payment', emoji: '🏠', targetAmount: 500000, savedAmount: 310000, color: '#755DEF', priority: 1 },
+  { id: 'g2', name: 'Europe Trip',        emoji: '✈️', targetAmount:  50000, savedAmount:  40000, color: '#22C55E', priority: 2 },
+  { id: 'g3', name: 'Emergency Fund',     emoji: '🆘', targetAmount: 150000, savedAmount:  67500, color: '#F97316', priority: 3 },
+];
+
 // ── Dashboard summary ─────────────────────────────────────────────────────────
 
 export const SEED_DASHBOARD: DashboardSummary = {
@@ -113,6 +121,9 @@ export const SEED_DASHBOARD: DashboardSummary = {
   monthlyIncome:    6472.80,
   monthlyExpenses:  1428.14,
   savingsRate:        77.9,
-  balanceDelta:      348.50,
-  balanceDeltaPct:     2.08,
+  balanceDelta:      3200.00,
+  balanceDeltaPct:     0.78,
+  totalAssets:     485000.00,
+  totalDebts:       72000.00,
+  investmentValue: 128300.00,
 };

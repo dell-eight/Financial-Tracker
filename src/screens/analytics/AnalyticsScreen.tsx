@@ -28,17 +28,17 @@ import Svg, {
   Line as SvgLine,
   Text as SvgText,
 } from 'react-native-svg';
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { StackScreenProps } from '@react-navigation/stack';
 
 import { useTheme }        from '../../hooks/ui/useTheme';
 import { useTransactions } from '../../hooks/queries/useTransactions';
 import { useBudgets }      from '../../hooks/queries/useBudgets';
 import { AnalyticsCard, ChartCard, SectionHeader } from '../../components';
 import { getCategoryBgColor } from '../../theme';
-import type { MainTabParamList } from '../../navigation/types';
+import type { AnalyticsStackParamList } from '../../navigation/types';
 import type { CategoryKey } from '../../theme';
 
-type Props   = BottomTabScreenProps<MainTabParamList, 'Analytics'>;
+type Props   = StackScreenProps<AnalyticsStackParamList, 'AnalyticsHome'>;
 type Period  = 'weekly' | 'monthly' | 'yearly';
 
 const { width: SCREEN_W } = Dimensions.get('window');

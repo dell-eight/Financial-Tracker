@@ -20,16 +20,16 @@ import Animated, {
   Easing,
   interpolate,
 } from 'react-native-reanimated';
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { StackScreenProps } from '@react-navigation/stack';
 
 import { useTheme }        from '../../hooks/ui/useTheme';
 import { useTransactions } from '../../hooks/queries/useTransactions';
 import { ExpenseItem, SectionHeader } from '../../components';
 import { getCategoryBgColor } from '../../theme';
-import type { MainTabParamList } from '../../navigation/types';
+import type { TransactionsStackParamList } from '../../navigation/types';
 import type { CategoryKey } from '../../theme';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'Expenses'>;
+type Props = StackScreenProps<TransactionsStackParamList, 'TransactionList'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -690,10 +690,12 @@ function TransactionGroup({
   dateLabel,
   items,
   dayTotal,
+  onPressTx,
 }: {
-  dateLabel: string;
-  items:     Transaction[];
-  dayTotal:  number;
+  dateLabel:  string;
+  items:      Transaction[];
+  dayTotal:   number;
+  onPressTx?: (id: string, type: 'income' | 'expense') => void;
 }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
@@ -745,6 +747,7 @@ function TransactionGroup({
             date={tx.note ?? tx.label}
             time={tx.time}
             showDivider={i < items.length - 1}
+            onPress={onPressTx ? () => onPressTx(tx.id, tx.type) : undefined}
           />
         ))}
       </View>
@@ -881,7 +884,7 @@ const afbStyles = StyleSheet.create({
 
 // ─── ExpenseScreen ────────────────────────────────────────────────────────────
 
-export function ExpenseScreen(_props: Props) {
+export function ExpenseScreen({ navigation, route }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
@@ -909,6 +912,8 @@ export function ExpenseScreen(_props: Props) {
   const [searchQuery,  setSearchQuery]  = useState('');
   const [catFilter,    setCatFilter]    = useState<'all' | CategoryKey>('all');
   const [typeFilter,   setTypeFilter]   = useState<TypeFilter>('all');
+  const [minAmount,    setMinAmount]    = useState<number | null>(null);
+  const [maxAmount,    setMaxAmount]    = useState<number | null>(null);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
@@ -931,8 +936,10 @@ export function ExpenseScreen(_props: Props) {
         (tx.note ?? '').toLowerCase().includes(q),
       );
     }
+    if (minAmount !== null) result = result.filter(tx => tx.amount >= minAmount);
+    if (maxAmount !== null) result = result.filter(tx => tx.amount <= maxAmount);
     return result;
-  }, [allTransactions, period, typeFilter, catFilter, searchQuery]);
+  }, [allTransactions, period, typeFilter, catFilter, searchQuery, minAmount, maxAmount]);
 
   // ── Grouped by date ─────────────────────────────────────────────────────────
   const grouped = useMemo(() => {
@@ -989,14 +996,26 @@ export function ExpenseScreen(_props: Props) {
     return map;
   }, [allTransactions, period, typeFilter, searchQuery]);
 
+  // ── Sync incoming filter params (from FilterSheet) ─────────────────────────
+  useEffect(() => {
+    const p = route.params;
+    if (!p) return;
+    if (p.type    !== undefined) setTypeFilter(p.type as TypeFilter);
+    if (p.period  !== undefined) setPeriod(p.period as Period);
+    setMinAmount(p.minAmount ?? null);
+    setMaxAmount(p.maxAmount ?? null);
+  }, [route.params]);
+
   // ── Clear all filters ───────────────────────────────────────────────────────
   const clearFilters = useCallback(() => {
     setSearchQuery('');
     setCatFilter('all');
     setTypeFilter('all');
+    setMinAmount(null);
+    setMaxAmount(null);
   }, []);
 
-  const hasActiveFilters = catFilter !== 'all' || typeFilter !== 'all' || searchQuery.length > 0;
+  const hasActiveFilters = catFilter !== 'all' || typeFilter !== 'all' || searchQuery.length > 0 || minAmount !== null || maxAmount !== null;
 
   // ── Entrance animations ─────────────────────────────────────────────────────
   const headerAnim  = useSharedValue(0);
@@ -1051,7 +1070,7 @@ export function ExpenseScreen(_props: Props) {
         <Animated.View style={[scr.headerRow, headerStyle, { paddingHorizontal: spacing[5] }]}>
           <View>
             <Text style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: colors.text.primary, letterSpacing: -0.4, lineHeight: 28 }}>
-              Expenses
+              Transactions
             </Text>
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
               {allTransactions.length} total transactions
@@ -1061,13 +1080,35 @@ export function ExpenseScreen(_props: Props) {
           <View style={scr.headerRight}>
             <PeriodToggle value={period} onChange={setPeriod} />
 
+            {/* Filter button */}
             <Pressable
+              onPress={() => navigation.push('Filter', {
+                current: { type: typeFilter, period, minAmount: minAmount ?? undefined, maxAmount: maxAmount ?? undefined },
+              })}
+              style={[
+                scr.iconBtn,
+                {
+                  backgroundColor: hasActiveFilters ? colors.accent.muted : colors.bg.surface,
+                  borderRadius:    borderRadius.full,
+                  borderWidth:     1,
+                  borderColor:     hasActiveFilters ? colors.accent.primary : colors.border.subtle,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Filter transactions"
+            >
+              <Text style={{ fontSize: 16, color: hasActiveFilters ? colors.accent.primary : colors.text.secondary }}>≡</Text>
+            </Pressable>
+
+            {/* Add button */}
+            <Pressable
+              onPress={() => navigation.getParent()?.getParent()?.navigate('QuickAddSheet')}
               style={[
                 scr.addBtn,
                 { backgroundColor: colors.accent.primary, borderRadius: borderRadius.full },
               ]}
               accessibilityRole="button"
-              accessibilityLabel="Add new expense"
+              accessibilityLabel="Add new transaction"
             >
               <Text style={{ fontSize: 20, color: '#FFFFFF', fontFamily: fontFamily.bold, lineHeight: 24 }}>+</Text>
             </Pressable>
@@ -1142,6 +1183,7 @@ export function ExpenseScreen(_props: Props) {
                 dateLabel={label}
                 items={items}
                 dayTotal={dayNet}
+                onPressTx={(id, type) => navigation.push('TransactionDetail', { id, type })}
               />
             ))
           )}
@@ -1170,6 +1212,12 @@ const scr = StyleSheet.create({
     gap:           10,
   },
   addBtn: {
+    width:          36,
+    height:         36,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  iconBtn: {
     width:          36,
     height:         36,
     alignItems:     'center',

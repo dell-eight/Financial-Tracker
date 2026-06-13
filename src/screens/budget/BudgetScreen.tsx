@@ -20,15 +20,15 @@ import Animated, {
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle } from 'react-native-svg';
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { StackScreenProps } from '@react-navigation/stack';
 
 import { useTheme }    from '../../hooks/ui/useTheme';
 import { useBudgets }  from '../../hooks/queries/useBudgets';
 import { BudgetCard, SectionHeader } from '../../components';
-import type { MainTabParamList } from '../../navigation/types';
+import type { BudgetStackParamList } from '../../navigation/types';
 import type { CategoryKey } from '../../theme';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'Budget'>;
+type Props = StackScreenProps<BudgetStackParamList, 'BudgetOverview'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
 

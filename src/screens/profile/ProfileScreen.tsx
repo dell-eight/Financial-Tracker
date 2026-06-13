@@ -18,14 +18,14 @@ import Animated, {
   Easing,
   interpolate,
 } from 'react-native-reanimated';
-import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
+import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useAuthStore } from '../../store/auth.store';
 import { useAppStore } from '../../store/app.store';
 import type { ThemePreference } from '../../store/app.store';
-import type { MainTabParamList } from '../../navigation/types';
+import type { HomeStackParamList } from '../../navigation/types';
 
-type Props = BottomTabScreenProps<MainTabParamList, 'Profile'>;
+type Props = StackScreenProps<HomeStackParamList, 'Profile'>;
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
