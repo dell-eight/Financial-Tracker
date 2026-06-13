@@ -795,7 +795,7 @@ const remainStyles = StyleSheet.create({
 
 // ─── BudgetScreen ─────────────────────────────────────────────────────────────
 
-export function BudgetScreen(_props: Props) {
+export function BudgetScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
@@ -915,19 +915,27 @@ export function BudgetScreen(_props: Props) {
             </Text>
           </View>
 
-          <Pressable
-            style={[
-              screenStyles.addBtn,
-              { backgroundColor: colors.accent.primary, borderRadius: borderRadius.button },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Add new budget"
-          >
-            <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: '#FFFFFF', lineHeight: 22 }}>+</Text>
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: '#FFFFFF', marginLeft: 4 }}>
-              Add
-            </Text>
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: spacing[2] }}>
+            <Pressable
+              onPress={() => navigation.push('AlertSettings')}
+              style={[screenStyles.iconBtn, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.full, borderWidth: 1, borderColor: colors.border.subtle }]}
+              accessibilityRole="button"
+              accessibilityLabel="Alert settings"
+            >
+              <Text style={{ fontSize: 16, lineHeight: 20 }}>🔔</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.push('BudgetSetupWizard')}
+              style={[screenStyles.addBtn, { backgroundColor: colors.accent.primary, borderRadius: borderRadius.button }]}
+              accessibilityRole="button"
+              accessibilityLabel="Set up budget"
+            >
+              <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: '#FFFFFF', lineHeight: 22 }}>+</Text>
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: '#FFFFFF', marginLeft: 4 }}>
+                Edit
+              </Text>
+            </Pressable>
+          </View>
         </Animated.View>
 
         {/* ── 2. Month Selector ─────────────────────────────────────────────── */}
@@ -1011,8 +1019,8 @@ export function BudgetScreen(_props: Props) {
         <Animated.View style={[{ marginTop: spacing[5] }, catStyle]}>
           <SectionHeader
             title="Budget Categories"
-            actionLabel="Edit All"
-            onAction={() => {}}
+            actionLabel="History"
+            onAction={() => navigation.push('BudgetHistory')}
             style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}
           />
 
@@ -1025,6 +1033,7 @@ export function BudgetScreen(_props: Props) {
                 categoryIcon={<CategoryIcon icon={item.icon} />}
                 spent={item.spent}
                 limit={item.limit}
+                onPress={() => navigation.push('CategoryBudgetDetail', { categoryId: item.id })}
               />
             ))}
           </View>
@@ -1062,6 +1071,12 @@ const screenStyles = StyleSheet.create({
     alignItems:        'center',
     paddingHorizontal: 16,
     paddingVertical:   9,
+  },
+  iconBtn: {
+    width:          36,
+    height:         36,
+    alignItems:     'center',
+    justifyContent: 'center',
   },
   monthRow: {
     flexDirection:  'row',
