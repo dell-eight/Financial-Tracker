@@ -19,8 +19,7 @@ import { useTheme }        from '../../hooks/ui/useTheme';
 import { useTransactions } from '../../hooks/queries/useTransactions';
 import { useMonthlyHistory, useWeeklyHistory } from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
-import { formatFull, formatCompact } from '../../utils/currency';
-import { useAppStore } from '../../store/app.store';
+import { useCurrency } from '../../utils/currency';
 
 type Props   = StackScreenProps<AnalyticsStackParamList, 'SpendingTrends'>;
 type Period  = 'weekly' | 'monthly' | 'yearly';
@@ -31,11 +30,6 @@ const X_H     = 24;
 const Y_W     = 40;
 const Y_PAD   = 12;
 
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmtK(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
-function fmt(n: number): string  { return formatFull(n,    useAppStore.getState().currency); }
 
 function smoothPath(pts: { x: number; y: number }[]): string {
   if (pts.length < 2) return '';
@@ -54,6 +48,7 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 function SpendingChart({ data, color }: { data: { label: string; value: number }[]; color: string }) {
   const theme = useTheme();
   const { colors, fontFamily } = theme;
+  const { fmtCompact: fmtK } = useCurrency();
   const W = SCREEN_W - 40;
   const plotW = W - Y_W;
   const plotH = CHART_H - X_H - Y_PAD;
@@ -130,6 +125,7 @@ export function SpendingTrendsScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt } = useCurrency();
   const { data: txns }           = useTransactions();
   const { data: monthlyHistory } = useMonthlyHistory(6);
   const { data: weeklyHistory }  = useWeeklyHistory();

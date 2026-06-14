@@ -13,14 +13,10 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments } from '../../../hooks/queries/useInvestments';
 import type { WealthStackParamList } from '../../../navigation/types';
-import { formatFull, formatCompact } from '../../../utils/currency';
-import { useAppStore } from '../../../store/app.store';
+import { useCurrency } from '../../../utils/currency';
 import type { InvestmentHolding } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'InvestmentAccountDetail'>;
-
-function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
-function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // ─── InvestmentAccountDetailScreen ───────────────────────────────────────────
 
@@ -28,6 +24,7 @@ export function InvestmentAccountDetailScreen({ navigation, route }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt, fmtCompact: fmtShort } = useCurrency();
   const { accountId } = route.params;
 
   const { data: allHoldings } = useInvestments();

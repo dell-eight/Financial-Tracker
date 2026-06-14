@@ -18,17 +18,13 @@ import { useSavingsGoals, SAVINGS_GOALS_KEY } from '../../../hooks/queries/useSa
 import { ASSETS_KEY } from '../../../hooks/queries/useNetWorth';
 import { getContributions, deleteSavingsGoal, type Contribution } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
-import { formatFull, formatCompact } from '../../../utils/currency';
-import { useAppStore } from '../../../store/app.store';
+import { useCurrency } from '../../../utils/currency';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { SavingsGoal } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'GoalDetail'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
-function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // ─── CircleProgress ───────────────────────────────────────────────────────────
 
@@ -78,6 +74,7 @@ function CircleProgress({ ratio, color, size = 160, emoji, strokeWidth = 12 }: {
 function ContributionRow({ c, isLast }: { c: Contribution; isLast: boolean }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { fmt } = useCurrency();
   return (
     <View style={[cStyles.row, { paddingHorizontal: spacing[4], paddingVertical: spacing[3], borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }]}>
       <View style={[cStyles.dot, { backgroundColor: colors.income + '30', borderRadius: borderRadius.full, width: 32, height: 32 }]}>
@@ -105,6 +102,7 @@ export function GoalDetailScreen({ navigation, route }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmtCompact: fmtShort } = useCurrency();
   const queryClient = useQueryClient();
   const { goalId }  = route.params;
   const [deleting, setDeleting] = useState(false);

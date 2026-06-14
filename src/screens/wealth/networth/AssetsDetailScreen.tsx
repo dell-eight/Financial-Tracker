@@ -28,8 +28,7 @@ import {
   deleteAsset,
 } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
-import { formatFull, formatCompact, useCurrency } from '../../../utils/currency';
-import { useAppStore } from '../../../store/app.store';
+import { useCurrency } from '../../../utils/currency';
 import type { AssetCategory, AssetItem } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'AssetsDetail'>;
@@ -56,9 +55,6 @@ const ADD_TYPES: { key: AddCategory; label: string; icon: string }[] = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
-function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // ─── AddAssetModal ────────────────────────────────────────────────────────────
 
@@ -284,6 +280,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt, fmtCompact: fmtShort } = useCurrency();
   const queryClient = useQueryClient();
 
   const { data: assets, isLoading } = useAssets();

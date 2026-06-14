@@ -1,56 +1,66 @@
-import * as Notifications from 'expo-notifications';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import type { Budget } from '../types/models';
 
-// Remote push tokens are not available in Expo Go since SDK 53.
-// Local notifications (scheduleNotificationAsync) still work fine.
+// expo-notifications auto-registers for push tokens at import time via TokenAutoRegistration.fxs.js,
+// triggering a console error in Expo Go since SDK 53 removed remote push support.
+// Lazy-loading via require() prevents the module from loading (and auto-registering) in Expo Go.
 const IS_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
-// Show alerts even when the app is foregrounded
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert:  true,
-    shouldShowBanner: true,
-    shouldShowList:   true,
-    shouldPlaySound:  true,
-    shouldSetBadge:   false,
-  }),
-});
+type Notifs = typeof import('expo-notifications');
+let _notifs: Notifs | null = null;
+
+function getNotifs(): Notifs | null {
+  if (IS_EXPO_GO) return null;
+  if (!_notifs) {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    _notifs = require('expo-notifications') as Notifs;
+    _notifs.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert:  true,
+        shouldShowBanner: true,
+        shouldShowList:   true,
+        shouldPlaySound:  true,
+        shouldSetBadge:   false,
+      }),
+    });
+  }
+  return _notifs;
+}
 
 // ── Permission + token ──────────────────────────────────────────────────────────
 
 export async function requestPermissionsAndGetToken(): Promise<string | null> {
-  const { status: existing } = await Notifications.getPermissionsAsync();
+  const N = getNotifs();
+  if (!N) return null;
+
+  const { status: existing } = await N.getPermissionsAsync();
   let finalStatus = existing;
 
   if (existing !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
+    const { status } = await N.requestPermissionsAsync();
     finalStatus = status;
   }
 
   if (finalStatus !== 'granted') return null;
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync('budget-alerts', {
+    await N.setNotificationChannelAsync('budget-alerts', {
       name:             'Budget Alerts',
-      importance:       Notifications.AndroidImportance.HIGH,
+      importance:       N.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor:       '#755DEF',
     });
-    await Notifications.setNotificationChannelAsync('weekly-summary', {
+    await N.setNotificationChannelAsync('weekly-summary', {
       name:       'Weekly Summary',
-      importance: Notifications.AndroidImportance.DEFAULT,
+      importance: N.AndroidImportance.DEFAULT,
     });
   }
 
-  // Remote push tokens require a dev/production build — not available in Expo Go SDK 53+
-  if (IS_EXPO_GO) return null;
-
   try {
-    const { data } = await Notifications.getExpoPushTokenAsync();
+    const { data } = await N.getExpoPushTokenAsync();
     return data;
   } catch {
     return null;
@@ -87,7 +97,8 @@ export async function checkBudgetThresholds(
   alert80Enabled:  boolean,
   alert100Enabled: boolean,
 ): Promise<void> {
-  const now = new Date();
+  const N = getNotifs();
+  if (!N) return;
 
   for (const budget of budgets) {
     if (budget.limit <= 0) continue;
@@ -97,7 +108,7 @@ export async function checkBudgetThresholds(
     if (alert100Enabled && ratio >= 1) {
       const key = `100_${budget.id}_${monthKey}`;
       if (!(await wasAlreadyFired(key))) {
-        await Notifications.scheduleNotificationAsync({
+        await N.scheduleNotificationAsync({
           identifier: key,
           content: {
             title:            `🚨 Over Budget: ${budget.label}`,
@@ -112,7 +123,7 @@ export async function checkBudgetThresholds(
     } else if (alert80Enabled && ratio >= 0.8) {
       const key = `80_${budget.id}_${monthKey}`;
       if (!(await wasAlreadyFired(key))) {
-        await Notifications.scheduleNotificationAsync({
+        await N.scheduleNotificationAsync({
           identifier: key,
           content: {
             title:            `⚠️ Budget Warning: ${budget.label}`,
@@ -128,16 +139,29 @@ export async function checkBudgetThresholds(
   }
 }
 
+// ── Notification response listener (deep-link on tap) ──────────────────────────
+
+export function addResponseListener(
+  listener: (response: import('expo-notifications').NotificationResponse) => void,
+): { remove: () => void } {
+  const N = getNotifs();
+  if (!N) return { remove: () => {} };
+  return N.addNotificationResponseReceivedListener(listener);
+}
+
 // ── Weekly summary ──────────────────────────────────────────────────────────────
 
 const WEEKLY_SUMMARY_ID = 'weekly-budget-summary';
 
 export async function syncWeeklySummary(enabled: boolean): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(WEEKLY_SUMMARY_ID);
+  const N = getNotifs();
+  if (!N) return;
+
+  await N.cancelScheduledNotificationAsync(WEEKLY_SUMMARY_ID);
 
   if (!enabled) return;
 
-  await Notifications.scheduleNotificationAsync({
+  await N.scheduleNotificationAsync({
     identifier: WEEKLY_SUMMARY_ID,
     content: {
       title:              '📊 Weekly Budget Summary',
@@ -146,7 +170,7 @@ export async function syncWeeklySummary(enabled: boolean): Promise<void> {
       categoryIdentifier: 'weekly-summary',
     },
     trigger: {
-      type:    Notifications.SchedulableTriggerInputTypes.WEEKLY,
+      type:    N.SchedulableTriggerInputTypes.WEEKLY,
       weekday: 1, // Sunday
       hour:    9,
       minute:  0,

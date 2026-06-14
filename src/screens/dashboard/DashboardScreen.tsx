@@ -34,19 +34,13 @@ import { useTransactions }            from '../../hooks/queries/useTransactions'
 import { useBudgets }                 from '../../hooks/queries/useBudgets';
 import { useSavingsGoals }            from '../../hooks/queries/useSavingsGoals';
 import { useAuthStore }               from '../../store/auth.store';
-import { useAppStore }                from '../../store/app.store';
 import { ProgressBar, SectionHeader, ExpenseItem } from '../../components';
 import type { HomeStackParamList, MainTabParamList } from '../../navigation/types';
-import { formatFull, formatCompact } from '../../utils/currency';
+import { useCurrency } from '../../utils/currency';
 
 type Props = StackScreenProps<HomeStackParamList, 'HomeMain'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
-
-// ── Formatters ─────────────────────────────────────────────────────────────────
-
-function fmtPh(n: number): string { return formatFull(n,    useAppStore.getState().currency); }
-function fmtK(n: number): string  { return formatCompact(n, useAppStore.getState().currency); }
 
 function formatDateLabel(dateStr: string): string {
   const today    = new Date();
@@ -134,6 +128,7 @@ function NetWorthCard({
 }: NetWorthCardProps) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
+  const { fmt: fmtPh, fmtCompact: fmtK } = useCurrency();
 
   if (loading) {
     return (
@@ -281,6 +276,7 @@ function CashFlowStrip({ income, expenses, saved, onPress, loading }: {
 }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
+  const { fmt: fmtPh } = useCurrency();
 
   if (loading) {
     return <SkeletonBox height={70} borderRadius={borderRadius.card} />;
@@ -334,6 +330,7 @@ function BudgetProgressRow({ icon, label, spent, limit, onPress }: {
 }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily } = theme;
+  const { fmt: fmtPh } = useCurrency();
 
   const ratio   = limit > 0 ? spent / limit : 0;
   const isOver  = ratio > 1;
@@ -376,6 +373,7 @@ function GoalChip({ emoji, name, savedAmount, targetAmount, color, onPress }: {
 }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
+  const { fmtCompact: fmtK } = useCurrency();
 
   const pct = targetAmount > 0 ? Math.round((savedAmount / targetAmount) * 100) : 0;
 
@@ -418,6 +416,7 @@ export function DashboardScreen({ navigation }: Props) {
   const insets      = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt: fmtPh } = useCurrency();
 
   const user    = useAuthStore(s => s.user);
 

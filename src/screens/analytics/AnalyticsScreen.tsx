@@ -38,8 +38,7 @@ import { AnalyticsCard, ChartCard, SectionHeader } from '../../components';
 import { getCategoryBgColor } from '../../theme';
 import type { AnalyticsStackParamList } from '../../navigation/types';
 import type { CategoryKey } from '../../theme';
-import { formatFull, formatCompact, useCurrency } from '../../utils/currency';
-import { useAppStore } from '../../store/app.store';
+import { useCurrency } from '../../utils/currency';
 
 type Props   = StackScreenProps<AnalyticsStackParamList, 'AnalyticsHome'>;
 type Period  = 'weekly' | 'monthly' | 'yearly';
@@ -97,11 +96,6 @@ const EMPTY_META: PeriodMeta = {
   delta: '—', vsLabel: '',
   savingsRate: 0, prevSavingsRate: 0,
 };
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmtK(n: number): string    { return formatCompact(n, useAppStore.getState().currency); }
-function fmtFull(n: number): string { return formatFull(n,    useAppStore.getState().currency); }
 
 // Smooth cubic bezier through points
 function smoothPath(pts: { x: number; y: number }[]): string {
@@ -271,6 +265,7 @@ function SpendingLineChart({
 }) {
   const theme = useTheme();
   const { colors, fontFamily: FF } = theme;
+  const { fmtCompact: fmtK } = useCurrency();
 
   const PLOT_W = chartW - Y_LABEL_W;
   const PLOT_H = LINE_H  - X_LABEL_H - Y_PAD;
@@ -446,6 +441,7 @@ function CategoryDonut({
 }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { fmtCompact: fmtK, fmt: fmtFull } = useCurrency();
 
   const [selIdx, setSelIdx] = useState<number | null>(null);
 
@@ -576,6 +572,7 @@ function CategoryDonut({
 function TopCategoriesCard({ data }: { data: CatStat[] }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt: fmtFull } = useCurrency();
 
   const maxAmt = Math.max(...data.map(d => d.amount), 1);
   const top5   = [...data].sort((a, b) => b.amount - a.amount).slice(0, 5);
@@ -851,6 +848,7 @@ interface BudgetPerfItem {
 function BudgetPerformanceCard({ data }: { data: BudgetPerfItem[] }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt: fmtFull } = useCurrency();
 
   return (
     <View
@@ -977,6 +975,7 @@ export function AnalyticsScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows, categoryColors } = theme;
+  const { fmt: fmtFull } = useCurrency();
 
   const { data: txns }          = useTransactions();
   const { data: budgets }       = useBudgets();

@@ -22,16 +22,13 @@ import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { getCategoryBgColor } from '../../theme';
 import { deleteTransaction, updateExpense, updateIncome } from '../../services/finance.service';
 import type { TransactionsStackParamList } from '../../navigation/types';
-import { formatFull, formatCompact, useCurrency } from '../../utils/currency';
-import { useAppStore } from '../../store/app.store';
+import { useCurrency } from '../../utils/currency';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import type { Transaction } from '../../types/models';
 
 type Props = StackScreenProps<TransactionsStackParamList, 'TransactionDetail'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(n: number): string { return formatFull(n, useAppStore.getState().currency); }
 
 function formatDisplayDate(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -98,7 +95,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
-  const { symbol } = useCurrency();
+  const { symbol, fmt } = useCurrency();
   const { id, type } = route.params;
 
   const [deleting, setDeleting] = useState(false);

@@ -27,8 +27,7 @@ import { useTransactions } from '../../hooks/queries/useTransactions';
 import { ExpenseItem, SectionHeader } from '../../components';
 import { getCategoryBgColor } from '../../theme';
 import type { TransactionsStackParamList } from '../../navigation/types';
-import { formatFull, formatCompact } from '../../utils/currency';
-import { useAppStore } from '../../store/app.store';
+import { useCurrency } from '../../utils/currency';
 import type { CategoryKey } from '../../theme';
 
 type Props = StackScreenProps<TransactionsStackParamList, 'TransactionList'>;
@@ -81,11 +80,6 @@ const CATEGORY_CHIPS: ChipDef[] = [
   { key: 'education',    label: 'Education',      icon: '📚' },
   { key: 'other',        label: 'Other',          icon: '💰' },
 ];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
-function fmtCompact(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 function isInPeriod(date: string, period: Period): boolean {
   if (period === 'week')  return date >= WEEK_START && date <= TODAY;
@@ -273,6 +267,7 @@ interface Summary { income: number; expense: number; net: number; count: number 
 function SummaryCards({ s, period }: { s: Summary; period: Period }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
+  const { fmtCompact } = useCurrency();
 
   const netPositive = s.net >= 0;
   const cards = [
@@ -404,6 +399,7 @@ function CategoryBreakdown({
 }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows, categoryColors } = theme;
+  const { fmt, fmtCompact } = useCurrency();
 
   if (stats.length === 0) return null;
 
@@ -694,6 +690,7 @@ function TransactionGroup({
 }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
+  const { fmt, fmtCompact } = useCurrency();
 
   const netNeg = dayTotal < 0;
 

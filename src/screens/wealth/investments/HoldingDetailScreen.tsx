@@ -17,17 +17,13 @@ import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments, HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
 import { deleteHolding } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
-import { formatFull, formatCompact } from '../../../utils/currency';
-import { useAppStore } from '../../../store/app.store';
+import { useCurrency } from '../../../utils/currency';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { InvestmentHolding } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'HoldingDetail'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
-function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // Generate deterministic 7-day price bars relative to currentPrice
 function generatePriceBars(currentPrice: number): number[] {
@@ -81,6 +77,7 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt } = useCurrency();
   const queryClient = useQueryClient();
   const { holdingId } = route.params;
   const [deleting, setDeleting] = useState(false);

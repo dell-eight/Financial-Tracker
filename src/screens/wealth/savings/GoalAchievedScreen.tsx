@@ -14,8 +14,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useSavingsGoals } from '../../../hooks/queries/useSavingsGoals';
 import type { WealthStackParamList } from '../../../navigation/types';
-import { formatFull, formatCompact } from '../../../utils/currency';
-import { useAppStore } from '../../../store/app.store';
+import { useCurrency } from '../../../utils/currency';
 import type { SavingsGoal } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'GoalAchieved'>;
@@ -24,8 +23,6 @@ type Props = StackScreenProps<WealthStackParamList, 'GoalAchieved'>;
 
 const CONFETTI_EMOJIS = ['🎊', '🎉', '⭐', '✨', '🏆', '🌟'];
 const NUM_PARTICLES   = 18;
-
-function fmt(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // ─── Confetti particle hook ───────────────────────────────────────────────────
 
@@ -59,6 +56,7 @@ export function GoalAchievedScreen({ navigation, route }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { fmtCompact: fmt } = useCurrency();
   const { goalId } = route.params;
 
   const { data: goals } = useSavingsGoals();

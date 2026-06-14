@@ -10,11 +10,11 @@ import { useAppStore } from '../store/app.store';
 import { BiometricLockScreen } from '../screens/auth/BiometricLockScreen';
 import { supabase } from '../lib/supabase';
 import { OfflineBanner } from '../components/common/OfflineBanner';
-import * as Notifications from 'expo-notifications';
 import {
   requestPermissionsAndGetToken,
   savePushToken,
   syncWeeklySummary,
+  addResponseListener,
 } from '../services/notifications.service';
 
 const Root = createStackNavigator<RootStackParamList>();
@@ -59,7 +59,7 @@ export function RootNavigator() {
     syncWeeklySummary(weeklySummaryEnabled);
 
     // Handle taps on notifications (deep-link to BudgetAlerts or a specific screen)
-    const sub = Notifications.addNotificationResponseReceivedListener(_response => {
+    const sub = addResponseListener(_response => {
       // Future: navigate based on response.notification.request.content.data.type
     });
 

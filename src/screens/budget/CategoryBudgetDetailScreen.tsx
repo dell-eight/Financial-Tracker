@@ -24,15 +24,9 @@ import { ExpenseItem } from '../../components';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import type { BudgetStackParamList } from '../../navigation/types';
 import type { Budget, Transaction } from '../../types/models';
-import { formatFull, formatCompact, getCurrencySymbol } from '../../utils/currency';
-import { useAppStore } from '../../store/app.store';
+import { useCurrency } from '../../utils/currency';
 
 type Props = StackScreenProps<BudgetStackParamList, 'CategoryBudgetDetail'>;
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
-function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 function currentMonthPrefix(): string {
   return new Date().toISOString().slice(0, 7); // "2026-06"
@@ -78,6 +72,7 @@ function EditLimitModal({
 }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily } = theme;
+  const { symbol } = useCurrency();
   const [value, setValue] = useState(String(currentLimit));
 
   const parsed  = parseFloat(value);
@@ -91,7 +86,7 @@ function EditLimitModal({
           Edit Budget Limit
         </Text>
         <View style={[modalStyles.inputRow, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.input, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: spacing[4], height: 52 }]}>
-          <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.muted, marginRight: 4 }}>{getCurrencySymbol(useAppStore.getState().currency)}</Text>
+          <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
           <TextInput
             value={value}
             onChangeText={v => {
@@ -136,6 +131,7 @@ export function CategoryBudgetDetailScreen({ navigation, route }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt, fmtCompact: fmtShort } = useCurrency();
   const queryClient = useQueryClient();
   const { categoryId } = route.params;
 

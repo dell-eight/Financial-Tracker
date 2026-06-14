@@ -17,8 +17,7 @@ import { useInvestments } from '../../hooks/queries/useInvestments';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useNetWorthHistory } from '../../hooks/queries/useAnalytics';
 import type { WealthStackParamList } from '../../navigation/types';
-import { formatFull, formatCompact } from '../../utils/currency';
-import { useAppStore } from '../../store/app.store';
+import { useCurrency } from '../../utils/currency';
 
 type Props = StackScreenProps<WealthStackParamList, 'WealthMain'>;
 
@@ -54,9 +53,7 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
     return { deltaAmt: amt, deltaPct: pct };
   }, [nwHist]);
 
-  const _currency = useAppStore.getState().currency;
-  function fmt(n: number): string      { return formatFull(n,    _currency); }
-  function fmtShort(n: number): string { return formatCompact(n, _currency); }
+  const { fmt, fmtCompact: fmtShort } = useCurrency();
 
   // Asset category breakdown for mini bars
   const assetGroups = useMemo(() => {
@@ -173,7 +170,7 @@ function SavingsOverview({ navigation }: { navigation: Props['navigation'] }) {
   const totalTarget = useMemo(() => (goals ?? []).reduce((s, g) => s + g.targetAmount, 0), [goals]);
   const overallPct  = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0;
 
-  function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
+  const { fmtCompact: fmtShort } = useCurrency();
 
   return (
     <ScrollView
@@ -307,8 +304,7 @@ function InvestmentsOverview({ navigation }: { navigation: Props['navigation'] }
   const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0;
   const isPositive  = totalPnl >= 0;
 
-  function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
-  function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
+  const { fmt, fmtCompact: fmtShort } = useCurrency();
 
   return (
     <ScrollView

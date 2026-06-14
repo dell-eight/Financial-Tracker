@@ -17,7 +17,7 @@ import { useBudgets } from '../../hooks/queries/useBudgets';
 import { getCategoryBgColor } from '../../theme';
 import type { BudgetStackParamList } from '../../navigation/types';
 import { useAppStore } from '../../store/app.store';
-import { formatFull } from '../../utils/currency';
+import { useCurrency } from '../../utils/currency';
 import { syncWeeklySummary } from '../../services/notifications.service';
 
 type Props = StackScreenProps<BudgetStackParamList, 'AlertSettings'>;
@@ -106,6 +106,7 @@ export function AlertSettingsScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt } = useCurrency();
 
   const { data: budgets } = useBudgets();
 
@@ -233,7 +234,7 @@ export function AlertSettingsScreen({ navigation }: Props) {
                     {b.label}
                   </Text>
                   <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: ratio > 0.8 ? colors.warning : colors.text.muted, marginTop: 2 }}>
-                    {Math.round(ratio * 100)}% used · limit {formatFull(b.limit, useAppStore.getState().currency)}
+                    {Math.round(ratio * 100)}% used · limit {fmt(b.limit)}
                   </Text>
                 </View>
 

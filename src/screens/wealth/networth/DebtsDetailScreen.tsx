@@ -24,8 +24,7 @@ import { useAccounts, ACCOUNTS_KEY } from '../../../hooks/queries/useAccounts';
 import { TRANSACTIONS_KEY } from '../../../hooks/queries/useTransactions';
 import { createDebt, updateDebtBalance, addDebtCharge, deleteDebt, makeDebtPayment } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
-import { formatFull, formatCompact, useCurrency } from '../../../utils/currency';
-import { useAppStore } from '../../../store/app.store';
+import { useCurrency } from '../../../utils/currency';
 import type { DebtCategory, DebtItem } from '../../../types/models';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 
@@ -42,9 +41,6 @@ const CATEGORY_LABELS: Record<DebtCategory, string> = {
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
-function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // Estimated months to pay off at current monthly payment
 function monthsToPayoff(balance: number, monthly: number, rate: number): number | null {
@@ -230,7 +226,7 @@ function AddChargeModal({
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
-  const { symbol } = useCurrency();
+  const { symbol, fmt } = useCurrency();
   const [amountStr, setAmountStr] = useState('');
   const [saving,    setSaving]    = useState(false);
 
@@ -329,7 +325,7 @@ function PayDebtModal({
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
-  const { symbol } = useCurrency();
+  const { symbol, fmt } = useCurrency();
   const { data: accounts = [] } = useAccounts();
 
   const [amountStr,      setAmountStr]      = useState('');
@@ -494,6 +490,7 @@ function DebtCard({
 }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt } = useCurrency();
 
   const paidOff = debt.originalAmount > 0 ? 1 - debt.balance / debt.originalAmount : 0;
   const paidPct = Math.max(0, Math.min(paidOff * 100, 100));
@@ -612,6 +609,7 @@ export function DebtsDetailScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt } = useCurrency();
   const queryClient = useQueryClient();
 
   const { data: debts, isLoading } = useDebts();

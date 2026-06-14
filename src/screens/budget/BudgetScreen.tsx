@@ -27,8 +27,7 @@ import { useBudgets }  from '../../hooks/queries/useBudgets';
 import { BudgetCard, SectionHeader } from '../../components';
 import type { BudgetStackParamList } from '../../navigation/types';
 import type { CategoryKey } from '../../theme';
-import { formatFull, formatCompact } from '../../utils/currency';
-import { useAppStore } from '../../store/app.store';
+import { useCurrency } from '../../utils/currency';
 
 type Props = StackScreenProps<BudgetStackParamList, 'BudgetOverview'>;
 
@@ -50,11 +49,6 @@ interface BudgetItem {
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
                 'July', 'August', 'September', 'October', 'November', 'December'];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
-function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // ─── CategoryIcon ─────────────────────────────────────────────────────────────
 
@@ -130,6 +124,7 @@ interface OverviewCardProps {
 function BudgetOverviewCard({ month, year, totalAllocated, totalSpent }: OverviewCardProps) {
   const theme = useTheme();
   const { spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
+  const { fmt } = useCurrency();
 
   const ratio     = totalAllocated > 0 ? totalSpent / totalAllocated : 0;
   const remaining = totalAllocated - totalSpent;
@@ -388,6 +383,7 @@ interface AllocationCardProps {
 function BudgetAllocationCard({ items, totalAllocated }: AllocationCardProps) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
+  const { fmt, fmtCompact: fmtShort } = useCurrency();
 
   const segments = items.map(b => ({ value: b.limit, color: b.color }));
 
@@ -565,6 +561,7 @@ function RemainingMetricsCard({
 }: RemainingMetricsProps) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
+  const { fmt, fmtCompact: fmtShort } = useCurrency();
 
   const overallRemaining   = totalAllocated - totalSpent;
   const savingsRate        = totalAllocated > 0 ? Math.round(((totalAllocated - totalSpent) / totalAllocated) * 100) : 0;

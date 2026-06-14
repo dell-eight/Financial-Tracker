@@ -18,16 +18,13 @@ import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments, HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
 import { logTrade } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
-import { formatFull, formatCompact, useCurrency } from '../../../utils/currency';
-import { useAppStore } from '../../../store/app.store';
+import { useCurrency } from '../../../utils/currency';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { InvestmentHolding } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'LogTransaction'>;
 
 type TxType = 'buy' | 'sell';
-
-function fmt(n: number): string { return formatFull(n, useAppStore.getState().currency); }
 
 // ─── LogTransactionScreen ─────────────────────────────────────────────────────
 
@@ -36,7 +33,7 @@ export function LogTransactionScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient  = useQueryClient();
-  const { symbol } = useCurrency();
+  const { symbol, fmt } = useCurrency();
   const { holdingId } = route.params;
 
   const [txType,    setTxType]    = useState<TxType>('buy');

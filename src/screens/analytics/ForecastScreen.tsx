@@ -18,15 +18,9 @@ import { useSavingsGoals }   from '../../hooks/queries/useSavingsGoals';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useMonthlyHistory }  from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
-import { formatFull, formatCompact, useCurrency } from '../../utils/currency';
-import { useAppStore } from '../../store/app.store';
+import { useCurrency } from '../../utils/currency';
 
 type Props = StackScreenProps<AnalyticsStackParamList, 'Forecast'>;
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
-function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
 
 function monthsToPayoff(balance: number, monthly: number, rate: number): number {
   if (monthly <= 0) return 999;
@@ -55,7 +49,8 @@ export function ForecastScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
-  const { fmt: fmtCurrency } = useCurrency();
+  const { fmt, fmtCompact: fmtShort } = useCurrency();
+  const fmtCurrency = fmt;
 
   const { data: goals         } = useSavingsGoals();
   const { data: debts         } = useDebts();

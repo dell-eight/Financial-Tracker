@@ -14,8 +14,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useBudgets } from '../../hooks/queries/useBudgets';
 import type { BudgetStackParamList } from '../../navigation/types';
-import { formatFull, formatCompact } from '../../utils/currency';
-import { useAppStore } from '../../store/app.store';
+import { useCurrency } from '../../utils/currency';
 
 type Props = StackScreenProps<BudgetStackParamList, 'BudgetHistory'>;
 
@@ -36,14 +35,12 @@ const MOCK_PCTS = [0.61, 0.92, 0.66, 0.78, 0.81];
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
-function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
-
 // ─── MonthBar ─────────────────────────────────────────────────────────────────
 
 function MonthBar({ record, maxSpent }: { record: MonthRecord; maxSpent: number }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
+  const { fmt, fmtCompact: fmtShort } = useCurrency();
 
   const ratio     = record.allocated > 0 ? record.spent / record.allocated : 0;
   const barWidth  = maxSpent > 0 ? (record.spent / maxSpent) * (SCREEN_W - 40 - 120) : 0;
@@ -103,6 +100,7 @@ export function BudgetHistoryScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmtCompact: fmtShort } = useCurrency();
 
   const { data: budgets } = useBudgets();
 

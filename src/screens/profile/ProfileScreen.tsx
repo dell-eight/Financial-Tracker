@@ -22,7 +22,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useAuthStore } from '../../store/auth.store';
 import { useAppStore } from '../../store/app.store';
-import { formatCompact } from '../../utils/currency';
+import { useCurrency } from '../../utils/currency';
 import type { ThemePreference } from '../../store/app.store';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useTransactions } from '../../hooks/queries/useTransactions';
@@ -275,6 +275,7 @@ export function ProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
 
+  const { fmtCompact } = useCurrency();
   const user         = useAuthStore(s => s.user);
   const clearAuth    = useAuthStore(s => s.clearAuth);
   const notifEnabled = useAppStore(s => s.notificationsEnabled);
@@ -411,7 +412,7 @@ export function ProfileScreen({ navigation }: Props) {
             },
           ]}
         >
-          <StatCard label="Net Worth"   value={formatCompact(netWorth, useAppStore.getState().currency)} sub="+1.3%" theme={theme} />
+          <StatCard label="Net Worth"   value={fmtCompact(netWorth)} sub="+1.3%" theme={theme} />
           <StatCard label="This Month"  value={`${monthTxCount} txns`}               theme={theme} />
           <StatCard label="Savings"     value={`${savingsRate}%`} sub="↑ great"      theme={theme} />
         </Animated.View>

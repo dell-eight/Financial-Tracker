@@ -13,16 +13,12 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments } from '../../../hooks/queries/useInvestments';
 import type { WealthStackParamList } from '../../../navigation/types';
-import { formatFull, formatCompact } from '../../../utils/currency';
-import { useAppStore } from '../../../store/app.store';
+import { useCurrency } from '../../../utils/currency';
 import type { AssetType, InvestmentHolding } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'Allocation'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
-function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 const TYPE_LABELS: Record<AssetType, string> = {
   stock:  'Stocks',
@@ -86,6 +82,7 @@ function DonutChart({ segments }: { segments: { pct: number; color: string }[] }
 function AllocationRow({ label, value, pct, color, isLast }: { label: string; value: number; pct: number; color: string; isLast?: boolean }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily } = theme;
+  const { fmtCompact: fmtShort } = useCurrency();
   return (
     <View style={{ paddingVertical: spacing[3], borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing[2] }}>
@@ -109,6 +106,7 @@ export function AllocationScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmtCompact: fmtShort } = useCurrency();
 
   const { data: holdings } = useInvestments();
 

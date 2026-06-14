@@ -19,17 +19,12 @@ import { useTheme }          from '../../hooks/ui/useTheme';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useNetWorthHistory }  from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
-import { formatCompact } from '../../utils/currency';
-import { useAppStore } from '../../store/app.store';
+import { useCurrency } from '../../utils/currency';
 
 type Props = StackScreenProps<AnalyticsStackParamList, 'NetWorthGrowth'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 function smoothPath(pts: { x: number; y: number }[]): string {
   if (pts.length < 2) return '';
@@ -46,6 +41,7 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 function NWChart({ data }: { data: { label: string; nw: number }[] }) {
   const theme = useTheme();
   const { colors, fontFamily } = theme;
+  const { fmtCompact: fmtShort } = useCurrency();
   const W = SCREEN_W - 40;
   const Y_W = 48, X_H = 24, Y_PAD = 12, CHART_H = 200;
   const plotW = W - Y_W;
@@ -126,6 +122,7 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmtCompact: fmtShort } = useCurrency();
 
   const { data: assets    } = useAssets();
   const { data: debts     } = useDebts();
@@ -148,11 +145,11 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
     const magnitude = Math.pow(10, Math.floor(Math.log10(Math.max(currentNW, 100_000))));
     const steps     = [0.5, 0.75, 1, 1.5, 2, 3].map(x => Math.round(x * magnitude));
     return steps.map(v => ({
-      label:   formatCompact(v, useAppStore.getState().currency),
+      label:   fmtShort(v),
       value:   v,
       reached: currentNW >= v,
     }));
-  }, [currentNW]);
+  }, [currentNW, fmtShort]);
 
   const nextMilestone  = milestones.find(m => !m.reached);
   const toGo           = nextMilestone ? nextMilestone.value - currentNW : 0;
