@@ -13,19 +13,14 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments } from '../../../hooks/queries/useInvestments';
 import type { WealthStackParamList } from '../../../navigation/types';
+import { formatFull, formatCompact } from '../../../utils/currency';
+import { useAppStore } from '../../../store/app.store';
 import type { InvestmentHolding } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'InvestmentAccountDetail'>;
 
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtShort(n: number): string {
-  if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)     return `₱${(n / 1_000).toFixed(1)}k`;
-  return `₱${Math.round(n)}`;
-}
+function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
+function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // ─── InvestmentAccountDetailScreen ───────────────────────────────────────────
 

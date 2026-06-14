@@ -14,6 +14,8 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useBudgets } from '../../hooks/queries/useBudgets';
 import type { BudgetStackParamList } from '../../navigation/types';
+import { formatFull, formatCompact } from '../../utils/currency';
+import { useAppStore } from '../../store/app.store';
 
 type Props = StackScreenProps<BudgetStackParamList, 'BudgetHistory'>;
 
@@ -34,14 +36,8 @@ const MOCK_PCTS = [0.61, 0.92, 0.66, 0.78, 0.81];
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtShort(n: number): string {
-  if (n >= 1000) return `₱${(n / 1000).toFixed(1)}k`;
-  return `₱${Math.round(n)}`;
-}
+function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
+function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // ─── MonthBar ─────────────────────────────────────────────────────────────────
 

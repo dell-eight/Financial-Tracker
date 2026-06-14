@@ -38,6 +38,8 @@ import { AnalyticsCard, ChartCard, SectionHeader } from '../../components';
 import { getCategoryBgColor } from '../../theme';
 import type { AnalyticsStackParamList } from '../../navigation/types';
 import type { CategoryKey } from '../../theme';
+import { formatFull, formatCompact, useCurrency } from '../../utils/currency';
+import { useAppStore } from '../../store/app.store';
 
 type Props   = StackScreenProps<AnalyticsStackParamList, 'AnalyticsHome'>;
 type Period  = 'weekly' | 'monthly' | 'yearly';
@@ -91,22 +93,15 @@ interface PeriodMeta {
 }
 
 const EMPTY_META: PeriodMeta = {
-  total: '₱0.00', income: '₱0.00', net: '₱0.00',
+  total: '$0.00', income: '$0.00', net: '$0.00',
   delta: '—', vsLabel: '',
   savingsRate: 0, prevSavingsRate: 0,
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmtK(n: number): string {
-  if (n >= 10000) return `₱${(n / 1000).toFixed(0)}k`;
-  if (n >= 1000)  return `₱${(n / 1000).toFixed(1)}k`;
-  return `₱${Math.round(n)}`;
-}
-
-function fmtFull(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+function fmtK(n: number): string    { return formatCompact(n, useAppStore.getState().currency); }
+function fmtFull(n: number): string { return formatFull(n,    useAppStore.getState().currency); }
 
 // Smooth cubic bezier through points
 function smoothPath(pts: { x: number; y: number }[]): string {
@@ -706,6 +701,7 @@ function SavingsCard({
 }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt } = useCurrency();
 
   const delta    = rate - prevRate;
   const positive = delta >= 0;
@@ -808,9 +804,9 @@ function SavingsCard({
         }}
       >
         {([
-          { label: 'This Month', value: `₱${thisMonth.toLocaleString()}`, color: colors.income          },
-          { label: 'YTD Total',  value: `₱${ytdSaved.toLocaleString()}`,  color: colors.accent.primary  },
-          { label: 'Monthly Avg',value: `₱${avgSaved.toLocaleString()}`,  color: colors.text.secondary  },
+          { label: 'This Month', value: fmt(thisMonth), color: colors.income          },
+          { label: 'YTD Total',  value: fmt(ytdSaved),  color: colors.accent.primary  },
+          { label: 'Monthly Avg',value: fmt(avgSaved),  color: colors.text.secondary  },
         ] as const).map(({ label, value, color }) => (
           <View key={label} style={{ flex: 1 }}>
             <Text

@@ -19,6 +19,8 @@ import { SAVINGS_GOALS_KEY } from '../../../hooks/queries/useSavingsGoals';
 import { createSavingsGoal } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
+import { useCurrency, formatFull } from '../../../utils/currency';
+import { useAppStore } from '../../../store/app.store';
 
 type Props = StackScreenProps<WealthStackParamList, 'CreateGoal'>;
 
@@ -42,6 +44,7 @@ export function CreateGoalScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
+  const { symbol, fmt } = useCurrency();
 
   const [name,      setName]      = useState('');
   const [emoji,     setEmoji]     = useState('🎯');
@@ -118,7 +121,7 @@ export function CreateGoalScreen({ navigation }: Props) {
           </Text>
           {parsed > 0 && (
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
-              Target: ₱{parsed.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+              Target: {fmt(parsed)}
             </Text>
           )}
         </View>
@@ -144,7 +147,7 @@ export function CreateGoalScreen({ navigation }: Props) {
           TARGET AMOUNT
         </Text>
         <View style={[styles.inputWrap, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: parsed > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[5] }]}>
-          <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, fontFamily: fontFamily.medium, marginRight: 4 }}>₱</Text>
+          <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, fontFamily: fontFamily.medium, marginRight: 4 }}>{symbol}</Text>
           <TextInput
             value={amountStr}
             onChangeText={v => {

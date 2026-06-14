@@ -1,8 +1,13 @@
 import * as Notifications from 'expo-notifications';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import type { Budget } from '../types/models';
+
+// Remote push tokens are not available in Expo Go since SDK 53.
+// Local notifications (scheduleNotificationAsync) still work fine.
+const IS_EXPO_GO = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 // Show alerts even when the app is foregrounded
 Notifications.setNotificationHandler({
@@ -40,6 +45,9 @@ export async function requestPermissionsAndGetToken(): Promise<string | null> {
       importance: Notifications.AndroidImportance.DEFAULT,
     });
   }
+
+  // Remote push tokens require a dev/production build — not available in Expo Go SDK 53+
+  if (IS_EXPO_GO) return null;
 
   try {
     const { data } = await Notifications.getExpoPushTokenAsync();

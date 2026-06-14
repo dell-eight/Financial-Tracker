@@ -22,6 +22,8 @@ import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { getCategoryBgColor } from '../../theme';
 import { deleteTransaction, updateExpense, updateIncome } from '../../services/finance.service';
 import type { TransactionsStackParamList } from '../../navigation/types';
+import { formatFull, formatCompact, useCurrency } from '../../utils/currency';
+import { useAppStore } from '../../store/app.store';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import type { Transaction } from '../../types/models';
 
@@ -29,9 +31,7 @@ type Props = StackScreenProps<TransactionsStackParamList, 'TransactionDetail'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+function fmt(n: number): string { return formatFull(n, useAppStore.getState().currency); }
 
 function formatDisplayDate(dateStr: string): string {
   const d = new Date(dateStr + 'T12:00:00');
@@ -98,6 +98,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
+  const { symbol } = useCurrency();
   const { id, type } = route.params;
 
   const [deleting, setDeleting] = useState(false);
@@ -267,7 +268,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
           {/* Amount */}
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>AMOUNT</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: editedAmount > 0 ? amtColor : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[4] }}>
-            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
               value={editAmountStr}
               onChangeText={v => {

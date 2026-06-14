@@ -24,19 +24,15 @@ import { ExpenseItem } from '../../components';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import type { BudgetStackParamList } from '../../navigation/types';
 import type { Budget, Transaction } from '../../types/models';
+import { formatFull, formatCompact, getCurrencySymbol } from '../../utils/currency';
+import { useAppStore } from '../../store/app.store';
 
 type Props = StackScreenProps<BudgetStackParamList, 'CategoryBudgetDetail'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtShort(n: number): string {
-  if (n >= 1000) return `₱${(n / 1000).toFixed(1)}k`;
-  return `₱${Math.round(n)}`;
-}
+function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
+function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 function currentMonthPrefix(): string {
   return new Date().toISOString().slice(0, 7); // "2026-06"
@@ -95,7 +91,7 @@ function EditLimitModal({
           Edit Budget Limit
         </Text>
         <View style={[modalStyles.inputRow, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.input, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: spacing[4], height: 52 }]}>
-          <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+          <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.muted, marginRight: 4 }}>{getCurrencySymbol(useAppStore.getState().currency)}</Text>
           <TextInput
             value={value}
             onChangeText={v => {
@@ -323,7 +319,7 @@ export function CategoryBudgetDetailScreen({ navigation, route }: Props) {
                 categoryKey={tx.category}
                 categoryLabel={tx.categoryLabel}
                 categoryIcon={<Text style={{ fontSize: 16, lineHeight: 20 }}>{tx.categoryIcon}</Text>}
-                amount={`₱${tx.amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                amount={fmt(tx.amount)}
                 type={tx.type}
                 date={tx.note ?? tx.categoryLabel}
                 time={formatTime(tx.time)}

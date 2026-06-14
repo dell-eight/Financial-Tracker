@@ -18,6 +18,7 @@ import { useTheme } from '../../hooks/ui/useTheme';
 import { useNetworkStatus } from '../../hooks/ui/useNetworkStatus';
 import { TRANSACTIONS_KEY } from '../../hooks/queries/useTransactions';
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
+import { useCurrency } from '../../utils/currency';
 import { useAccounts } from '../../hooks/queries/useAccounts';
 import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { addIncome } from '../../services/finance.service';
@@ -46,6 +47,7 @@ export function AddIncomeScreen({ navigation }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
+  const { symbol, fmt } = useCurrency();
 
   const { data: accounts = [] } = useAccounts();
 
@@ -153,7 +155,7 @@ export function AddIncomeScreen({ navigation }: Props) {
           </Text>
           <View style={styles.amountRow}>
             <Text style={{ fontSize: 44, fontFamily: fontFamily.bold, color: amountStr ? colors.income : colors.text.muted, lineHeight: 52, marginRight: 4 }}>
-              ₱
+              {symbol}
             </Text>
             <TextInput
               value={amountStr}
@@ -248,7 +250,7 @@ export function AddIncomeScreen({ navigation }: Props) {
                     {toAccount.institutionName}
                   </Text>
                   <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
-                    {toAccount.maskedNumber} · ₱{toAccount.balance.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+                    {toAccount.maskedNumber} · {fmt(toAccount.balance)}
                   </Text>
                 </>
               ) : (
@@ -313,7 +315,7 @@ export function AddIncomeScreen({ navigation }: Props) {
                     </Text>
                   </View>
                   <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
-                    ₱{acc.balance.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+                    {fmt(acc.balance)}
                   </Text>
                   {toAccount?.id === acc.id && (
                     <Text style={{ fontSize: 14, color: colors.income, marginLeft: spacing[2] }}>✓</Text>

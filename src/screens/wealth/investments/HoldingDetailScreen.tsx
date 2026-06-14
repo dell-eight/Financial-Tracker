@@ -17,6 +17,8 @@ import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments, HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
 import { deleteHolding } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
+import { formatFull, formatCompact } from '../../../utils/currency';
+import { useAppStore } from '../../../store/app.store';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { InvestmentHolding } from '../../../types/models';
 
@@ -24,15 +26,8 @@ type Props = StackScreenProps<WealthStackParamList, 'HoldingDetail'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(n: number, decimals = 2): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
-}
-
-function fmtShort(n: number): string {
-  if (Math.abs(n) >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
-  if (Math.abs(n) >= 1_000)     return `₱${(n / 1_000).toFixed(1)}k`;
-  return `₱${n.toFixed(0)}`;
-}
+function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
+function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // Generate deterministic 7-day price bars relative to currentPrice
 function generatePriceBars(currentPrice: number): number[] {

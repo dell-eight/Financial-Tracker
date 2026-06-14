@@ -28,6 +28,8 @@ import {
   deleteAsset,
 } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
+import { formatFull, formatCompact, useCurrency } from '../../../utils/currency';
+import { useAppStore } from '../../../store/app.store';
 import type { AssetCategory, AssetItem } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'AssetsDetail'>;
@@ -55,15 +57,8 @@ const ADD_TYPES: { key: AddCategory; label: string; icon: string }[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtShort(n: number): string {
-  if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)     return `₱${(n / 1_000).toFixed(1)}k`;
-  return `₱${Math.round(n)}`;
-}
+function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
+function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // ─── AddAssetModal ────────────────────────────────────────────────────────────
 
@@ -77,6 +72,7 @@ function AddAssetModal({
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { symbol } = useCurrency();
 
   const [name,       setName]       = useState('');
   const [category,   setCategory]   = useState<AddCategory>('cash');
@@ -150,7 +146,7 @@ function AddAssetModal({
           {/* Balance */}
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>CURRENT BALANCE</Text>
           <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: balance > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[4] }]}>
-            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
               value={balanceStr}
               onChangeText={v => {
@@ -203,6 +199,7 @@ function EditBalanceModal({
 }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { symbol } = useCurrency();
   const [valueStr, setValueStr] = useState('');
   const [saving,   setSaving]   = useState(false);
   const [error,    setError]    = useState<string | null>(null);
@@ -242,7 +239,7 @@ function EditBalanceModal({
             </Text>
           )}
           <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: canSave ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[4] }]}>
-            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
               value={valueStr}
               onChangeText={v => {

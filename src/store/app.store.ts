@@ -29,7 +29,7 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       themePreference:      'system',
-      currency:             'USD',
+      currency:             'PHP',
       notificationsEnabled: true,
       biometricEnabled:     false,
       isBiometricUnlocked:  false,

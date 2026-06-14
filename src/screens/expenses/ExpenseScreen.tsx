@@ -27,6 +27,8 @@ import { useTransactions } from '../../hooks/queries/useTransactions';
 import { ExpenseItem, SectionHeader } from '../../components';
 import { getCategoryBgColor } from '../../theme';
 import type { TransactionsStackParamList } from '../../navigation/types';
+import { formatFull, formatCompact } from '../../utils/currency';
+import { useAppStore } from '../../store/app.store';
 import type { CategoryKey } from '../../theme';
 
 type Props = StackScreenProps<TransactionsStackParamList, 'TransactionList'>;
@@ -82,15 +84,8 @@ const CATEGORY_CHIPS: ChipDef[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtCompact(n: number): string {
-  if (n >= 10000) return `₱${(n / 1000).toFixed(1)}k`;
-  if (n >= 1000)  return `₱${(n / 1000).toFixed(2)}k`;
-  return fmt(n);
-}
+function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
+function fmtCompact(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 function isInPeriod(date: string, period: Period): boolean {
   if (period === 'week')  return date >= WEEK_START && date <= TODAY;

@@ -18,20 +18,15 @@ import { useSavingsGoals }   from '../../hooks/queries/useSavingsGoals';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useMonthlyHistory }  from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
+import { formatFull, formatCompact, useCurrency } from '../../utils/currency';
+import { useAppStore } from '../../store/app.store';
 
 type Props = StackScreenProps<AnalyticsStackParamList, 'Forecast'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtShort(n: number): string {
-  if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)     return `₱${(n / 1_000).toFixed(1)}k`;
-  return `₱${Math.round(n)}`;
-}
-
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
+function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
 
 function monthsToPayoff(balance: number, monthly: number, rate: number): number {
   if (monthly <= 0) return 999;
@@ -60,6 +55,7 @@ export function ForecastScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt: fmtCurrency } = useCurrency();
 
   const { data: goals         } = useSavingsGoals();
   const { data: debts         } = useDebts();
@@ -155,7 +151,7 @@ export function ForecastScreen({ navigation }: Props) {
               ))}
             </View>
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: spacing[2] }}>
-              Assumes ₱{MONTHLY_SAVINGS.toLocaleString('en-PH')}/mo savings + 7% investment growth
+              Assumes {fmtCurrency(MONTHLY_SAVINGS)}/mo savings + 7% investment growth
             </Text>
           </View>
         </Animated.View>
@@ -196,7 +192,7 @@ export function ForecastScreen({ navigation }: Props) {
               );
             })}
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>
-              Based on ₱{MONTHLY_SAVINGS.toLocaleString('en-PH')}/mo available for goals
+              Based on {fmtCurrency(MONTHLY_SAVINGS)}/mo available for goals
             </Text>
           </View>
         </Animated.View>

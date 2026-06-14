@@ -27,6 +27,8 @@ import { useBudgets }  from '../../hooks/queries/useBudgets';
 import { BudgetCard, SectionHeader } from '../../components';
 import type { BudgetStackParamList } from '../../navigation/types';
 import type { CategoryKey } from '../../theme';
+import { formatFull, formatCompact } from '../../utils/currency';
+import { useAppStore } from '../../store/app.store';
 
 type Props = StackScreenProps<BudgetStackParamList, 'BudgetOverview'>;
 
@@ -51,14 +53,8 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June',
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(n: number) {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtShort(n: number) {
-  if (n >= 1000) return `₱${(n / 1000).toFixed(1)}k`;
-  return `₱${Math.round(n)}`;
-}
+function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
+function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // ─── CategoryIcon ─────────────────────────────────────────────────────────────
 

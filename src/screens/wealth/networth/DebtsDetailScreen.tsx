@@ -24,6 +24,8 @@ import { useAccounts, ACCOUNTS_KEY } from '../../../hooks/queries/useAccounts';
 import { TRANSACTIONS_KEY } from '../../../hooks/queries/useTransactions';
 import { createDebt, updateDebtBalance, addDebtCharge, deleteDebt, makeDebtPayment } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
+import { formatFull, formatCompact, useCurrency } from '../../../utils/currency';
+import { useAppStore } from '../../../store/app.store';
 import type { DebtCategory, DebtItem } from '../../../types/models';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 
@@ -41,15 +43,8 @@ const CATEGORY_LABELS: Record<DebtCategory, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtShort(n: number): string {
-  if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)     return `₱${(n / 1_000).toFixed(1)}k`;
-  return `₱${Math.round(n)}`;
-}
+function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
+function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // Estimated months to pay off at current monthly payment
 function monthsToPayoff(balance: number, monthly: number, rate: number): number | null {
@@ -82,6 +77,7 @@ function AddDebtModal({
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { symbol } = useCurrency();
 
   const [name,           setName]           = useState('');
   const [debtType,       setDebtType]       = useState<DebtCategory>('credit_card');
@@ -176,14 +172,14 @@ function AddDebtModal({
           {/* Current Balance */}
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>CURRENT BALANCE</Text>
           <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: balance > 0 ? colors.expense : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[4] }]}>
-            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput value={balanceStr} onChangeText={v => numField(v, setBalanceStr)} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.expense, padding: 0 }} />
           </View>
 
           {/* Original Amount */}
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>ORIGINAL AMOUNT <Text style={{ fontFamily: fontFamily.regular, color: colors.text.muted }}>(optional)</Text></Text>
           <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: originalStr ? colors.border.subtle : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[4] }]}>
-            <Text style={{ fontSize: fontSize.bodyLg, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <Text style={{ fontSize: fontSize.bodyLg, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput value={originalStr} onChangeText={v => numField(v, setOriginalStr)} keyboardType="decimal-pad" placeholder={balanceStr || '0'} placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.bodyLg, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }} />
           </View>
 
@@ -199,7 +195,7 @@ function AddDebtModal({
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>MONTHLY PAYMENT</Text>
               <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: spacing[3], height: 50 }]}>
-                <Text style={{ fontSize: fontSize.bodySm, color: colors.text.muted, marginRight: 2 }}>₱</Text>
+                <Text style={{ fontSize: fontSize.bodySm, color: colors.text.muted, marginRight: 2 }}>{symbol}</Text>
                 <TextInput value={monthlyStr} onChangeText={v => numField(v, setMonthlyStr)} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }} />
               </View>
             </View>
@@ -234,6 +230,7 @@ function AddChargeModal({
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { symbol } = useCurrency();
   const [amountStr, setAmountStr] = useState('');
   const [saving,    setSaving]    = useState(false);
 
@@ -274,7 +271,7 @@ function AddChargeModal({
             AMOUNT TO ADD
           </Text>
           <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: amount > 0 ? colors.expense : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[2] }]}>
-            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
               value={amountStr}
               onChangeText={v => {
@@ -332,6 +329,7 @@ function PayDebtModal({
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { symbol } = useCurrency();
   const { data: accounts = [] } = useAccounts();
 
   const [amountStr,      setAmountStr]      = useState('');
@@ -401,7 +399,7 @@ function PayDebtModal({
           {/* Amount */}
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>PAYMENT AMOUNT</Text>
           <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: amount > 0 ? colors.income : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[2] }]}>
-            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
               value={amountStr}
               onChangeText={numField}

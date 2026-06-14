@@ -21,6 +21,8 @@ import { getCategoryBgColor } from '../../theme';
 import { EXPENSE_CATEGORIES } from '../../constants/categories';
 import type { BudgetStackParamList } from '../../navigation/types';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
+import { useCurrency, formatFull } from '../../utils/currency';
+import { useAppStore } from '../../store/app.store';
 
 type Props = StackScreenProps<BudgetStackParamList, 'BudgetSetupWizard'>;
 
@@ -83,6 +85,7 @@ function CategoryRow({
 }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontFamily, fontSize } = theme;
+  const { symbol } = useCurrency();
   const catColor = (theme.categoryColors as Record<string, string>)[catKey] ?? colors.accent.primary;
   const catBg    = getCategoryBgColor(catKey as any);
 
@@ -103,7 +106,7 @@ function CategoryRow({
         {label}
       </Text>
       <View style={[catRowStyles.inputWrap, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.input, borderWidth: 1, borderColor: value ? catColor : colors.border.subtle, paddingHorizontal: spacing[2], height: 40, width: 110 }]}>
-        <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted }}>₱</Text>
+        <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted }}>{symbol}</Text>
         <TextInput
           value={value}
           onChangeText={handleChange}
@@ -130,6 +133,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
+  const { symbol, fmt } = useCurrency();
 
   // Existing budgets — used only to pre-fill limits
   const { data: existingBudgets } = useBudgets();
@@ -220,7 +224,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
       <View style={{ alignItems: 'center', marginTop: spacing[8] }}>
         <View style={step1Styles.amtRow}>
           <Text style={{ fontSize: 44, fontFamily: fontFamily.bold, color: income ? colors.income : colors.text.muted, lineHeight: 52, marginRight: 4 }}>
-            ₱
+            {symbol}
           </Text>
           <TextInput
             value={income}
@@ -247,7 +251,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
             💡 Budget tip
           </Text>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary, marginTop: 4, lineHeight: 20 }}>
-            The 50/30/20 rule suggests allocating ₱{(parsedIncome * 0.5).toLocaleString('en-PH', { minimumFractionDigits: 0 })} to needs, ₱{(parsedIncome * 0.3).toLocaleString('en-PH', { minimumFractionDigits: 0 })} to wants, and ₱{(parsedIncome * 0.2).toLocaleString('en-PH', { minimumFractionDigits: 0 })} to savings.
+            The 50/30/20 rule suggests allocating {fmt(parsedIncome * 0.5)} to needs, {fmt(parsedIncome * 0.3)} to wants, and {fmt(parsedIncome * 0.2)} to savings.
           </Text>
         </View>
       )}
@@ -272,12 +276,12 @@ export function BudgetSetupWizard({ navigation }: Props) {
               Allocated
             </Text>
             <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: allocPct > 100 ? colors.expense : colors.text.primary, letterSpacing: -0.3, marginTop: 2 }}>
-              ₱{totalAllocated.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+              {fmt(totalAllocated)}
             </Text>
           </View>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>
-              of ₱{parsedIncome.toLocaleString('en-PH', { minimumFractionDigits: 0 })} income
+              of {fmt(parsedIncome)} income
             </Text>
             <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: allocPct > 100 ? colors.expense : colors.income, letterSpacing: -0.3, marginTop: 2 }}>
               {allocPct}%
@@ -326,19 +330,19 @@ export function BudgetSetupWizard({ navigation }: Props) {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: spacing[4], borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }}>
           <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.muted }}>Monthly Income</Text>
           <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.bold, color: colors.income }}>
-            ₱{parsedIncome.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+            {fmt(parsedIncome)}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing[4], borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }}>
           <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.muted }}>Total Allocated</Text>
           <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.bold, color: colors.text.primary }}>
-            ₱{totalAllocated.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+            {fmt(totalAllocated)}
           </Text>
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing[4] }}>
           <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.muted }}>Unallocated</Text>
           <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.bold, color: parsedIncome - totalAllocated >= 0 ? colors.income : colors.expense }}>
-            ₱{Math.abs(parsedIncome - totalAllocated).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+            {fmt(Math.abs(parsedIncome - totalAllocated))}
           </Text>
         </View>
       </View>
@@ -368,7 +372,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
                     {c.label}
                   </Text>
                   <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: catColor }}>
-                    ₱{alloc.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+                    {fmt(alloc)}
                   </Text>
                 </View>
               );

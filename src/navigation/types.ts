@@ -25,6 +25,7 @@ export type HomeStackParamList = {
   Profile:           undefined;
   DataExport:        undefined;
   SecuritySettings:  undefined;
+  CurrencyPicker:    undefined;
   TransactionDetail: { id: string; type: 'expense' | 'income' };
 };
 

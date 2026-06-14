@@ -19,6 +19,7 @@ import { HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
 import { addHolding } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
+import { useCurrency } from '../../../utils/currency';
 import type { AssetType } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'AddHolding'>;
@@ -42,6 +43,7 @@ export function AddHoldingScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
+  const { symbol: currencySymbol } = useCurrency();
 
   const [symbol,    setSymbol]    = useState('');
   const [name,      setName]      = useState('');
@@ -185,7 +187,7 @@ export function AddHoldingScreen({ navigation, route }: Props) {
           <View style={{ flex: 1 }}>
             <Text style={[styles.label, { color: colors.text.muted, marginBottom: spacing[2] }]}>AVG COST / SHARE</Text>
             <View style={[styles.inputRow, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: cost > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[3], height: 50 }]}>
-              <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, marginRight: 2 }}>₱</Text>
+              <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, marginRight: 2 }}>{currencySymbol}</Text>
               <TextInput
                 value={costStr}
                 onChangeText={handleAmountChange(setCostStr)}
@@ -201,7 +203,7 @@ export function AddHoldingScreen({ navigation, route }: Props) {
         {/* ── Current price ── */}
         <Text style={[styles.label, { color: colors.text.muted, marginBottom: spacing[2] }]}>CURRENT PRICE (optional)</Text>
         <View style={[styles.inputRow, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: price > 0 && price !== cost ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[5] }]}>
-          <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, marginRight: 2 }}>₱</Text>
+          <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, marginRight: 2 }}>{currencySymbol}</Text>
           <TextInput
             value={priceStr}
             onChangeText={handleAmountChange(setPriceStr)}

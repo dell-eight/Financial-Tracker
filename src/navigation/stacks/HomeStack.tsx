@@ -8,6 +8,7 @@ import { NotificationsSheet }     from '../../screens/home/NotificationsSheet';
 import { ProfileScreen }          from '../../screens/profile/ProfileScreen';
 import { DataExportScreen }       from '../../screens/profile/DataExportScreen';
 import { SecuritySettingsScreen } from '../../screens/profile/SecuritySettingsScreen';
+import { CurrencyPickerScreen }   from '../../screens/profile/CurrencyPickerScreen';
 import { TransactionDetailScreen } from '../../screens/transactions/TransactionDetailScreen';
 
 const Stack = createStackNavigator<HomeStackParamList>();
@@ -22,6 +23,7 @@ export function HomeStack() {
       <Stack.Screen name="Profile"           component={ProfileScreen} />
       <Stack.Screen name="DataExport"        component={DataExportScreen} />
       <Stack.Screen name="SecuritySettings"  component={SecuritySettingsScreen} />
+      <Stack.Screen name="CurrencyPicker"    component={CurrencyPickerScreen} />
       <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
     </Stack.Navigator>
   );

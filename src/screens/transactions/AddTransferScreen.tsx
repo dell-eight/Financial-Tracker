@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useNetworkStatus } from '../../hooks/ui/useNetworkStatus';
+import { useCurrency } from '../../utils/currency';
 import { useAccounts } from '../../hooks/queries/useAccounts';
 import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
@@ -43,6 +44,7 @@ function AccountPicker({
 }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
+  const { fmt } = useCurrency();
   const [open, setOpen] = useState(false);
 
   return (
@@ -129,7 +131,7 @@ function AccountPicker({
                 </Text>
               </View>
               <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
-                ₱{acc.balance.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+                {fmt(acc.balance)}
               </Text>
               {selected?.id === acc.id && (
                 <Text style={{ fontSize: 14, color: colors.accent.primary, marginLeft: spacing[2] }}>✓</Text>
@@ -154,6 +156,7 @@ export function AddTransferScreen({ navigation }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
+  const { symbol, fmt } = useCurrency();
 
   const { data: accounts = [] } = useAccounts();
 
@@ -251,7 +254,7 @@ export function AddTransferScreen({ navigation }: Props) {
           </Text>
           <View style={styles.amountRow}>
             <Text style={{ fontSize: 44, fontFamily: fontFamily.bold, color: amountStr ? colors.accent.primary : colors.text.muted, lineHeight: 52, marginRight: 4 }}>
-              ₱
+              {symbol}
             </Text>
             <TextInput
               value={amountStr}

@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
+import { useCurrency } from '../../utils/currency';
 import type { TransactionsStackParamList, FilterState } from '../../navigation/types';
 
 type Props = StackScreenProps<TransactionsStackParamList, 'Filter'>;
@@ -101,6 +102,7 @@ function AmountInput({
 }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontFamily, fontSize } = theme;
+  const { symbol } = useCurrency();
 
   function handleChange(text: string) {
     const cleaned = text.replace(/[^0-9.]/g, '');
@@ -116,7 +118,7 @@ function AmountInput({
         {label}
       </Text>
       <View style={[amtStyles.wrap, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: spacing[3], height: 44 }]}>
-        <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+        <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
         <TextInput
           value={value}
           onChangeText={handleChange}
@@ -140,6 +142,7 @@ export function FilterSheet({ navigation, route }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { symbol } = useCurrency();
 
   const initial = route.params?.current;
 
@@ -263,12 +266,12 @@ export function FilterSheet({ navigation, route }: Props) {
             )}
             {minAmtStr.length > 0 && (
               <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary }}>
-                • Min amount: ₱{minAmtStr}
+                • Min amount: {symbol}{minAmtStr}
               </Text>
             )}
             {maxAmtStr.length > 0 && (
               <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary }}>
-                • Max amount: ₱{maxAmtStr}
+                • Max amount: {symbol}{maxAmtStr}
               </Text>
             )}
           </View>

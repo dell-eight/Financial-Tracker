@@ -19,6 +19,8 @@ import { useTheme }        from '../../hooks/ui/useTheme';
 import { useTransactions } from '../../hooks/queries/useTransactions';
 import { useMonthlyHistory, useIncomeStreams } from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
+import { formatFull, formatCompact } from '../../utils/currency';
+import { useAppStore } from '../../store/app.store';
 
 type Props = StackScreenProps<AnalyticsStackParamList, 'IncomeAnalysis'>;
 
@@ -27,14 +29,8 @@ const { width: SCREEN_W } = Dimensions.get('window');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtK(n: number): string {
-  if (n >= 1000) return `₱${(n / 1000).toFixed(1)}k`;
-  return `₱${Math.round(n)}`;
-}
+function fmt(n: number): string  { return formatFull(n,    useAppStore.getState().currency); }
+function fmtK(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 function smoothPath(pts: { x: number; y: number }[]): string {
   if (pts.length < 2) return '';

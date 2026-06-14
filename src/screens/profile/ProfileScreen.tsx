@@ -22,6 +22,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useAuthStore } from '../../store/auth.store';
 import { useAppStore } from '../../store/app.store';
+import { formatCompact } from '../../utils/currency';
 import type { ThemePreference } from '../../store/app.store';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useTransactions } from '../../hooks/queries/useTransactions';
@@ -410,7 +411,7 @@ export function ProfileScreen({ navigation }: Props) {
             },
           ]}
         >
-          <StatCard label="Net Worth"   value={netWorth >= 1000 ? `₱${(netWorth/1000).toFixed(0)}k` : `₱${Math.round(netWorth)}`} sub="+1.3%" theme={theme} />
+          <StatCard label="Net Worth"   value={formatCompact(netWorth, useAppStore.getState().currency)} sub="+1.3%" theme={theme} />
           <StatCard label="This Month"  value={`${monthTxCount} txns`}               theme={theme} />
           <StatCard label="Savings"     value={`${savingsRate}%`} sub="↑ great"      theme={theme} />
         </Animated.View>
@@ -432,8 +433,8 @@ export function ProfileScreen({ navigation }: Props) {
               theme={theme}
             />
             <MenuItem
-              icon="💱" label="Currency" value={useAppStore.getState().currency} chevron
-              onPress={() => Alert.alert('Currency', 'Coming soon')}
+              icon="💱" label="Currency" value={useAppStore(s => s.currency)} chevron
+              onPress={() => navigation.push('CurrencyPicker')}
               theme={theme}
             />
             <MenuItem

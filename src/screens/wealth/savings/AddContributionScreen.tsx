@@ -22,6 +22,7 @@ import { addContribution } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
 import type { SavingsGoal, Account } from '../../../types/models';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
+import { useCurrency } from '../../../utils/currency';
 
 type Props = StackScreenProps<WealthStackParamList, 'AddContribution'>;
 
@@ -29,9 +30,7 @@ type Props = StackScreenProps<WealthStackParamList, 'AddContribution'>;
 
 const PRESETS = [500, 1000, 2000, 5000];
 
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+// fmt is defined per-component via useCurrency() below
 
 // ─── AddContributionScreen ────────────────────────────────────────────────────
 
@@ -40,6 +39,7 @@ export function AddContributionScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
+  const { symbol, fmt } = useCurrency();
   const { goalId }  = route.params;
 
   const { data: accounts = [] } = useAccounts();
@@ -156,7 +156,7 @@ export function AddContributionScreen({ navigation, route }: Props) {
         <View style={{ alignItems: 'center', paddingVertical: spacing[6] }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={{ fontSize: 44, fontFamily: fontFamily.bold, color: parsed > 0 ? colors.income : colors.text.muted, lineHeight: 52, marginRight: 4 }}>
-              ₱
+              {symbol}
             </Text>
             <TextInput
               value={amountStr}
@@ -190,7 +190,7 @@ export function AddContributionScreen({ navigation, route }: Props) {
         {/* ── Quick presets ── */}
         <View style={[styles.presetRow, { paddingHorizontal: H_PAD, gap: spacing[3], marginBottom: spacing[5] }]}>
           {PRESETS.map(v => {
-            const label = v >= 1000 ? `₱${v / 1000}k` : `₱${v}`;
+            const label = fmt(v);
             return (
               <Pressable
                 key={v}
@@ -240,7 +240,7 @@ export function AddContributionScreen({ navigation, route }: Props) {
                 <>
                   <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>{fromAccount.institutionName}</Text>
                   <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
-                    {fromAccount.maskedNumber} · ₱{fromAccount.balance.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+                    {fromAccount.maskedNumber} · {fmt(fromAccount.balance)}
                   </Text>
                 </>
               ) : (
@@ -252,7 +252,7 @@ export function AddContributionScreen({ navigation, route }: Props) {
 
           {insufficientFunds && (
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.expense, marginTop: spacing[2] }}>
-              Insufficient funds — {fromAccount!.institutionName} only has ₱{fromAccount!.balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+              Insufficient funds — {fromAccount!.institutionName} only has {fmt(fromAccount!.balance)}
             </Text>
           )}
 
@@ -284,7 +284,7 @@ export function AddContributionScreen({ navigation, route }: Props) {
                         {acc.maskedNumber}{noFunds ? ' · No funds' : ''}
                       </Text>
                     </View>
-                    <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: noFunds ? colors.text.muted : colors.text.primary }}>₱{acc.balance.toLocaleString('en-PH', { minimumFractionDigits: 0 })}</Text>
+                    <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: noFunds ? colors.text.muted : colors.text.primary }}>{fmt(acc.balance)}</Text>
                     {fromAccount?.id === acc.id && <Text style={{ fontSize: 14, color: colors.accent.primary, marginLeft: spacing[2] }}>✓</Text>}
                   </Pressable>
                 );

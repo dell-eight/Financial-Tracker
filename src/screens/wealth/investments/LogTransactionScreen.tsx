@@ -18,6 +18,8 @@ import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments, HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
 import { logTrade } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
+import { formatFull, formatCompact, useCurrency } from '../../../utils/currency';
+import { useAppStore } from '../../../store/app.store';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { InvestmentHolding } from '../../../types/models';
 
@@ -25,9 +27,7 @@ type Props = StackScreenProps<WealthStackParamList, 'LogTransaction'>;
 
 type TxType = 'buy' | 'sell';
 
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+function fmt(n: number): string { return formatFull(n, useAppStore.getState().currency); }
 
 // ─── LogTransactionScreen ─────────────────────────────────────────────────────
 
@@ -36,6 +36,7 @@ export function LogTransactionScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient  = useQueryClient();
+  const { symbol } = useCurrency();
   const { holdingId } = route.params;
 
   const [txType,    setTxType]    = useState<TxType>('buy');
@@ -178,7 +179,7 @@ export function LogTransactionScreen({ navigation, route }: Props) {
         <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }}>
           <Text style={[styles.label, { color: colors.text.muted, marginBottom: spacing[2] }]}>PRICE PER SHARE</Text>
           <View style={[styles.inputRow, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: price > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 50 }]}>
-            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
               value={priceStr}
               onChangeText={handleAmountChange(setPriceStr)}

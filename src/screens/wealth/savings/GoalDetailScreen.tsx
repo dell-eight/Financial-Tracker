@@ -18,6 +18,8 @@ import { useSavingsGoals, SAVINGS_GOALS_KEY } from '../../../hooks/queries/useSa
 import { ASSETS_KEY } from '../../../hooks/queries/useNetWorth';
 import { getContributions, deleteSavingsGoal, type Contribution } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
+import { formatFull, formatCompact } from '../../../utils/currency';
+import { useAppStore } from '../../../store/app.store';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { SavingsGoal } from '../../../types/models';
 
@@ -25,15 +27,8 @@ type Props = StackScreenProps<WealthStackParamList, 'GoalDetail'>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtShort(n: number): string {
-  if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)     return `₱${(n / 1_000).toFixed(1)}k`;
-  return `₱${Math.round(n)}`;
-}
+function fmt(n: number): string      { return formatFull(n,    useAppStore.getState().currency); }
+function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 // ─── CircleProgress ───────────────────────────────────────────────────────────
 
@@ -247,7 +242,7 @@ export function GoalDetailScreen({ navigation, route }: Props) {
             </View>
             {!isComplete && monthlyEst > 0 && (
               <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: spacing[2], textAlign: 'center' }}>
-                ~{monthlyEst} months at ₱5,000/mo
+                ~{monthlyEst} months at {fmtShort(5000)}/mo
               </Text>
             )}
           </View>

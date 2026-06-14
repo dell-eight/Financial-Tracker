@@ -19,6 +19,8 @@ import { useTheme }          from '../../hooks/ui/useTheme';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useNetWorthHistory }  from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
+import { formatCompact } from '../../utils/currency';
+import { useAppStore } from '../../store/app.store';
 
 type Props = StackScreenProps<AnalyticsStackParamList, 'NetWorthGrowth'>;
 
@@ -27,11 +29,7 @@ const { width: SCREEN_W } = Dimensions.get('window');
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtShort(n: number): string {
-  if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000)     return `₱${(n / 1_000).toFixed(0)}k`;
-  return `₱${Math.round(n)}`;
-}
+function fmtShort(n: number): string { return formatCompact(n, useAppStore.getState().currency); }
 
 function smoothPath(pts: { x: number; y: number }[]): string {
   if (pts.length < 2) return '';
@@ -150,8 +148,7 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
     const magnitude = Math.pow(10, Math.floor(Math.log10(Math.max(currentNW, 100_000))));
     const steps     = [0.5, 0.75, 1, 1.5, 2, 3].map(x => Math.round(x * magnitude));
     return steps.map(v => ({
-      label:   v >= 1_000_000 ? `₱${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`
-               : `₱${(v / 1_000).toFixed(0)}k`,
+      label:   formatCompact(v, useAppStore.getState().currency),
       value:   v,
       reached: currentNW >= v,
     }));

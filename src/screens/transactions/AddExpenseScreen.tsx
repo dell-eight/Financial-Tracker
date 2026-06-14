@@ -28,6 +28,7 @@ import type { TransactionsStackParamList } from '../../navigation/types';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import { checkBudgetThresholds } from '../../services/notifications.service';
 import { useAppStore } from '../../store/app.store';
+import { useCurrency } from '../../utils/currency';
 import type { CategoryKey } from '../../theme';
 import type { Account } from '../../types/models';
 import { EXPENSE_CATEGORIES } from '../../constants/categories';
@@ -54,6 +55,7 @@ export function AddExpenseScreen({ navigation }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
+  const { symbol, fmt } = useCurrency();
   const notificationsEnabled = useAppStore(s => s.notificationsEnabled);
   const alert80Enabled       = useAppStore(s => s.alert80Enabled);
   const alert100Enabled      = useAppStore(s => s.alert100Enabled);
@@ -168,7 +170,7 @@ export function AddExpenseScreen({ navigation }: Props) {
           </Text>
           <View style={styles.amountRow}>
             <Text style={{ fontSize: 44, fontFamily: fontFamily.bold, color: amountStr ? colors.expense : colors.text.muted, lineHeight: 52, marginRight: 4 }}>
-              ₱
+              {symbol}
             </Text>
             <TextInput
               value={amountStr}
@@ -264,7 +266,7 @@ export function AddExpenseScreen({ navigation }: Props) {
                     {fromAccount.institutionName}
                   </Text>
                   <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
-                    {fromAccount.maskedNumber} · ₱{fromAccount.balance.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+                    {fromAccount.maskedNumber} · {fmt(fromAccount.balance)}
                   </Text>
                 </>
               ) : (
@@ -328,7 +330,7 @@ export function AddExpenseScreen({ navigation }: Props) {
                     </Text>
                   </View>
                   <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
-                    ₱{acc.balance.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+                    {fmt(acc.balance)}
                   </Text>
                   {fromAccount?.id === acc.id && (
                     <Text style={{ fontSize: 14, color: colors.expense, marginLeft: spacing[2] }}>✓</Text>

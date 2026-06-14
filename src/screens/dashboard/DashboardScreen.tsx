@@ -34,8 +34,10 @@ import { useTransactions }            from '../../hooks/queries/useTransactions'
 import { useBudgets }                 from '../../hooks/queries/useBudgets';
 import { useSavingsGoals }            from '../../hooks/queries/useSavingsGoals';
 import { useAuthStore }               from '../../store/auth.store';
+import { useAppStore }                from '../../store/app.store';
 import { ProgressBar, SectionHeader, ExpenseItem } from '../../components';
 import type { HomeStackParamList, MainTabParamList } from '../../navigation/types';
+import { formatFull, formatCompact } from '../../utils/currency';
 
 type Props = StackScreenProps<HomeStackParamList, 'HomeMain'>;
 
@@ -43,15 +45,8 @@ const { width: SCREEN_W } = Dimensions.get('window');
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
 
-function fmtPh(n: number): string {
-  return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtK(n: number): string {
-  if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `₱${(n / 1_000).toFixed(0)}K`;
-  return `₱${n.toFixed(0)}`;
-}
+function fmtPh(n: number): string { return formatFull(n,    useAppStore.getState().currency); }
+function fmtK(n: number): string  { return formatCompact(n, useAppStore.getState().currency); }
 
 function formatDateLabel(dateStr: string): string {
   const today    = new Date();

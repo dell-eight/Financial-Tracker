@@ -6,6 +6,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { useTheme } from '../../../hooks/ui/useTheme';
+import { useCurrency } from '../../../utils/currency';
 import { getCategoryBgColor, getProgressColor } from '../../../theme';
 import { ProgressBar } from '../../charts/ProgressBar/ProgressBar';
 import type { CategoryKey } from '../../../theme';
@@ -33,11 +34,13 @@ export function BudgetCard({
   categoryIcon,
   spent,
   limit,
-  currencySymbol = '₱',
+  currencySymbol,
   onPress,
   style,
 }: BudgetCardProps) {
   const theme = useTheme();
+  const { symbol: defaultSymbol } = useCurrency();
+  const sym = currencySymbol ?? defaultSymbol;
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows, categoryColors } = theme;
 
   const ratio       = limit > 0 ? spent / limit : 0;
@@ -60,7 +63,7 @@ export function BudgetCard({
       onPressOut={() => { if (onPress) scale.value = withSpring(1,    theme.animation.spring.snappy); }}
       style={animatedStyle}
       accessibilityRole={onPress ? 'button' : 'none'}
-      accessibilityLabel={`${categoryLabel} budget: ${formatAmount(spent, currencySymbol)} of ${formatAmount(limit, currencySymbol)} spent`}
+      accessibilityLabel={`${categoryLabel} budget: ${formatAmount(spent, sym)} of ${formatAmount(limit, sym)} spent`}
     >
       <View
         style={[
@@ -104,7 +107,7 @@ export function BudgetCard({
                 marginTop:  2,
               }}
             >
-              Limit: {formatAmount(limit, currencySymbol)}
+              Limit: {formatAmount(limit, sym)}
             </Text>
           </View>
 
@@ -117,7 +120,7 @@ export function BudgetCard({
               letterSpacing: -0.2,
             }}
           >
-            {formatAmount(spent, currencySymbol)}
+            {formatAmount(spent, sym)}
           </Text>
         </View>
 
@@ -146,8 +149,8 @@ export function BudgetCard({
             }}
           >
             {isExceeded
-              ? `Over by ${formatAmount(spent - limit, currencySymbol)}`
-              : `${formatAmount(remaining, currencySymbol)} left`}
+              ? `Over by ${formatAmount(spent - limit, sym)}`
+              : `${formatAmount(remaining, sym)} left`}
           </Text>
         </View>
       </View>
