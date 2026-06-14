@@ -19,12 +19,15 @@ import { useTheme } from '../../hooks/ui/useTheme';
 import { useNetworkStatus } from '../../hooks/ui/useNetworkStatus';
 import { TRANSACTIONS_KEY } from '../../hooks/queries/useTransactions';
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
-import { addExpense } from '../../services/finance.service';
+import { BUDGETS_KEY } from '../../hooks/queries/useBudgets';
+import { addExpense, getBudgets } from '../../services/finance.service';
 import { useAccounts } from '../../hooks/queries/useAccounts';
 import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { getCategoryBgColor } from '../../theme';
 import type { TransactionsStackParamList } from '../../navigation/types';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
+import { checkBudgetThresholds } from '../../services/notifications.service';
+import { useAppStore } from '../../store/app.store';
 import type { CategoryKey } from '../../theme';
 import type { Account } from '../../types/models';
 import { EXPENSE_CATEGORIES } from '../../constants/categories';
@@ -51,6 +54,9 @@ export function AddExpenseScreen({ navigation }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
+  const notificationsEnabled = useAppStore(s => s.notificationsEnabled);
+  const alert80Enabled       = useAppStore(s => s.alert80Enabled);
+  const alert100Enabled      = useAppStore(s => s.alert100Enabled);
 
   const { data: accounts = [] } = useAccounts();
 
@@ -101,9 +107,18 @@ export function AddExpenseScreen({ navigation }: Props) {
       const keys: Promise<void>[] = [
         queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }),
         queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+        queryClient.invalidateQueries({ queryKey: BUDGETS_KEY }),
       ];
       if (fromAccount) keys.push(queryClient.invalidateQueries({ queryKey: ASSETS_KEY }));
       await Promise.all(keys);
+
+      // Fire budget threshold notifications for the current month
+      if (notificationsEnabled) {
+        const now = new Date();
+        const freshBudgets = await getBudgets(now.getFullYear(), now.getMonth() + 1);
+        checkBudgetThresholds(freshBudgets, alert80Enabled, alert100Enabled);
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.navigate('TransactionList', undefined);
     } catch (e: any) {

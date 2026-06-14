@@ -30,7 +30,15 @@
     "plugins": [
       "expo-font",
       "expo-secure-store",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "color": "#755DEF",
+          "defaultChannel": "budget-alerts",
+          "sounds": []
+        }
+      ]
     ]
   }
 }

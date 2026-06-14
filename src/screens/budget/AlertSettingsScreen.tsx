@@ -16,6 +16,8 @@ import { useTheme } from '../../hooks/ui/useTheme';
 import { useBudgets } from '../../hooks/queries/useBudgets';
 import { getCategoryBgColor } from '../../theme';
 import type { BudgetStackParamList } from '../../navigation/types';
+import { useAppStore } from '../../store/app.store';
+import { syncWeeklySummary } from '../../services/notifications.service';
 
 type Props = StackScreenProps<BudgetStackParamList, 'AlertSettings'>;
 
@@ -106,14 +108,17 @@ export function AlertSettingsScreen({ navigation }: Props) {
 
   const { data: budgets } = useBudgets();
 
+  const notificationsEnabled   = useAppStore(s => s.notificationsEnabled);
+  const alert80Enabled         = useAppStore(s => s.alert80Enabled);
+  const alert100Enabled        = useAppStore(s => s.alert100Enabled);
+  const weeklySummaryEnabled   = useAppStore(s => s.weeklySummaryEnabled);
+  const setNotificationsEnabled   = useAppStore(s => s.setNotificationsEnabled);
+  const setAlert80Enabled         = useAppStore(s => s.setAlert80Enabled);
+  const setAlert100Enabled        = useAppStore(s => s.setAlert100Enabled);
+  const setWeeklySummaryEnabled   = useAppStore(s => s.setWeeklySummaryEnabled);
+
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
-
-  // Global alert toggles
-  const [alert80,       setAlert80]       = useState(true);
-  const [alert100,      setAlert100]      = useState(true);
-  const [weeklySummary, setWeeklySummary] = useState(false);
-  const [pushEnabled,   setPushEnabled]   = useState(true);
 
   // Per-category alert toggles (all on by default)
   const [catAlerts, setCatAlerts] = useState<Record<string, boolean>>(() => {
@@ -161,15 +166,15 @@ export function AlertSettingsScreen({ navigation }: Props) {
             icon="📲"
             title="Push Notifications"
             subtitle="Allow budget alerts to appear on your device"
-            value={pushEnabled}
-            onChange={setPushEnabled}
+            value={notificationsEnabled}
+            onChange={setNotificationsEnabled}
           />
           <SettingRow
             icon="📋"
             title="Weekly Summary"
             subtitle="Receive a budget recap every Sunday morning"
-            value={weeklySummary}
-            onChange={setWeeklySummary}
+            value={weeklySummaryEnabled}
+            onChange={(v) => { setWeeklySummaryEnabled(v); syncWeeklySummary(v); }}
             isLast
           />
         </View>
@@ -181,15 +186,15 @@ export function AlertSettingsScreen({ navigation }: Props) {
             icon="⚠️"
             title="80% Warning"
             subtitle="Alert when a category reaches 80% of its budget"
-            value={alert80}
-            onChange={setAlert80}
+            value={alert80Enabled}
+            onChange={setAlert80Enabled}
           />
           <SettingRow
             icon="🚨"
             title="Over Budget Alert"
             subtitle="Alert immediately when spending exceeds the limit"
-            value={alert100}
-            onChange={setAlert100}
+            value={alert100Enabled}
+            onChange={setAlert100Enabled}
             isLast
           />
         </View>
