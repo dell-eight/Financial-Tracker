@@ -18,6 +18,7 @@ export interface CategoryMeta {
   key:       CategoryKey;
   label:     string;
   iconName:  string;    // Phosphor / Heroicons icon name — resolved in IconCircle component
+  emoji:     string;    // Emoji glyph — used in pickers and transaction lists
   color:     string;    // hex — from theme.categoryColors
   type:      'expense' | 'income' | 'both';
 }
@@ -25,8 +26,9 @@ export interface CategoryMeta {
 export const CATEGORIES: CategoryMeta[] = [
   {
     key:      'food',
-    label:    'Food & Dining',
+    label:    'Food',
     iconName: 'fork-knife',
+    emoji:    '🍔',
     color:    categoryColors.food,
     type:     'expense',
   },
@@ -34,6 +36,7 @@ export const CATEGORIES: CategoryMeta[] = [
     key:      'transport',
     label:    'Transport',
     iconName: 'car',
+    emoji:    '🚗',
     color:    categoryColors.transport,
     type:     'expense',
   },
@@ -41,6 +44,7 @@ export const CATEGORIES: CategoryMeta[] = [
     key:      'shopping',
     label:    'Shopping',
     iconName: 'shopping-bag',
+    emoji:    '🛍️',
     color:    categoryColors.shopping,
     type:     'expense',
   },
@@ -48,6 +52,7 @@ export const CATEGORIES: CategoryMeta[] = [
     key:      'bills',
     label:    'Bills',
     iconName: 'lightning',
+    emoji:    '⚡',
     color:    categoryColors.bills,
     type:     'expense',
   },
@@ -55,6 +60,7 @@ export const CATEGORIES: CategoryMeta[] = [
     key:      'health',
     label:    'Health',
     iconName: 'heart',
+    emoji:    '💊',
     color:    categoryColors.health,
     type:     'expense',
   },
@@ -62,6 +68,7 @@ export const CATEGORIES: CategoryMeta[] = [
     key:      'entertainment',
     label:    'Entertainment',
     iconName: 'game-controller',
+    emoji:    '🎬',
     color:    categoryColors.entertainment,
     type:     'expense',
   },
@@ -69,6 +76,7 @@ export const CATEGORIES: CategoryMeta[] = [
     key:      'education',
     label:    'Education',
     iconName: 'graduation-cap',
+    emoji:    '📚',
     color:    categoryColors.education,
     type:     'expense',
   },
@@ -76,6 +84,7 @@ export const CATEGORIES: CategoryMeta[] = [
     key:      'other',
     label:    'Other',
     iconName: 'dots-three',
+    emoji:    '💰',
     color:    categoryColors.other,
     type:     'both',
   },
@@ -83,6 +92,7 @@ export const CATEGORIES: CategoryMeta[] = [
     key:      'income_salary',
     label:    'Salary',
     iconName: 'briefcase',
+    emoji:    '💼',
     color:    categoryColors.income_salary,
     type:     'income',
   },
@@ -90,6 +100,7 @@ export const CATEGORIES: CategoryMeta[] = [
     key:      'income_freelance',
     label:    'Freelance',
     iconName: 'laptop',
+    emoji:    '💻',
     color:    categoryColors.income_freelance,
     type:     'income',
   },
@@ -97,6 +108,7 @@ export const CATEGORIES: CategoryMeta[] = [
     key:      'income_other',
     label:    'Other Income',
     iconName: 'coins',
+    emoji:    '💵',
     color:    categoryColors.income_other,
     type:     'income',
   },

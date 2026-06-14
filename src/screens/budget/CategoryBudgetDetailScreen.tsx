@@ -17,9 +17,11 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useBudgets, BUDGETS_KEY } from '../../hooks/queries/useBudgets';
 import { useTransactions } from '../../hooks/queries/useTransactions';
+import { updateBudgetLimit } from '../../services/finance.service';
 import { getCategoryBgColor, getProgressColor } from '../../theme';
 import { ProgressBar } from '../../components/charts/ProgressBar/ProgressBar';
 import { ExpenseItem } from '../../components';
+import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import type { BudgetStackParamList } from '../../navigation/types';
 import type { Budget, Transaction } from '../../types/models';
 
@@ -142,6 +144,7 @@ export function CategoryBudgetDetailScreen({ navigation, route }: Props) {
   const { categoryId } = route.params;
 
   const [editingLimit, setEditingLimit] = useState(false);
+  const [savingLimit,  setSavingLimit]  = useState(false);
 
   const { data: budgets }  = useBudgets();
   const { data: allTxns }  = useTransactions();
@@ -162,14 +165,19 @@ export function CategoryBudgetDetailScreen({ navigation, route }: Props) {
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
 
-  function handleSaveLimit(newLimit: number) {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    queryClient.setQueryData(
-      BUDGETS_KEY,
-      (old: Budget[] | undefined) =>
-        (old ?? []).map(b => b.id === categoryId ? { ...b, limit: newLimit } : b),
-    );
-    setEditingLimit(false);
+  async function handleSaveLimit(newLimit: number) {
+    if (!budget || savingLimit) return;
+    setSavingLimit(true);
+    try {
+      await updateBudgetLimit(budget.label, budget.icon, newLimit, budget.color);
+      await queryClient.invalidateQueries({ queryKey: [...BUDGETS_KEY] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setEditingLimit(false);
+    } catch {
+      // silent — modal stays open so user can retry
+    } finally {
+      setSavingLimit(false);
+    }
   }
 
   // ── Not found ────────────────────────────────────────────────────────────────
@@ -208,6 +216,8 @@ export function CategoryBudgetDetailScreen({ navigation, route }: Props) {
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
       <StatusBar style="light" />
+
+      <LoadingOverlay visible={savingLimit} message="Saving…" />
 
       {/* Edit limit modal */}
       {editingLimit && (

@@ -16,9 +16,11 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useBudgets, BUDGETS_KEY } from '../../hooks/queries/useBudgets';
+import { updateBudgetLimit } from '../../services/finance.service';
 import { getCategoryBgColor } from '../../theme';
+import { EXPENSE_CATEGORIES } from '../../constants/categories';
 import type { BudgetStackParamList } from '../../navigation/types';
-import type { Budget } from '../../types/models';
+import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 
 type Props = StackScreenProps<BudgetStackParamList, 'BudgetSetupWizard'>;
 
@@ -67,18 +69,22 @@ const stepStyles = StyleSheet.create({
 // ─── CategoryRow ──────────────────────────────────────────────────────────────
 
 function CategoryRow({
-  budget,
+  catKey,
+  label,
+  emoji,
   value,
   onChange,
 }: {
-  budget:   Budget;
+  catKey:   string;
+  label:    string;
+  emoji:    string;
   value:    string;
   onChange: (v: string) => void;
 }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontFamily, fontSize } = theme;
-  const catColor = theme.categoryColors[budget.category] ?? colors.accent.primary;
-  const catBg    = getCategoryBgColor(budget.category);
+  const catColor = (theme.categoryColors as Record<string, string>)[catKey] ?? colors.accent.primary;
+  const catBg    = getCategoryBgColor(catKey as any);
 
   function handleChange(text: string) {
     const cleaned = text.replace(/[^0-9.]/g, '');
@@ -91,10 +97,10 @@ function CategoryRow({
   return (
     <View style={[catRowStyles.row, { paddingVertical: spacing[3] }]}>
       <View style={[catRowStyles.icon, { backgroundColor: catBg, borderRadius: borderRadius.full, width: 40, height: 40 }]}>
-        <Text style={{ fontSize: 18, lineHeight: 24 }}>{budget.icon}</Text>
+        <Text style={{ fontSize: 18, lineHeight: 24 }}>{emoji}</Text>
       </View>
       <Text style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, marginLeft: spacing[3] }} numberOfLines={1}>
-        {budget.label}
+        {label}
       </Text>
       <View style={[catRowStyles.inputWrap, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.input, borderWidth: 1, borderColor: value ? catColor : colors.border.subtle, paddingHorizontal: spacing[2], height: 40, width: 110 }]}>
         <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted }}>₱</Text>
@@ -125,20 +131,28 @@ export function BudgetSetupWizard({ navigation }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
 
-  const { data: budgets } = useBudgets();
+  // Existing budgets — used only to pre-fill limits
+  const { data: existingBudgets } = useBudgets();
 
   const [step,     setStep]     = useState(1);
-  const [income,   setIncome]   = useState('4800');
+  const [income,   setIncome]   = useState('43171.80');
+  // allocMap key = category key (e.g. 'food', 'transport')
   const [allocMap, setAllocMap] = useState<Record<string, string>>({});
+  const [saving,   setSaving]   = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
-  // Initialise allocations from live budget data
+  // Pre-fill from existing Supabase budgets (match by label)
   useEffect(() => {
-    if (budgets && Object.keys(allocMap).length === 0) {
+    if (existingBudgets && existingBudgets.length > 0 && Object.keys(allocMap).length === 0) {
       const initial: Record<string, string> = {};
-      for (const b of budgets) initial[b.id] = String(b.limit);
-      setAllocMap(initial);
+      for (const b of existingBudgets) {
+        // Match existing budget to a category by key
+        const cat = EXPENSE_CATEGORIES.find(c => c.label.toLowerCase() === b.label.toLowerCase() || c.key === b.category);
+        if (cat && b.limit > 0) initial[cat.key] = String(b.limit);
+      }
+      if (Object.keys(initial).length > 0) setAllocMap(initial);
     }
-  }, [budgets]);
+  }, [existingBudgets]);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -153,22 +167,29 @@ export function BudgetSetupWizard({ navigation }: Props) {
   const canStep1        = parsedIncome > 0;
   const canStep2        = totalAllocated > 0;
 
-  function handleSave() {
-    if (!budgets) return;
-    const updated = budgets.map(b => ({
-      ...b,
-      limit: parseFloat(allocMap[b.id] ?? '0') || b.limit,
-    }));
-    queryClient.setQueryData(BUDGETS_KEY, updated);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    navigation.goBack();
+  async function handleSave() {
+    if (saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const toSave = EXPENSE_CATEGORIES.filter(c => allocMap[c.key] && parseFloat(allocMap[c.key]) > 0);
+      for (const c of toSave) {
+        await updateBudgetLimit(c.label, c.emoji, parseFloat(allocMap[c.key]), c.color);
+      }
+      await queryClient.invalidateQueries({ queryKey: [...BUDGETS_KEY] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.goBack();
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to save. Please try again.');
+      setSaving(false);
+    }
   }
 
-  function updateAlloc(id: string, value: string) {
-    setAllocMap(prev => ({ ...prev, [id]: value }));
+  function updateAlloc(key: string, value: string) {
+    setAllocMap(prev => ({ ...prev, [key]: value }));
   }
 
-  // ── Step-local style sheets (must be declared before the JSX that uses them) ──
+  // ── Step-local style sheets ────────────────────────────────────────────────
   const step1Styles = StyleSheet.create({
     amtRow:   { flexDirection: 'row', alignItems: 'center' },
     hintCard: {},
@@ -186,7 +207,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
     catRow:      { flexDirection: 'row', alignItems: 'center' },
   });
 
-  // ── Step 1: Income ────────────────────────────────────────────────────────────
+  // ── Step 1: Income ─────────────────────────────────────────────────────────
   const step1 = (
     <View style={{ flex: 1, paddingHorizontal: H_PAD }}>
       <Text style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: colors.text.primary, marginTop: spacing[6] }}>
@@ -196,7 +217,6 @@ export function BudgetSetupWizard({ navigation }: Props) {
         Your income helps us suggest realistic budget limits for each category.
       </Text>
 
-      {/* Amount input */}
       <View style={{ alignItems: 'center', marginTop: spacing[8] }}>
         <View style={step1Styles.amtRow}>
           <Text style={{ fontSize: 44, fontFamily: fontFamily.bold, color: income ? colors.income : colors.text.muted, lineHeight: 52, marginRight: 4 }}>
@@ -234,7 +254,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
     </View>
   );
 
-  // ── Step 2: Category Allocations ──────────────────────────────────────────────
+  // ── Step 2: Category Allocations ───────────────────────────────────────────
   const step2 = (
     <View style={{ flex: 1 }}>
       <View style={{ paddingHorizontal: H_PAD }}>
@@ -271,16 +291,18 @@ export function BudgetSetupWizard({ navigation }: Props) {
         </View>
       </View>
 
-      {/* Category rows */}
+      {/* Category rows — all expense categories */}
       <View style={{ paddingHorizontal: H_PAD, marginTop: spacing[3] }}>
-        {(budgets ?? []).map((budget, i) => (
-          <React.Fragment key={budget.id}>
+        {EXPENSE_CATEGORIES.map((cat, i) => (
+          <React.Fragment key={cat.key}>
             <CategoryRow
-              budget={budget}
-              value={allocMap[budget.id] ?? ''}
-              onChange={v => updateAlloc(budget.id, v)}
+              catKey={cat.key}
+              label={cat.label}
+              emoji={cat.emoji}
+              value={allocMap[cat.key] ?? ''}
+              onChange={v => updateAlloc(cat.key, v)}
             />
-            {i < (budgets?.length ?? 0) - 1 && (
+            {i < EXPENSE_CATEGORIES.length - 1 && (
               <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border.subtle }} />
             )}
           </React.Fragment>
@@ -289,7 +311,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
     </View>
   );
 
-  // ── Step 3: Review ────────────────────────────────────────────────────────────
+  // ── Step 3: Review ─────────────────────────────────────────────────────────
   const step3 = (
     <View style={{ flex: 1, paddingHorizontal: H_PAD }}>
       <Text style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: colors.text.primary, marginTop: spacing[6] }}>
@@ -300,20 +322,20 @@ export function BudgetSetupWizard({ navigation }: Props) {
       </Text>
 
       {/* Summary card */}
-      <View style={[step3Styles.summaryCard, shadows.card, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[5], marginTop: spacing[5] }]}>
-        <View style={[step3Styles.summaryRow, { paddingBottom: spacing[4], borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }]}>
+      <View style={[shadows.card, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[5], marginTop: spacing[5] }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: spacing[4], borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }}>
           <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.muted }}>Monthly Income</Text>
           <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.bold, color: colors.income }}>
             ₱{parsedIncome.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
           </Text>
         </View>
-        <View style={[step3Styles.summaryRow, { paddingVertical: spacing[4], borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing[4], borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }}>
           <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.muted }}>Total Allocated</Text>
           <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.bold, color: colors.text.primary }}>
             ₱{totalAllocated.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
           </Text>
         </View>
-        <View style={[step3Styles.summaryRow, { paddingTop: spacing[4] }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: spacing[4] }}>
           <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.muted }}>Unallocated</Text>
           <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.bold, color: parsedIncome - totalAllocated >= 0 ? colors.income : colors.expense }}>
             ₱{Math.abs(parsedIncome - totalAllocated).toLocaleString('en-PH', { minimumFractionDigits: 2 })}
@@ -321,45 +343,42 @@ export function BudgetSetupWizard({ navigation }: Props) {
         </View>
       </View>
 
-      {/* Category breakdown */}
-      <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginTop: spacing[4], overflow: 'hidden' }]}>
-        {(budgets ?? []).map((b, i) => {
-          const alloc    = parseFloat(allocMap[b.id] ?? '0') || 0;
-          const catColor = theme.categoryColors[b.category] ?? colors.accent.primary;
-          return (
-            <View
-              key={b.id}
-              style={[
-                step3Styles.catRow,
-                {
-                  paddingHorizontal: spacing[4],
-                  paddingVertical:   spacing[3],
-                  borderBottomWidth: i < (budgets?.length ?? 0) - 1 ? StyleSheet.hairlineWidth : 0,
-                  borderBottomColor: colors.border.subtle,
-                },
-              ]}
-            >
-              <Text style={{ fontSize: 16, marginRight: spacing[3] }}>{b.icon}</Text>
-              <Text style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary }} numberOfLines={1}>
-                {b.label}
-              </Text>
-              {alloc > 0 ? (
-                <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: catColor }}>
-                  ₱{alloc.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
-                </Text>
-              ) : (
-                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>
-                  No limit
-                </Text>
-              )}
-            </View>
-          );
-        })}
-      </View>
+      {/* Category breakdown — only those with a limit set */}
+      {EXPENSE_CATEGORIES.filter(c => parseFloat(allocMap[c.key] ?? '0') > 0).length > 0 && (
+        <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginTop: spacing[4], overflow: 'hidden' }]}>
+          {EXPENSE_CATEGORIES
+            .filter(c => parseFloat(allocMap[c.key] ?? '0') > 0)
+            .map((c, i, arr) => {
+              const alloc    = parseFloat(allocMap[c.key] ?? '0');
+              const catColor = (theme.categoryColors as Record<string, string>)[c.key] ?? colors.accent.primary;
+              return (
+                <View
+                  key={c.key}
+                  style={{
+                    flexDirection:     'row',
+                    alignItems:        'center',
+                    paddingHorizontal: spacing[4],
+                    paddingVertical:   spacing[3],
+                    borderBottomWidth: i < arr.length - 1 ? StyleSheet.hairlineWidth : 0,
+                    borderBottomColor: colors.border.subtle,
+                  }}
+                >
+                  <Text style={{ fontSize: 16, marginRight: spacing[3] }}>{c.emoji}</Text>
+                  <Text style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary }} numberOfLines={1}>
+                    {c.label}
+                  </Text>
+                  <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: catColor }}>
+                    ₱{alloc.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+                  </Text>
+                </View>
+              );
+            })}
+        </View>
+      )}
     </View>
   );
 
-  // ── Footer buttons ────────────────────────────────────────────────────────────
+  // ── Footer buttons ─────────────────────────────────────────────────────────
   const canContinue = step === 1 ? canStep1 : step === 2 ? canStep2 : true;
 
   function handleNext() {
@@ -376,6 +395,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.screen, { backgroundColor: colors.bg.base }]}
     >
+      <LoadingOverlay visible={saving} message="Saving budget…" />
       <StatusBar style="light" />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
@@ -402,13 +422,18 @@ export function BudgetSetupWizard({ navigation }: Props) {
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
       <View style={[styles.footer, { paddingHorizontal: H_PAD, paddingBottom: btmPad + spacing[3], paddingTop: spacing[3], borderTopColor: colors.border.subtle }]}>
+        {saveError && step === 3 && (
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.expense, textAlign: 'center', marginBottom: spacing[3] }}>
+            {saveError}
+          </Text>
+        )}
         <Pressable
           onPress={handleNext}
-          disabled={!canContinue}
+          disabled={!canContinue || saving}
           style={({ pressed }) => [
             styles.continueBtn,
             {
-              backgroundColor: !canContinue
+              backgroundColor: !canContinue || saving
                 ? colors.bg.surfaceMuted
                 : pressed
                   ? colors.accent.pressed
@@ -419,7 +444,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
           ]}
           accessibilityRole="button"
         >
-          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: canContinue ? '#FFFFFF' : colors.text.muted }}>
+          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: (canContinue && !saving) ? '#FFFFFF' : colors.text.muted }}>
             {step < 3 ? 'Continue' : 'Save Budget'}
           </Text>
         </Pressable>

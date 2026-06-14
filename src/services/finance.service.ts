@@ -225,6 +225,72 @@ export async function getTransactions(): Promise<Transaction[]> {
   );
 }
 
+export async function updateExpense(id: string, params: {
+  merchant:     string;
+  categoryName: string;
+  categoryIcon: string;
+  amount:       number;
+  date:         string;
+  note?:        string;
+}): Promise<void> {
+  const userId = await uid();
+
+  const { data: existing } = await supabase
+    .from('expense_categories')
+    .select('id')
+    .eq('user_id', userId)
+    .ilike('name', params.categoryName)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  let categoryId: string;
+  if (existing) {
+    categoryId = existing.id;
+  } else {
+    const { data: newCat, error: catErr } = await supabase
+      .from('expense_categories')
+      .insert({ user_id: userId, name: params.categoryName, icon: params.categoryIcon, color: '#6B7280' })
+      .select('id')
+      .single();
+    if (catErr) throw catErr;
+    categoryId = newCat.id;
+  }
+
+  const { error } = await supabase
+    .from('expenses')
+    .update({
+      description: params.merchant,
+      amount:      params.amount,
+      date:        params.date,
+      category_id: categoryId,
+      notes:       params.note ?? null,
+    })
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function updateIncome(id: string, params: {
+  description: string;
+  amount:      number;
+  date:        string;
+  note?:       string;
+}): Promise<void> {
+  const userId = await uid();
+
+  const { error } = await supabase
+    .from('income_records')
+    .update({
+      description: params.description,
+      amount:      params.amount,
+      date:        params.date,
+      notes:       params.note ?? null,
+    })
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
 export async function deleteTransaction(id: string, type: 'expense' | 'income'): Promise<void> {
   const userId = await uid();
 
@@ -457,11 +523,11 @@ export async function addTransfer(params: {
 
 // ── Budgets ────────────────────────────────────────────────────────────────────
 
-export async function getBudgets(): Promise<Budget[]> {
+export async function getBudgets(forYear?: number, forMonth?: number): Promise<Budget[]> {
   const userId = await uid();
   const now    = new Date();
-  const year   = now.getFullYear();
-  const month  = now.getMonth() + 1;
+  const year   = forYear  ?? now.getFullYear();
+  const month  = forMonth ?? now.getMonth() + 1;
 
   const [catRes, expRes] = await Promise.all([
     supabase
@@ -499,6 +565,37 @@ export async function getBudgets(): Promise<Budget[]> {
     month,
     year,
   }));
+}
+
+export async function updateBudgetLimit(
+  categoryName: string,
+  categoryIcon: string,
+  newLimit: number,
+  categoryColor = '#6B7280',
+): Promise<void> {
+  const userId = await uid();
+
+  // Find existing category row for this user
+  const { data: existing } = await supabase
+    .from('expense_categories')
+    .select('id')
+    .eq('user_id', userId)
+    .ilike('name', categoryName)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (existing) {
+    const { error } = await supabase
+      .from('expense_categories')
+      .update({ budget_limit: newLimit, icon: categoryIcon, color: categoryColor })
+      .eq('id', existing.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('expense_categories')
+      .insert({ user_id: userId, name: categoryName, icon: categoryIcon, budget_limit: newLimit, color: categoryColor });
+    if (error) throw error;
+  }
 }
 
 // ── Savings Goals ──────────────────────────────────────────────────────────────

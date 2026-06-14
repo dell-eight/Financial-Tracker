@@ -1,9 +1,10 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import type { AuthStackParamList } from './types';
-import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
-import { SignUpScreen } from '../screens/auth/SignUpScreen';
-import { LoginScreen } from '../screens/auth/LoginScreen';
+import { WelcomeScreen }        from '../screens/auth/WelcomeScreen';
+import { SignUpScreen }          from '../screens/auth/SignUpScreen';
+import { LoginScreen }           from '../screens/auth/LoginScreen';
+import { ForgotPasswordScreen }  from '../screens/auth/ForgotPasswordScreen';
 
 const Stack = createStackNavigator<AuthStackParamList>();
 
@@ -13,9 +14,10 @@ export function AuthNavigator() {
       initialRouteName="Welcome"
       screenOptions={{ headerShown: false }}
     >
-      <Stack.Screen name="Welcome" component={WelcomeScreen} />
-      <Stack.Screen name="SignUp"  component={SignUpScreen} />
-      <Stack.Screen name="Login"   component={LoginScreen} />
+      <Stack.Screen name="Welcome"        component={WelcomeScreen} />
+      <Stack.Screen name="SignUp"         component={SignUpScreen} />
+      <Stack.Screen name="Login"          component={LoginScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </Stack.Navigator>
   );
 }

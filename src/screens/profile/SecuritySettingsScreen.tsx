@@ -18,6 +18,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useAppStore } from '../../store/app.store';
 import { useAuthStore } from '../../store/auth.store';
+import { isBiometricAvailable, authenticateWithBiometrics } from '../../utils/biometrics';
 import type { HomeStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<HomeStackParamList, 'SecuritySettings'>;
@@ -40,6 +41,24 @@ export function SecuritySettingsScreen({ navigation }: Props) {
   const biometric    = useAppStore(s => s.biometricEnabled);
   const setBiometric = useAppStore(s => s.setBiometricEnabled);
   const clearAuth    = useAuthStore(s => s.clearAuth);
+
+  async function handleBiometricToggle(value: boolean) {
+    if (!value) {
+      setBiometric(false);
+      return;
+    }
+    const available = await isBiometricAvailable();
+    if (!available) {
+      Alert.alert('Not Available', 'Biometrics are not set up on this device. Please enroll Face ID or fingerprint in your device settings first.');
+      return;
+    }
+    const success = await authenticateWithBiometrics('Confirm to enable biometric unlock');
+    if (success) {
+      setBiometric(true);
+    } else {
+      Alert.alert('Authentication Failed', 'Could not verify your identity. Biometric lock was not enabled.');
+    }
+  }
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -125,7 +144,7 @@ export function SecuritySettingsScreen({ navigation }: Props) {
 
   function CardGroup({ children }: { children: React.ReactNode }) {
     return (
-      <View style={[shadows.sm, { marginHorizontal: spacing[5], marginBottom: spacing[4], backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, overflow: 'hidden', gap: StyleSheet.hairlineWidth, backgroundColor: colors.border.subtle }]}>
+      <View style={[shadows.sm, { marginHorizontal: spacing[5], marginBottom: spacing[4], borderRadius: borderRadius.card, overflow: 'hidden', gap: StyleSheet.hairlineWidth, backgroundColor: colors.border.subtle }]}>
         {children}
       </View>
     );
@@ -158,7 +177,7 @@ export function SecuritySettingsScreen({ navigation }: Props) {
                 right={
                   <Switch
                     value={biometric}
-                    onValueChange={setBiometric}
+                    onValueChange={handleBiometricToggle}
                     trackColor={{ false: colors.bg.surfaceMuted, true: colors.accent.muted }}
                     thumbColor={biometric ? colors.accent.primary : colors.text.muted}
                   />

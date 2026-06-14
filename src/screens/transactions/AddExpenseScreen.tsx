@@ -26,26 +26,19 @@ import type { TransactionsStackParamList } from '../../navigation/types';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import type { CategoryKey } from '../../theme';
 import type { Account } from '../../types/models';
+import { EXPENSE_CATEGORIES } from '../../constants/categories';
 
 type Props = StackScreenProps<TransactionsStackParamList, 'AddExpense'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-type ExpenseCatKey = Extract<
-  CategoryKey,
-  'food' | 'transport' | 'shopping' | 'bills' | 'entertainment' | 'health' | 'education' | 'other'
->;
+type ExpenseCatKey = CategoryKey;
 
-const EXPENSE_CATS: { key: ExpenseCatKey; label: string; icon: string }[] = [
-  { key: 'food',           label: 'Food',          icon: '🍔' },
-  { key: 'transport',      label: 'Transport',      icon: '🚗' },
-  { key: 'shopping',       label: 'Shopping',       icon: '🛍️' },
-  { key: 'bills',          label: 'Bills',          icon: '⚡' },
-  { key: 'entertainment',  label: 'Entertainment',  icon: '🎬' },
-  { key: 'health',         label: 'Health',         icon: '💊' },
-  { key: 'education',      label: 'Education',      icon: '📚' },
-  { key: 'other',          label: 'Other',          icon: '💰' },
-];
+const EXPENSE_CATS = EXPENSE_CATEGORIES.map(c => ({
+  key:   c.key as ExpenseCatKey,
+  label: c.label,
+  icon:  c.emoji,
+}));
 
 function formatDateDisplay(d: Date): string {
   return d.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });

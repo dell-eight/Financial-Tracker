@@ -7,6 +7,8 @@ import {
   Alert,
   StyleSheet,
   Platform,
+  TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,7 +20,7 @@ import { useTransactions, TRANSACTIONS_KEY } from '../../hooks/queries/useTransa
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
 import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { getCategoryBgColor } from '../../theme';
-import { deleteTransaction } from '../../services/finance.service';
+import { deleteTransaction, updateExpense, updateIncome } from '../../services/finance.service';
 import type { TransactionsStackParamList } from '../../navigation/types';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import type { Transaction } from '../../types/models';
@@ -97,13 +99,22 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
   const { id, type } = route.params;
+
   const [deleting, setDeleting] = useState(false);
+  const [saving,   setSaving]   = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const { data: allTxns } = useTransactions();
   const tx = useMemo<Transaction | undefined>(
     () => allTxns?.find(t => t.id === id),
     [allTxns, id],
   );
+
+  // Edit form state — initialised when entering edit mode
+  const [editMerchant,  setEditMerchant]  = useState('');
+  const [editAmountStr, setEditAmountStr] = useState('');
+  const [editDate,      setEditDate]      = useState('');
+  const [editNote,      setEditNote]      = useState('');
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -112,6 +123,60 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   const amtColor  = isExpense ? colors.expense : colors.income;
   const catColor  = tx ? (theme.categoryColors[tx.category] ?? colors.accent.primary) : colors.accent.primary;
   const catBg     = tx ? getCategoryBgColor(tx.category) : colors.bg.surfaceMuted;
+
+  function enterEdit() {
+    if (!tx) return;
+    setEditMerchant(tx.merchant);
+    setEditAmountStr(String(tx.amount));
+    setEditDate(tx.date);
+    setEditNote(tx.note ?? '');
+    setIsEditing(true);
+    Haptics.selectionAsync();
+  }
+
+  function cancelEdit() {
+    setIsEditing(false);
+  }
+
+  async function handleSaveEdit() {
+    if (!tx || saving) return;
+    const amount = parseFloat(editAmountStr.replace(/[^0-9.]/g, ''));
+    if (!amount || amount <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount.');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (isExpense) {
+        await updateExpense(id, {
+          merchant:     editMerchant.trim() || tx.merchant,
+          categoryName: tx.categoryLabel,
+          categoryIcon: tx.categoryIcon,
+          amount,
+          date:         editDate,
+          note:         editNote.trim() || undefined,
+        });
+      } else {
+        await updateIncome(id, {
+          description: editMerchant.trim() || tx.merchant,
+          amount,
+          date:        editDate,
+          note:        editNote.trim() || undefined,
+        });
+      }
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }),
+        queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+        queryClient.invalidateQueries({ queryKey: ASSETS_KEY }),
+      ]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setIsEditing(false);
+    } catch {
+      Alert.alert('Error', 'Failed to save changes. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function handleDelete() {
     const txType = (tx?.type ?? type) as 'expense' | 'income';
@@ -174,6 +239,107 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   const displayDate = formatDisplayDate(tx.date);
   const displayTime = formatTime(tx.time);
 
+  // ── Edit mode ─────────────────────────────────────────────────────────────────
+  if (isEditing) {
+    const editedAmount = parseFloat(editAmountStr.replace(/[^0-9.]/g, '')) || 0;
+    return (
+      <KeyboardAvoidingView
+        style={[styles.screen, { backgroundColor: colors.bg.base }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <StatusBar style="light" />
+        <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+          <Pressable onPress={cancelEdit} hitSlop={12} style={{ minWidth: 60 }}>
+            <Text style={{ fontSize: fontSize.bodyLg, color: colors.text.muted, fontFamily: fontFamily.medium }}>Cancel</Text>
+          </Pressable>
+          <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>
+            Edit Transaction
+          </Text>
+          <Pressable onPress={handleSaveEdit} disabled={saving} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: saving ? colors.text.muted : colors.accent.primary }}>
+              {saving ? 'Saving…' : 'Save'}
+            </Text>
+          </Pressable>
+        </View>
+
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: spacing[5], paddingBottom: btmPad + spacing[8] }}>
+
+          {/* Amount */}
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>AMOUNT</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: editedAmount > 0 ? amtColor : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[4] }}>
+            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <TextInput
+              value={editAmountStr}
+              onChangeText={v => {
+                const c = v.replace(/[^0-9.]/g, '');
+                if (c.split('.').length <= 2) setEditAmountStr(c);
+              }}
+              keyboardType="decimal-pad"
+              autoFocus
+              selectTextOnFocus
+              style={{ flex: 1, fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: amtColor, padding: 0 }}
+            />
+          </View>
+
+          {/* Description / Merchant */}
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>
+            {isExpense ? 'MERCHANT / DESCRIPTION' : 'DESCRIPTION'}
+          </Text>
+          <View style={{ backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: editMerchant ? colors.border.subtle : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, justifyContent: 'center', marginBottom: spacing[4] }}>
+            <TextInput
+              value={editMerchant}
+              onChangeText={setEditMerchant}
+              placeholder={isExpense ? 'e.g. Jollibee' : 'e.g. Salary'}
+              placeholderTextColor={colors.text.muted}
+              style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }}
+            />
+          </View>
+
+          {/* Date */}
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>DATE (YYYY-MM-DD)</Text>
+          <View style={{ backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: spacing[4], height: 50, justifyContent: 'center', marginBottom: spacing[4] }}>
+            <TextInput
+              value={editDate}
+              onChangeText={setEditDate}
+              placeholder="2026-06-14"
+              placeholderTextColor={colors.text.muted}
+              keyboardType="numbers-and-punctuation"
+              style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }}
+            />
+          </View>
+
+          {/* Note */}
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>NOTE (OPTIONAL)</Text>
+          <View style={{ backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: spacing[4], paddingVertical: spacing[3], marginBottom: spacing[6] }}>
+            <TextInput
+              value={editNote}
+              onChangeText={setEditNote}
+              placeholder="Add a note…"
+              placeholderTextColor={colors.text.muted}
+              multiline
+              numberOfLines={3}
+              style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.primary, padding: 0, minHeight: 60 }}
+            />
+          </View>
+
+          {/* Category (read-only) */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4], gap: spacing[3] }}>
+            <View style={{ width: 36, height: 36, borderRadius: borderRadius.full, backgroundColor: catBg, alignItems: 'center', justifyContent: 'center' }}>
+              <Text style={{ fontSize: 18 }}>{tx.categoryIcon}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>Category</Text>
+              <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary }}>{tx.categoryLabel}</Text>
+            </View>
+            <Text style={{ fontSize: fontSize.bodySm, color: colors.text.muted }}>cannot edit</Text>
+          </View>
+        </ScrollView>
+        <LoadingOverlay visible={saving} message="Saving…" />
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ── View mode ─────────────────────────────────────────────────────────────────
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
       <StatusBar style="light" />
@@ -188,9 +354,9 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>
           Transaction
         </Text>
-        <Pressable onPress={handleDelete} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
-          <Text style={{ fontSize: fontSize.bodyMd, color: colors.expense, fontFamily: fontFamily.medium }}>
-            Delete
+        <Pressable onPress={enterEdit} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
+          <Text style={{ fontSize: fontSize.bodyMd, color: colors.accent.primary, fontFamily: fontFamily.medium }}>
+            Edit
           </Text>
         </Pressable>
       </View>

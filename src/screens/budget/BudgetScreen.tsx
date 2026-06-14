@@ -800,10 +800,10 @@ export function BudgetScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
 
-  const { data: budgetsData } = useBudgets();
+  const now = new Date();
+  const [period, setPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() });
 
-  const [monthIdx, setMonthIdx] = useState(new Date().getMonth());
-  const year = 2026;
+  const { data: budgetsData } = useBudgets(period.year, period.month + 1);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
@@ -831,8 +831,10 @@ export function BudgetScreen({ navigation }: Props) {
 
   // Days for the metrics card
   const today       = new Date();
-  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-  const daysPassed  = monthIdx === today.getMonth() ? today.getDate() : daysInMonth;
+  const daysInMonth = new Date(period.year, period.month + 1, 0).getDate();
+  const daysPassed  = (period.month === today.getMonth() && period.year === today.getFullYear())
+    ? today.getDate()
+    : daysInMonth;
 
   // ── Animations ───────────────────────────────────────────────────────────────
 
@@ -954,7 +956,10 @@ export function BudgetScreen({ navigation }: Props) {
           ]}
         >
           <Pressable
-            onPress={() => setMonthIdx(m => (m - 1 + 12) % 12)}
+            onPress={() => setPeriod(p => p.month === 0
+              ? { year: p.year - 1, month: 11 }
+              : { year: p.year, month: p.month - 1 }
+            )}
             style={[
               screenStyles.arrowBtn,
               { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full },
@@ -974,11 +979,14 @@ export function BudgetScreen({ navigation }: Props) {
               letterSpacing: -0.2,
             }}
           >
-            {MONTHS[monthIdx]} {year}
+            {MONTHS[period.month]} {period.year}
           </Text>
 
           <Pressable
-            onPress={() => setMonthIdx(m => (m + 1) % 12)}
+            onPress={() => setPeriod(p => p.month === 11
+              ? { year: p.year + 1, month: 0 }
+              : { year: p.year, month: p.month + 1 }
+            )}
             style={[
               screenStyles.arrowBtn,
               { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full },
@@ -1022,8 +1030,8 @@ export function BudgetScreen({ navigation }: Props) {
             {/* ── 3. Budget Overview Hero ──────────────────────────────────── */}
             <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[4] }, heroStyle]}>
               <BudgetOverviewCard
-                month={MONTHS[monthIdx]}
-                year={year}
+                month={MONTHS[period.month]}
+                year={period.year}
                 totalAllocated={totalAllocated}
                 totalSpent={totalSpent}
               />
@@ -1074,7 +1082,7 @@ export function BudgetScreen({ navigation }: Props) {
                   totalSpent={totalSpent}
                   daysInMonth={daysInMonth}
                   daysPassed={daysPassed}
-                  currentMonthName={MONTHS[monthIdx].substring(0, 3)}
+                  currentMonthName={MONTHS[period.month].substring(0, 3)}
                 />
               </Animated.View>
             )}

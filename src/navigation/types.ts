@@ -10,9 +10,10 @@ export type FilterState = {
 
 // ── Auth stack ─────────────────────────────────────────────────────────────────
 export type AuthStackParamList = {
-  Welcome: undefined;
-  SignUp:  undefined;
-  Login:   undefined;
+  Welcome:        undefined;
+  SignUp:         undefined;
+  Login:          undefined;
+  ForgotPassword: undefined;
 };
 
 // ── Home stack ─────────────────────────────────────────────────────────────────

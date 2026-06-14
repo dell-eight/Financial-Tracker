@@ -206,7 +206,7 @@ export function LoginScreen({ navigation }: Props) {
 
             {/* Forgot Password — right-aligned below the input */}
             <Pressable
-              onPress={() => {/* TODO: navigate to ForgotPassword */}}
+              onPress={() => navigation.navigate('ForgotPassword')}
               style={{ alignSelf: 'flex-end', marginTop: spacing[2], marginBottom: spacing[5] }}
               accessibilityRole="button"
               accessibilityLabel="Forgot your password"

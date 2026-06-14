@@ -28,6 +28,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import type { NavigationProp } from '@react-navigation/native';
 
 import { useTheme }                   from '../../hooks/ui/useTheme';
+import type { ThemeColors }           from '../../theme';
 import { useDashboard }               from '../../hooks/queries/useDashboard';
 import { useTransactions }            from '../../hooks/queries/useTransactions';
 import { useBudgets }                 from '../../hooks/queries/useBudgets';
@@ -75,11 +76,11 @@ function getGreeting(): string {
   return 'Hello';
 }
 
-function getHealthBand(score: number): { label: string; color: string } {
-  if (score >= 80) return { label: 'Excellent', color: '#00C318' };
-  if (score >= 60) return { label: 'Good',      color: '#755DEF' };
-  if (score >= 40) return { label: 'Fair',       color: '#FF9500' };
-  return               { label: 'Needs Attention', color: '#FF6E52' };
+function getHealthBand(score: number, colors: ThemeColors): { label: string; color: string } {
+  if (score >= 80) return { label: 'Excellent',       color: colors.income };
+  if (score >= 60) return { label: 'Good',            color: colors.accent.primary };
+  if (score >= 40) return { label: 'Fair',            color: colors.warning };
+  return               { label: 'Needs Attention', color: colors.expense };
 }
 
 // ── SkeletonBox ────────────────────────────────────────────────────────────────
@@ -137,7 +138,7 @@ function NetWorthCard({
   onPress, loading,
 }: NetWorthCardProps) {
   const theme = useTheme();
-  const { spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
+  const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
 
   if (loading) {
     return (
@@ -177,7 +178,7 @@ function NetWorthCard({
         {/* Delta chip */}
         <View style={nwStyles.deltaRow}>
           <View style={nwStyles.deltaChip}>
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: isPositive ? '#4ADE80' : '#FF6E52' }}>
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: isPositive ? colors.income : colors.expense }}>
               {isPositive ? '↑' : '↓'} {fmtPh(Math.abs(delta))} ({isPositive ? '+' : ''}{deltaPct.toFixed(2)}%)
             </Text>
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: 'rgba(255,255,255,0.55)', marginLeft: 6 }}>
@@ -189,9 +190,9 @@ function NetWorthCard({
         {/* 3-col breakdown strip */}
         <View style={[nwStyles.strip, { marginTop: spacing[4], borderTopColor: 'rgba(255,255,255,0.10)', borderTopWidth: 1, paddingTop: spacing[3] }]}>
           {[
-            { label: 'Assets',      value: fmtK(totalAssets),     color: '#4ADE80' },
-            { label: 'Debts',       value: fmtK(totalDebts),      color: '#FF6E52' },
-            { label: 'Investments', value: fmtK(investmentValue), color: '#A78BFA' },
+            { label: 'Assets',      value: fmtK(totalAssets),     color: colors.income },
+            { label: 'Debts',       value: fmtK(totalDebts),      color: colors.expense },
+            { label: 'Investments', value: fmtK(investmentValue), color: colors.accent.secondary },
           ].map((item, i) => (
             <View key={item.label} style={[nwStyles.stripCol, i > 0 && { borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.10)' }]}>
               <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: item.color, letterSpacing: -0.2 }}>{item.value}</Text>
@@ -228,7 +229,7 @@ function HealthScoreBand({ score, onPress, loading }: {
     return <SkeletonBox height={72} borderRadius={borderRadius.card} />;
   }
 
-  const band = getHealthBand(score);
+  const band = getHealthBand(score, colors);
 
   return (
     <Pressable
