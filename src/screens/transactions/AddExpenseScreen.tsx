@@ -16,6 +16,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
+import { useNetworkStatus } from '../../hooks/ui/useNetworkStatus';
 import { TRANSACTIONS_KEY } from '../../hooks/queries/useTransactions';
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
 import { addExpense } from '../../services/finance.service';
@@ -49,6 +50,7 @@ export function AddExpenseScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
+  const { isOnline } = useNetworkStatus();
 
   const { data: accounts = [] } = useAccounts();
 
@@ -81,6 +83,7 @@ export function AddExpenseScreen({ navigation }: Props) {
 
   async function handleSave() {
     if (!canSave || !selectedCat || saving) return;
+    if (!isOnline) { setSaveError('No internet connection. Please try again when online.'); return; }
     const cat = EXPENSE_CATS.find(c => c.key === selectedCat)!;
     setSaving(true);
     setSaveError(null);

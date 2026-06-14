@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 import type { RootStackParamList } from './types';
 import { AuthNavigator } from './AuthNavigator';
@@ -8,8 +9,13 @@ import { useAuthStore } from '../store/auth.store';
 import { useAppStore } from '../store/app.store';
 import { BiometricLockScreen } from '../screens/auth/BiometricLockScreen';
 import { supabase } from '../lib/supabase';
+import { OfflineBanner } from '../components/common/OfflineBanner';
 
 const Root = createStackNavigator<RootStackParamList>();
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+});
 
 export function RootNavigator() {
   const isAuthenticated    = useAuthStore(s => s.isAuthenticated);
@@ -38,24 +44,27 @@ export function RootNavigator() {
   const showBiometricLock = isAuthenticated && biometricEnabled && !isBiometricUnlocked;
 
   return (
-    <Root.Navigator screenOptions={{ headerShown: false }}>
-      {showBiometricLock ? (
-        <Root.Screen name="Main" component={BiometricLockScreen} />
-      ) : isAuthenticated ? (
-        <Root.Screen name="Main" component={MainNavigator} />
-      ) : (
-        <Root.Screen name="Auth" component={AuthNavigator} />
-      )}
-      <Root.Screen
-        name="QuickAddSheet"
-        component={QuickAddSheet}
-        options={{
-          presentation:       'transparentModal',
-          cardStyle:          { backgroundColor: 'transparent' },
-          headerShown:        false,
-          cardOverlayEnabled: true,
-        }}
-      />
-    </Root.Navigator>
+    <View style={styles.root}>
+      <Root.Navigator screenOptions={{ headerShown: false }}>
+        {showBiometricLock ? (
+          <Root.Screen name="Main" component={BiometricLockScreen} />
+        ) : isAuthenticated ? (
+          <Root.Screen name="Main" component={MainNavigator} />
+        ) : (
+          <Root.Screen name="Auth" component={AuthNavigator} />
+        )}
+        <Root.Screen
+          name="QuickAddSheet"
+          component={QuickAddSheet}
+          options={{
+            presentation:       'transparentModal',
+            cardStyle:          { backgroundColor: 'transparent' },
+            headerShown:        false,
+            cardOverlayEnabled: true,
+          }}
+        />
+      </Root.Navigator>
+      <OfflineBanner />
+    </View>
   );
 }

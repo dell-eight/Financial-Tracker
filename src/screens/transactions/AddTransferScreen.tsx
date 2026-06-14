@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
+import { useNetworkStatus } from '../../hooks/ui/useNetworkStatus';
 import { useAccounts } from '../../hooks/queries/useAccounts';
 import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
@@ -152,6 +153,7 @@ export function AddTransferScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
   const queryClient = useQueryClient();
+  const { isOnline } = useNetworkStatus();
 
   const { data: accounts = [] } = useAccounts();
 
@@ -187,6 +189,7 @@ export function AddTransferScreen({ navigation }: Props) {
 
   async function handleSave() {
     if (!canSave || !fromAccount || !toAccount || saving) return;
+    if (!isOnline) { setSaveError('No internet connection. Please try again when online.'); return; }
     setSaving(true);
     setSaveError(null);
     try {
