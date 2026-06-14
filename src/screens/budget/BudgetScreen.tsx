@@ -798,7 +798,7 @@ const remainStyles = StyleSheet.create({
 export function BudgetScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
-  const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
 
   const { data: budgetsData } = useBudgets();
 
@@ -944,7 +944,7 @@ export function BudgetScreen({ navigation }: Props) {
             screenStyles.monthRow,
             headerStyle,
             {
-              paddingHorizontal: spacing[5],
+              paddingHorizontal: spacing[3],
               marginTop:         spacing[4],
               backgroundColor:   colors.bg.surface,
               borderRadius:      borderRadius.full,
@@ -991,64 +991,95 @@ export function BudgetScreen({ navigation }: Props) {
           </Pressable>
         </Animated.View>
 
-        {/* ── 3. Budget Overview Hero ────────────────────────────────────────── */}
-        <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[4] }, heroStyle]}>
-          <BudgetOverviewCard
-            month={MONTHS[monthIdx]}
-            year={year}
-            totalAllocated={totalAllocated}
-            totalSpent={totalSpent}
-          />
-        </Animated.View>
-
-        {/* ── 4. Budget Health Row ──────────────────────────────────────────── */}
-        <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[4] }, healthStyle]}>
-          <BudgetHealthRow
-            onTrackCount={onTrackCount}
-            nearLimitCount={nearLimitCount}
-            overBudgetCount={overBudgetCount}
-          />
-        </Animated.View>
-
-        {/* ── 5. Budget Allocation Card ─────────────────────────────────────── */}
-        <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[4] }, allocStyle]}>
-          <BudgetAllocationCard items={budgetItems} totalAllocated={totalAllocated} />
-        </Animated.View>
-
-        {/* ── 6. Budget Categories List ─────────────────────────────────────── */}
-        <Animated.View style={[{ marginTop: spacing[5] }, catStyle]}>
-          <SectionHeader
-            title="Budget Categories"
-            actionLabel="History"
-            onAction={() => navigation.push('BudgetHistory')}
-            style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}
-          />
-
-          <View style={[screenStyles.catList, { paddingHorizontal: spacing[5], gap: spacing[3] }]}>
-            {budgetItems.map(item => (
-              <BudgetCard
-                key={item.id}
-                category={item.category}
-                categoryLabel={item.label}
-                categoryIcon={<CategoryIcon icon={item.icon} />}
-                spent={item.spent}
-                limit={item.limit}
-                onPress={() => navigation.push('CategoryBudgetDetail', { categoryId: item.id })}
+        {budgetItems.length === 0 ? (
+          /* ── Empty state ─────────────────────────────────────────────────── */
+          <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[8], alignItems: 'center' }, heroStyle]}>
+            <Text style={{ fontSize: 56, marginBottom: spacing[4] }}>📊</Text>
+            <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary, textAlign: 'center', marginBottom: spacing[2] }}>
+              No Budget Set Up
+            </Text>
+            <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', lineHeight: 22, marginBottom: spacing[6] }}>
+              Create spending categories with limits to track your monthly budget.
+            </Text>
+            <Pressable
+              onPress={() => navigation.push('BudgetSetupWizard')}
+              style={({ pressed }) => [{
+                backgroundColor: pressed ? colors.accent.pressed : colors.accent.primary,
+                borderRadius: borderRadius.button,
+                paddingHorizontal: spacing[6],
+                height: 52,
+                alignItems: 'center' as const,
+                justifyContent: 'center' as const,
+              }]}
+            >
+              <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: '#FFFFFF' }}>
+                + Set Up Budget
+              </Text>
+            </Pressable>
+          </Animated.View>
+        ) : (
+          <>
+            {/* ── 3. Budget Overview Hero ──────────────────────────────────── */}
+            <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[4] }, heroStyle]}>
+              <BudgetOverviewCard
+                month={MONTHS[monthIdx]}
+                year={year}
+                totalAllocated={totalAllocated}
+                totalSpent={totalSpent}
               />
-            ))}
-          </View>
-        </Animated.View>
+            </Animated.View>
 
-        {/* ── 7. Remaining Budget Metrics ───────────────────────────────────── */}
-        <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[5] }, remainStyle]}>
-          <RemainingMetricsCard
-            totalAllocated={totalAllocated}
-            totalSpent={totalSpent}
-            daysInMonth={daysInMonth}
-            daysPassed={daysPassed}
-            currentMonthName={MONTHS[monthIdx].substring(0, 3)}
-          />
-        </Animated.View>
+            {/* ── 4. Budget Health Row ─────────────────────────────────────── */}
+            <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[4] }, healthStyle]}>
+              <BudgetHealthRow
+                onTrackCount={onTrackCount}
+                nearLimitCount={nearLimitCount}
+                overBudgetCount={overBudgetCount}
+              />
+            </Animated.View>
+
+            {/* ── 5. Budget Allocation Card ────────────────────────────────── */}
+            <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[4] }, allocStyle]}>
+              <BudgetAllocationCard items={budgetItems} totalAllocated={totalAllocated} />
+            </Animated.View>
+
+            {/* ── 6. Budget Categories List ────────────────────────────────── */}
+            <Animated.View style={[{ marginTop: spacing[5] }, catStyle]}>
+              <SectionHeader
+                title="Budget Categories"
+                actionLabel="History"
+                onAction={() => navigation.push('BudgetHistory')}
+                style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}
+              />
+              <View style={[screenStyles.catList, { paddingHorizontal: spacing[5], gap: spacing[3] }]}>
+                {budgetItems.map(item => (
+                  <BudgetCard
+                    key={item.id}
+                    category={item.category}
+                    categoryLabel={item.label}
+                    categoryIcon={<CategoryIcon icon={item.icon} />}
+                    spent={item.spent}
+                    limit={item.limit}
+                    onPress={() => navigation.push('CategoryBudgetDetail', { categoryId: item.id })}
+                  />
+                ))}
+              </View>
+            </Animated.View>
+
+            {/* ── 7. Remaining Budget Metrics ──────────────────────────────── */}
+            {totalAllocated > 0 && (
+              <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[5] }, remainStyle]}>
+                <RemainingMetricsCard
+                  totalAllocated={totalAllocated}
+                  totalSpent={totalSpent}
+                  daysInMonth={daysInMonth}
+                  daysPassed={daysPassed}
+                  currentMonthName={MONTHS[monthIdx].substring(0, 3)}
+                />
+              </Animated.View>
+            )}
+          </>
+        )}
       </ScrollView>
     </View>
   );

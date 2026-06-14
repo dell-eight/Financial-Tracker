@@ -16,8 +16,10 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
+import { addHolding } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
-import type { AssetType, InvestmentHolding } from '../../../types/models';
+import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
+import type { AssetType } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'AddHolding'>;
 
@@ -48,6 +50,8 @@ export function AddHoldingScreen({ navigation, route }: Props) {
   const [priceStr,  setPriceStr]  = useState('');
   const [assetType, setAssetType] = useState<AssetType>('stock');
   const [color,     setColor]     = useState(HOLDING_COLORS[0]);
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -70,25 +74,26 @@ export function AddHoldingScreen({ navigation, route }: Props) {
     };
   }
 
-  function handleSave() {
-    if (!canSave) return;
-    const newHolding: InvestmentHolding = {
-      id:              `h${Date.now()}`,
-      accountId:       route.params.accountId,
-      symbol:          symbol.trim().toUpperCase(),
-      name:            name.trim(),
-      assetType,
-      shares,
-      avgCostPerShare: cost,
-      currentPrice:    price || cost,
-      color,
-    };
-    queryClient.setQueryData(
-      HOLDINGS_KEY,
-      (old: InvestmentHolding[] | undefined) => [...(old ?? []), newHolding],
-    );
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    navigation.replace('HoldingDetail', { holdingId: newHolding.id });
+  async function handleSave() {
+    if (!canSave || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const newHolding = await addHolding({
+        symbol:          symbol.trim().toUpperCase(),
+        name:            name.trim(),
+        assetType,
+        shares,
+        avgCostPerShare: cost,
+        currentPrice:    price || cost,
+      });
+      await queryClient.invalidateQueries({ queryKey: HOLDINGS_KEY });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.replace('HoldingDetail', { holdingId: newHolding.id });
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to add holding. Please try again.');
+      setSaving(false);
+    }
   }
 
   return (
@@ -104,8 +109,8 @@ export function AddHoldingScreen({ navigation, route }: Props) {
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>Cancel</Text>
         </Pressable>
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>Add Holding</Text>
-        <Pressable onPress={handleSave} disabled={!canSave} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
-          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: canSave ? colors.accent.primary : colors.text.muted }}>Save</Text>
+        <Pressable onPress={handleSave} disabled={!canSave || saving} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? colors.accent.primary : colors.text.muted }}>{saving ? '…' : 'Save'}</Text>
         </Pressable>
       </View>
 
@@ -237,24 +242,32 @@ export function AddHoldingScreen({ navigation, route }: Props) {
           ))}
         </View>
 
+        {/* ── Error ── */}
+        {error && (
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.expense, textAlign: 'center', marginBottom: spacing[3] }}>
+            {error}
+          </Text>
+        )}
+
         {/* ── Save ── */}
         <Pressable
           onPress={handleSave}
-          disabled={!canSave}
+          disabled={!canSave || saving}
           style={({ pressed }) => [
             styles.saveBtn,
             {
-              backgroundColor: !canSave ? colors.bg.surfaceMuted : pressed ? colors.accent.pressed : colors.accent.primary,
+              backgroundColor: (!canSave || saving) ? colors.bg.surfaceMuted : pressed ? colors.accent.pressed : colors.accent.primary,
               borderRadius: borderRadius.button,
               height: 52,
             },
           ]}
         >
-          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: canSave ? '#FFFFFF' : colors.text.muted }}>
-            Add to Portfolio
+          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? '#FFFFFF' : colors.text.muted }}>
+            {saving ? 'Saving…' : 'Add to Portfolio'}
           </Text>
         </Pressable>
       </ScrollView>
+      <LoadingOverlay visible={saving} message="Adding holding…" />
     </KeyboardAvoidingView>
   );
 }

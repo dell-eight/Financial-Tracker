@@ -16,7 +16,9 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments, HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
+import { logTrade } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
+import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { InvestmentHolding } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'LogTransaction'>;
@@ -39,6 +41,8 @@ export function LogTransactionScreen({ navigation, route }: Props) {
   const [txType,    setTxType]    = useState<TxType>('buy');
   const [sharesStr, setSharesStr] = useState('');
   const [priceStr,  setPriceStr]  = useState('');
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
 
   const { data: holdings } = useInvestments();
   const holding = useMemo<InvestmentHolding | undefined>(
@@ -65,25 +69,28 @@ export function LogTransactionScreen({ navigation, route }: Props) {
     };
   }
 
-  function handleSave() {
-    if (!canSave || !holding) return;
-    queryClient.setQueryData(
-      HOLDINGS_KEY,
-      (old: InvestmentHolding[] | undefined) =>
-        (old ?? []).map(h => {
-          if (h.id !== holdingId) return h;
-          if (txType === 'buy') {
-            const newShares = h.shares + shares;
-            const newAvg    = ((h.shares * h.avgCostPerShare) + (shares * price)) / newShares;
-            return { ...h, shares: newShares, avgCostPerShare: newAvg, currentPrice: price };
-          } else {
-            const newShares = Math.max(h.shares - shares, 0);
-            return { ...h, shares: newShares, currentPrice: price };
-          }
-        }),
-    );
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    navigation.goBack();
+  async function handleSave() {
+    if (!canSave || !holding || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await logTrade({
+        holdingId:      holdingId,
+        accountId:      holding.accountId,
+        symbol:         holding.symbol,
+        txType,
+        shares,
+        price,
+        currentShares:  holding.shares,
+        currentAvgCost: holding.avgCostPerShare,
+      });
+      await queryClient.invalidateQueries({ queryKey: HOLDINGS_KEY });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.goBack();
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to log trade. Please try again.');
+      setSaving(false);
+    }
   }
 
   return (
@@ -209,15 +216,22 @@ export function LogTransactionScreen({ navigation, route }: Props) {
           </View>
         )}
 
+        {/* ── Error ── */}
+        {error && (
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.expense, textAlign: 'center', marginHorizontal: H_PAD, marginBottom: spacing[3] }}>
+            {error}
+          </Text>
+        )}
+
         {/* ── Save ── */}
         <Pressable
           onPress={handleSave}
-          disabled={!canSave}
+          disabled={!canSave || saving}
           style={({ pressed }) => [
             styles.saveBtn,
             {
               marginHorizontal: H_PAD,
-              backgroundColor: !canSave
+              backgroundColor: (!canSave || saving)
                 ? colors.bg.surfaceMuted
                 : txType === 'buy'
                   ? pressed ? colors.income + 'cc' : colors.income
@@ -227,11 +241,12 @@ export function LogTransactionScreen({ navigation, route }: Props) {
             },
           ]}
         >
-          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: canSave ? '#FFFFFF' : colors.text.muted }}>
-            Confirm {txType === 'buy' ? 'Buy' : 'Sell'}
+          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? '#FFFFFF' : colors.text.muted }}>
+            {saving ? 'Saving…' : `Confirm ${txType === 'buy' ? 'Buy' : 'Sell'}`}
           </Text>
         </Pressable>
       </ScrollView>
+      <LoadingOverlay visible={saving} message="Saving…" />
     </KeyboardAvoidingView>
   );
 }

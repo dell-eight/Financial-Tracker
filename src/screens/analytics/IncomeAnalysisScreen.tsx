@@ -15,33 +15,15 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line as SvgLine, Circle } from 'react-native-svg';
 import type { StackScreenProps } from '@react-navigation/stack';
-import { useTheme } from '../../hooks/ui/useTheme';
+import { useTheme }        from '../../hooks/ui/useTheme';
 import { useTransactions } from '../../hooks/queries/useTransactions';
+import { useMonthlyHistory, useIncomeStreams } from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<AnalyticsStackParamList, 'IncomeAnalysis'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const MONTHLY_INCOME = [
-  { label: 'Jan', value: 4800 },
-  { label: 'Feb', value: 4800 },
-  { label: 'Mar', value: 5100 },
-  { label: 'Apr', value: 4850 },
-  { label: 'May', value: 5050 },
-  { label: 'Jun', value: 5121 },
-];
-
-const INCOME_STREAMS = [
-  { label: 'Salary',    icon: '💼', amount: 4800.00, color: '#755DEF', pct: 74.3 },
-  { label: 'Freelance', icon: '💻', amount: 1200.00, color: '#22C55E', pct: 18.6 },
-  { label: 'Dividends', icon: '📈', amount:  420.00, color: '#F97316', pct:  6.5 },
-  { label: 'Interest',  icon: '🏦', amount:   52.80, color: '#3B82F6', pct:  0.8 },
-];
-
-const YTD_TOTAL = MONTHLY_INCOME.reduce((s, m) => s + m.value, 0);
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -84,9 +66,12 @@ function IncomeLineChart({ data, color }: { data: { label: string; value: number
     label: d.label,
   }));
 
-  const line = smoothPath(pts);
-  const last = pts[pts.length - 1];
-  const fill = line + ` L${last.x.toFixed(1)},${(Y_PAD + plotH).toFixed(1)} L0,${(Y_PAD + plotH).toFixed(1)}Z`;
+  const hasPts = pts.length >= 2;
+  const line   = hasPts ? smoothPath(pts) : '';
+  const last   = pts[pts.length - 1] ?? { x: 0, y: Y_PAD + plotH };
+  const fill   = hasPts
+    ? line + ` L${last.x.toFixed(1)},${(Y_PAD + plotH).toFixed(1)} L0,${(Y_PAD + plotH).toFixed(1)}Z`
+    : '';
 
   const reveal = useSharedValue(0);
   useEffect(() => {
@@ -136,7 +121,9 @@ export function IncomeAnalysisScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
-  const { data: txns } = useTransactions();
+  const { data: txns }           = useTransactions();
+  const { data: monthlyHistory } = useMonthlyHistory(6);
+  const { data: incomeStreams }  = useIncomeStreams();
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -147,17 +134,22 @@ export function IncomeAnalysisScreen({ navigation }: Props) {
     [txns],
   );
 
-  const prevMonthIncome = 5050;
-  const displayIncome   = monthIncome > 0 ? monthIncome : MONTHLY_INCOME[MONTHLY_INCOME.length - 1].value;
-  const incomeDelta     = ((displayIncome - prevMonthIncome) / prevMonthIncome) * 100;
+  const hist          = monthlyHistory ?? [];
+  const incomeHistory = hist.map(d => ({ label: d.label, value: d.income }));
+  const prevMonthIncome = hist.length >= 2 ? hist[hist.length - 2].income : 0;
+  const displayIncome   = monthIncome > 0 ? monthIncome : (hist[hist.length - 1]?.income ?? 0);
+  const incomeDelta     = prevMonthIncome > 0 ? ((displayIncome - prevMonthIncome) / prevMonthIncome) * 100 : 0;
   const isUp            = incomeDelta >= 0;
 
-  const avgMonthly = Math.round(YTD_TOTAL / MONTHLY_INCOME.length);
-  const bestMonth  = MONTHLY_INCOME.reduce((best, m) => m.value > best.value ? m : best, MONTHLY_INCOME[0]);
+  const ytdTotal   = hist.reduce((s, d) => s + d.income, 0);
+  const avgMonthly = hist.length > 0 ? Math.round(ytdTotal / hist.length) : 0;
+  const bestMonth  = hist.length > 0
+    ? hist.reduce((best, m) => m.income > best.income ? m : best, hist[0])
+    : null;
 
-  const variance  = MONTHLY_INCOME.reduce((s, m) => s + Math.pow(m.value - avgMonthly, 2), 0) / MONTHLY_INCOME.length;
+  const variance  = hist.reduce((s, m) => s + Math.pow(m.income - avgMonthly, 2), 0) / Math.max(hist.length, 1);
   const stdDev    = Math.sqrt(variance);
-  const cv        = (stdDev / avgMonthly) * 100;
+  const cv        = avgMonthly > 0 ? (stdDev / avgMonthly) * 100 : 0;
   const stability = Math.max(0, Math.min(100, Math.round(100 - cv * 2)));
 
   const a = [0, 1, 2, 3, 4].map(() => useSharedValue(0));
@@ -199,9 +191,9 @@ export function IncomeAnalysisScreen({ navigation }: Props) {
             </View>
             <View style={{ flexDirection: 'row', gap: spacing[4], marginTop: spacing[4], paddingTop: spacing[3], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border.subtle }}>
               {[
-                { label: 'YTD Total',    value: fmt(YTD_TOTAL) },
-                { label: 'Monthly Avg',  value: fmt(avgMonthly) },
-                { label: 'Best Month',   value: bestMonth.label },
+                { label: 'YTD Total',   value: fmt(ytdTotal) },
+                { label: 'Monthly Avg', value: fmt(avgMonthly) },
+                { label: 'Best Month',  value: bestMonth?.label ?? '—' },
               ].map(stat => (
                 <View key={stat.label} style={{ flex: 1 }}>
                   <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted }}>{stat.label}</Text>
@@ -218,7 +210,7 @@ export function IncomeAnalysisScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
               6-Month Income Trend
             </Text>
-            <IncomeLineChart data={MONTHLY_INCOME} color={colors.income} />
+            <IncomeLineChart data={incomeHistory.length > 0 ? incomeHistory : [{ label: '—', value: 0 }]} color={colors.income} />
           </View>
         </Animated.View>
 
@@ -228,8 +220,8 @@ export function IncomeAnalysisScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
               Income Streams
             </Text>
-            {INCOME_STREAMS.map((stream, i) => (
-              <View key={i} style={{ marginBottom: i < INCOME_STREAMS.length - 1 ? spacing[4] : 0 }}>
+            {(incomeStreams ?? []).map((stream, i) => (
+              <View key={i} style={{ marginBottom: i < (incomeStreams ?? []).length - 1 ? spacing[4] : 0 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
                   <View style={{ width: 36, height: 36, borderRadius: borderRadius.full, backgroundColor: stream.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: spacing[3] }}>
                     <Text style={{ fontSize: 16 }}>{stream.icon}</Text>
@@ -248,46 +240,52 @@ export function IncomeAnalysisScreen({ navigation }: Props) {
           </View>
         </Animated.View>
 
-        {/* Stability score */}
-        <Animated.View style={[as[3], { marginHorizontal: spacing[5], marginBottom: spacing[4] }]}>
-          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4] }]}>
-            <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
-              Income Stability
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[4] }}>
-              <View style={{ alignItems: 'center' }}>
-                <Text style={{ fontSize: 40, fontFamily: fontFamily.bold, color: stability >= 80 ? colors.income : stability >= 60 ? '#F59E0B' : colors.expense, letterSpacing: -1 }}>
-                  {stability}
-                </Text>
-                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>/ 100</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={{ height: 10, backgroundColor: colors.bg.surfaceMuted, borderRadius: 99, marginBottom: spacing[2], overflow: 'hidden' }}>
-                  <View style={{ height: '100%', width: `${stability}%`, backgroundColor: stability >= 80 ? colors.income : stability >= 60 ? '#F59E0B' : colors.expense, borderRadius: 99 }} />
+        {/* Stability score — only when there is real income data */}
+        {ytdTotal > 0 && (
+          <Animated.View style={[as[3], { marginHorizontal: spacing[5], marginBottom: spacing[4] }]}>
+            <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4] }]}>
+              <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
+                Income Stability
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[4] }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 40, fontFamily: fontFamily.bold, color: stability >= 80 ? colors.income : stability >= 60 ? '#F59E0B' : colors.expense, letterSpacing: -1 }}>
+                    {stability}
+                  </Text>
+                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>/ 100</Text>
                 </View>
-                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary, lineHeight: 18 }}>
-                  {stability >= 80
-                    ? 'Excellent — your income is very consistent month-to-month.'
-                    : stability >= 60
-                      ? 'Good — minor fluctuations from freelance or variable income.'
-                      : 'Variable — consider building a 3-month emergency fund.'}
-                </Text>
+                <View style={{ flex: 1 }}>
+                  <View style={{ height: 10, backgroundColor: colors.bg.surfaceMuted, borderRadius: 99, marginBottom: spacing[2], overflow: 'hidden' }}>
+                    <View style={{ height: '100%', width: `${stability}%`, backgroundColor: stability >= 80 ? colors.income : stability >= 60 ? '#F59E0B' : colors.expense, borderRadius: 99 }} />
+                  </View>
+                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary, lineHeight: 18 }}>
+                    {stability >= 80
+                      ? 'Excellent — your income is very consistent month-to-month.'
+                      : stability >= 60
+                        ? 'Good — minor fluctuations from freelance or variable income.'
+                        : 'Variable — consider building a 3-month emergency fund.'}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
-        </Animated.View>
+          </Animated.View>
+        )}
 
-        {/* Growth tip */}
-        <Animated.View style={[as[4], { marginHorizontal: spacing[5] }]}>
-          <View style={{ backgroundColor: colors.income + '12', borderRadius: borderRadius.card, padding: spacing[4], borderWidth: 1, borderColor: colors.income + '25' }}>
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.income, marginBottom: spacing[2] }}>
-              💡 Income Growth Insight
-            </Text>
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary, lineHeight: 20 }}>
-              Your freelance income grew by ₱1,200 this month. Diversifying into 2–3 income streams can improve stability and grow your savings rate.
-            </Text>
-          </View>
-        </Animated.View>
+        {/* Growth tip — only when there is real income data */}
+        {ytdTotal > 0 && (
+          <Animated.View style={[as[4], { marginHorizontal: spacing[5] }]}>
+            <View style={{ backgroundColor: colors.income + '12', borderRadius: borderRadius.card, padding: spacing[4], borderWidth: 1, borderColor: colors.income + '25' }}>
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.income, marginBottom: spacing[2] }}>
+                💡 Income Growth Insight
+              </Text>
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary, lineHeight: 20 }}>
+                {(incomeStreams ?? []).length > 1
+                  ? `You have ${(incomeStreams ?? []).length} income streams this month. Diversifying further can improve stability and grow your savings rate.`
+                  : 'Consider adding freelance or investment income to diversify beyond a single income source.'}
+              </Text>
+            </View>
+          </Animated.View>
+        )}
       </ScrollView>
     </View>
   );

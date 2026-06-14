@@ -1,19 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
-import { mockGetAccounts, mockGetDashboard } from '../../api';
+import { getDashboard } from '../../services/finance.service';
 
-export const DASHBOARD_KEY  = ['dashboard'] as const;
-export const ACCOUNTS_KEY   = ['accounts']  as const;
+export const DASHBOARD_KEY = ['dashboard'] as const;
 
 export function useDashboard() {
   return useQuery({
-    queryKey: DASHBOARD_KEY,
-    queryFn:  mockGetDashboard,
-  });
-}
-
-export function useAccounts() {
-  return useQuery({
-    queryKey: ACCOUNTS_KEY,
-    queryFn:  mockGetAccounts,
+    queryKey:        DASHBOARD_KEY,
+    queryFn:         getDashboard,
+    staleTime:       0,          // always re-fetch when the dashboard mounts/focuses
+    refetchOnMount:  true,
+    refetchOnWindowFocus: true,
   });
 }

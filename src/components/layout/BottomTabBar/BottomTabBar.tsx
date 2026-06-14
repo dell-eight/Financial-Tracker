@@ -12,7 +12,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, StackActions } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import type { NavigationProp } from '@react-navigation/native';
@@ -197,8 +197,16 @@ export function BottomTabBar({ state, descriptors, navigation }: BottomTabBarPro
                 target:            route.key,
                 canPreventDefault: true,
               });
-              if (!isActive && !event.defaultPrevented) {
-                navigation.navigate(route.name);
+              if (!event.defaultPrevented) {
+                if (isActive) {
+                  // Pop the nested stack back to its root when re-pressing the active tab
+                  const nestedState = state.routes[index]?.state;
+                  if (nestedState && (nestedState.index ?? 0) > 0) {
+                    navigation.dispatch({ ...StackActions.popToTop(), target: nestedState.key });
+                  }
+                } else {
+                  navigation.navigate(route.name);
+                }
               }
             };
 

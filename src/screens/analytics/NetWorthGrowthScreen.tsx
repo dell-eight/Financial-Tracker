@@ -15,37 +15,15 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line as SvgLine, Circle } from 'react-native-svg';
 import type { StackScreenProps } from '@react-navigation/stack';
-import { useTheme } from '../../hooks/ui/useTheme';
+import { useTheme }          from '../../hooks/ui/useTheme';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
+import { useNetWorthHistory }  from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<AnalyticsStackParamList, 'NetWorthGrowth'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// ─── Mock 12-month history ────────────────────────────────────────────────────
-
-const NW_HISTORY = [
-  { label: 'Jul', nw: 760000 },
-  { label: 'Aug', nw: 774000 },
-  { label: 'Sep', nw: 789000 },
-  { label: 'Oct', nw: 801000 },
-  { label: 'Nov', nw: 818000 },
-  { label: 'Dec', nw: 832000 },
-  { label: 'Jan', nw: 841000 },
-  { label: 'Feb', nw: 848000 },
-  { label: 'Mar', nw: 854000 },
-  { label: 'Apr', nw: 859000 },
-  { label: 'May', nw: 865000 },
-  { label: 'Jun', nw: 876300 },
-];
-
-const MILESTONES = [
-  { label: '₱750k',  value: 750_000,   reached: true  },
-  { label: '₱850k',  value: 850_000,   reached: true  },
-  { label: '₱1M',    value: 1_000_000, reached: false },
-  { label: '₱1.5M',  value: 1_500_000, reached: false },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -67,7 +45,7 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 
 // ─── NWChart ─────────────────────────────────────────────────────────────────
 
-function NWChart({ data }: { data: typeof NW_HISTORY }) {
+function NWChart({ data }: { data: { label: string; nw: number }[] }) {
   const theme = useTheme();
   const { colors, fontFamily } = theme;
   const W = SCREEN_W - 40;
@@ -76,16 +54,19 @@ function NWChart({ data }: { data: typeof NW_HISTORY }) {
   const plotH = CHART_H - X_H - Y_PAD;
 
   const allVals = data.map(d => d.nw);
-  const minV    = Math.min(...allVals) * 0.97;
-  const maxV    = Math.max(...allVals) * 1.02;
+  const minV    = allVals.length > 0 ? Math.min(...allVals) * 0.97 : 0;
+  const maxV    = allVals.length > 0 ? Math.max(...allVals) * 1.02 : 1;
   const range   = maxV - minV || 1;
 
   const toY = (v: number) => Y_PAD + (1 - (v - minV) / range) * plotH;
 
-  const nwPts  = data.map((d, i) => ({ x: (i / (data.length - 1)) * plotW, y: toY(d.nw) }));
-  const nwLine = smoothPath(nwPts);
-  const last   = nwPts[nwPts.length - 1];
-  const nwFill = nwLine + ` L${last.x.toFixed(1)},${(Y_PAD + plotH).toFixed(1)} L0,${(Y_PAD + plotH).toFixed(1)}Z`;
+  const nwPts  = data.map((d, i) => ({ x: (i / Math.max(data.length - 1, 1)) * plotW, y: toY(d.nw) }));
+  const hasPts = nwPts.length >= 2;
+  const nwLine = hasPts ? smoothPath(nwPts) : '';
+  const last   = nwPts[nwPts.length - 1] ?? { x: 0, y: Y_PAD + plotH };
+  const nwFill = hasPts
+    ? nwLine + ` L${last.x.toFixed(1)},${(Y_PAD + plotH).toFixed(1)} L0,${(Y_PAD + plotH).toFixed(1)}Z`
+    : '';
 
   const tickStep = Math.ceil((maxV - minV) / 4 / 10000) * 10000;
   const ticks    = [0, 1, 2, 3, 4].map(i => minV + i * tickStep);
@@ -148,8 +129,9 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
 
-  const { data: assets } = useAssets();
-  const { data: debts  } = useDebts();
+  const { data: assets    } = useAssets();
+  const { data: debts     } = useDebts();
+  const { data: nwHistory } = useNetWorthHistory(12);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -158,13 +140,32 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
   const totalDebts  = useMemo(() => (debts  ?? []).reduce((s, d) => s + d.balance,  0), [debts]);
   const netWorth    = totalAssets - totalDebts;
 
-  const currentNW  = netWorth > 0 ? netWorth : NW_HISTORY[NW_HISTORY.length - 1].nw;
-  const prevNW     = NW_HISTORY[NW_HISTORY.length - 2].nw;
-  const nwDelta    = currentNW - prevNW;
+  const hist      = nwHistory ?? [];
+  const currentNW = netWorth > 0 ? netWorth : (hist[hist.length - 1]?.nw ?? 0);
+  const prevNW    = hist.length >= 2 ? hist[hist.length - 2].nw : 0;
+  const nwDelta   = currentNW - prevNW;
 
-  const nextMilestone  = MILESTONES.find(m => !m.reached);
+  // Dynamic milestones based on current net worth magnitude
+  const milestones = useMemo(() => {
+    const magnitude = Math.pow(10, Math.floor(Math.log10(Math.max(currentNW, 100_000))));
+    const steps     = [0.5, 0.75, 1, 1.5, 2, 3].map(x => Math.round(x * magnitude));
+    return steps.map(v => ({
+      label:   v >= 1_000_000 ? `₱${(v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1)}M`
+               : `₱${(v / 1_000).toFixed(0)}k`,
+      value:   v,
+      reached: currentNW >= v,
+    }));
+  }, [currentNW]);
+
+  const nextMilestone  = milestones.find(m => !m.reached);
   const toGo           = nextMilestone ? nextMilestone.value - currentNW : 0;
-  const monthsToTarget = Math.ceil(toGo / 11300);
+  const avgMonthlyGain = hist.length >= 2 ? (hist[hist.length - 1].nw - hist[0].nw) / (hist.length - 1) : 11_300;
+  const monthsToTarget = avgMonthlyGain > 0 ? Math.ceil(toGo / avgMonthlyGain) : 999;
+
+  // 12-month growth % for hero stat
+  const growth12m = hist.length >= 2 && hist[0].nw > 0
+    ? ((hist[hist.length - 1].nw - hist[0].nw) / hist[0].nw) * 100
+    : 0;
 
   const a = [0, 1, 2, 3, 4].map(() => useSharedValue(0));
   useEffect(() => {
@@ -205,9 +206,9 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
             </View>
             <View style={{ flexDirection: 'row', gap: spacing[4], marginTop: spacing[4], paddingTop: spacing[3], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border.subtle }}>
               {[
-                { label: 'Total Assets', value: fmtShort(totalAssets || 948300), color: colors.income },
-                { label: 'Total Debts',  value: fmtShort(totalDebts  || 72000),  color: colors.expense },
-                { label: '12-mo Growth', value: '+13.2%',                          color: colors.accent.primary },
+                { label: 'Total Assets', value: fmtShort(totalAssets), color: colors.income },
+                { label: 'Total Debts',  value: fmtShort(totalDebts),  color: colors.expense },
+                { label: '12-mo Growth', value: `${growth12m >= 0 ? '+' : ''}${growth12m.toFixed(1)}%`, color: colors.accent.primary },
               ].map(stat => (
                 <View key={stat.label} style={{ flex: 1 }}>
                   <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted }}>{stat.label}</Text>
@@ -224,7 +225,7 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
               12-Month Net Worth
             </Text>
-            <NWChart data={NW_HISTORY} />
+            <NWChart data={hist.length > 0 ? hist : [{ label: '—', nw: 0 }]} />
           </View>
         </Animated.View>
 
@@ -234,9 +235,9 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, paddingVertical: spacing[3], borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }}>
               Monthly Change
             </Text>
-            {NW_HISTORY.slice(-6).map((row, i, arr) => {
-              const prevIdx = NW_HISTORY.indexOf(row) - 1;
-              const prev    = prevIdx >= 0 ? NW_HISTORY[prevIdx].nw : row.nw;
+            {hist.slice(-6).map((row, i, arr) => {
+              const prevIdx = hist.indexOf(row) - 1;
+              const prev    = prevIdx >= 0 ? hist[prevIdx].nw : row.nw;
               const delta   = row.nw - prev;
               const up      = delta >= 0;
               return (
@@ -258,8 +259,8 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
               Milestones
             </Text>
-            {MILESTONES.map((m, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginBottom: i < MILESTONES.length - 1 ? spacing[3] : 0 }}>
+            {milestones.map((m, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], marginBottom: i < milestones.length - 1 ? spacing[3] : 0 }}>
                 <Text style={{ fontSize: 18 }}>{m.reached ? '✅' : '🎯'}</Text>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -286,8 +287,8 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
                 🎯 Next: {nextMilestone.label}
               </Text>
               <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary, lineHeight: 20 }}>
-                You need {fmtShort(toGo)} more. At your current rate of +₱11.3k/month, you'll reach {nextMilestone.label} in approximately{' '}
-                <Text style={{ fontFamily: fontFamily.semiBold, color: colors.text.primary }}>{monthsToTarget} months.</Text>
+                You need {fmtShort(toGo)} more. At your current rate of +{fmtShort(Math.max(avgMonthlyGain, 0))}/month, you'll reach {nextMilestone.label} in approximately{' '}
+                <Text style={{ fontFamily: fontFamily.semiBold, color: colors.text.primary }}>{monthsToTarget < 999 ? `${monthsToTarget} months` : 'a while'}.</Text>
               </Text>
             </View>
           </Animated.View>

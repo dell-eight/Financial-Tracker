@@ -15,8 +15,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line as SvgLine, Circle } from 'react-native-svg';
 import type { StackScreenProps } from '@react-navigation/stack';
-import { useTheme } from '../../hooks/ui/useTheme';
+import { useTheme }        from '../../hooks/ui/useTheme';
 import { useTransactions } from '../../hooks/queries/useTransactions';
+import { useMonthlyHistory, useWeeklyHistory } from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
 
 type Props   = StackScreenProps<AnalyticsStackParamList, 'SpendingTrends'>;
@@ -28,45 +29,6 @@ const X_H     = 24;
 const Y_W     = 40;
 const Y_PAD   = 12;
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const MONTHLY_EXP = [
-  { label: 'Jan', value: 3150 },
-  { label: 'Feb', value: 2890 },
-  { label: 'Mar', value: 3420 },
-  { label: 'Apr', value: 2600 },
-  { label: 'May', value: 2790 },
-  { label: 'Jun', value: 2336 },
-];
-
-const WEEKLY_EXP = [
-  { label: 'Mon', value: 99 },
-  { label: 'Tue', value: 165 },
-  { label: 'Wed', value: 112 },
-  { label: 'Thu', value: 52 },
-  { label: 'Fri', value: 118 },
-  { label: 'Sat', value: 210 },
-  { label: 'Sun', value: 88 },
-];
-
-const YEARLY_EXP = [
-  { label: "Q1'25", value: 9460 },
-  { label: "Q2'25", value: 8890 },
-  { label: "Q3'25", value: 9100 },
-  { label: "Q4'25", value: 10200 },
-  { label: "Q1'26", value: 9460 },
-  { label: "Q2'26", value: 7126 },
-];
-
-const DOW_BARS = [
-  { label: 'Mon', pct: 0.32 },
-  { label: 'Tue', pct: 0.54 },
-  { label: 'Wed', pct: 0.37 },
-  { label: 'Thu', pct: 0.17 },
-  { label: 'Fri', pct: 0.39 },
-  { label: 'Sat', pct: 0.69 },
-  { label: 'Sun', pct: 0.29 },
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -111,9 +73,12 @@ function SpendingChart({ data, color }: { data: { label: string; value: number }
     label: d.label, value: d.value,
   }));
 
-  const line     = smoothPath(pts);
-  const lastPt   = pts[pts.length - 1];
-  const fillPath = line + ` L${lastPt.x.toFixed(1)},${(Y_PAD + plotH).toFixed(1)} L0,${(Y_PAD + plotH).toFixed(1)}Z`;
+  const hasPts   = pts.length >= 2;
+  const line     = hasPts ? smoothPath(pts) : '';
+  const lastPt   = pts[pts.length - 1] ?? { x: 0, y: Y_PAD + plotH };
+  const fillPath = hasPts
+    ? line + ` L${lastPt.x.toFixed(1)},${(Y_PAD + plotH).toFixed(1)} L0,${(Y_PAD + plotH).toFixed(1)}Z`
+    : '';
 
   const reveal = useSharedValue(0);
   useEffect(() => {
@@ -169,7 +134,9 @@ export function SpendingTrendsScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
-  const { data: txns } = useTransactions();
+  const { data: txns }           = useTransactions();
+  const { data: monthlyHistory } = useMonthlyHistory(6);
+  const { data: weeklyHistory }  = useWeeklyHistory();
 
   const [period, setPeriod] = useState<Period>('monthly');
 
@@ -178,7 +145,6 @@ export function SpendingTrendsScreen({ navigation }: Props) {
 
   const CURRENT_MONTH = new Date().toISOString().substring(0, 7);
 
-  // Live category totals for current month
   const catTotals = useMemo(() => {
     const map = new Map<string, { label: string; icon: string; amount: number; color: string }>();
     const CAT_COLORS: Record<string, string> = {
@@ -196,11 +162,50 @@ export function SpendingTrendsScreen({ navigation }: Props) {
   const totalSpend = useMemo(() => catTotals.reduce((s, c) => s + c.amount, 0), [catTotals]);
   const maxCat     = catTotals[0]?.amount ?? 1;
 
-  const chartData = period === 'weekly' ? WEEKLY_EXP : period === 'yearly' ? YEARLY_EXP : MONTHLY_EXP;
+  // Derive chart data from real history
+  const chartData = useMemo(() => {
+    if (period === 'weekly') return (weeklyHistory ?? []).map(d => ({ label: d.label, value: d.expense }));
+    if (period === 'yearly') {
+      // Aggregate monthly into quarterly
+      const src = monthlyHistory ?? [];
+      const quarters: { label: string; value: number }[] = [];
+      for (let i = 0; i < src.length; i += 3) {
+        const slice = src.slice(i, i + 3);
+        const total = slice.reduce((s, d) => s + d.expense, 0);
+        quarters.push({ label: slice[0]?.label ?? `Q${Math.floor(i/3)+1}`, value: total });
+      }
+      return quarters;
+    }
+    return (monthlyHistory ?? []).map(d => ({ label: d.label, value: d.expense }));
+  }, [period, monthlyHistory, weeklyHistory]);
 
-  const prevTotal = period === 'monthly' ? 2790 : period === 'weekly' ? 844 : 46610;
-  const delta     = totalSpend > 0 ? ((totalSpend - prevTotal) / prevTotal) * 100 : 0;
-  const isDown    = delta <= 0;
+  // Derived day-of-week spending from real transactions this month
+  const dowBars = useMemo(() => {
+    const DAY = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const totals = [0,0,0,0,0,0,0];
+    for (const t of (txns ?? []).filter(t2 => t2.type === 'expense' && t2.date.startsWith(CURRENT_MONTH))) {
+      const idx = (new Date(t.date + 'T00:00:00').getDay() + 6) % 7;
+      totals[idx] += t.amount;
+    }
+    const maxVal = Math.max(...totals, 1);
+    return DAY.map((label, i) => ({ label, pct: totals[i] / maxVal }));
+  }, [txns]);
+
+  const peakDow = useMemo(() => {
+    const maxPct = Math.max(...dowBars.map(d => d.pct));
+    return dowBars.find(d => d.pct === maxPct)?.label ?? 'Saturday';
+  }, [dowBars]);
+
+  const periodTotal = useMemo(() => {
+    if (period === 'weekly')  return (weeklyHistory  ?? []).reduce((s, d) => s + d.expense, 0);
+    if (period === 'yearly')  return (monthlyHistory ?? []).reduce((s, d) => s + d.expense, 0);
+    return totalSpend;
+  }, [period, weeklyHistory, monthlyHistory, totalSpend]);
+
+  const hist        = monthlyHistory ?? [];
+  const prevExpense = hist.length >= 2 ? hist[hist.length - 2].expense : 0;
+  const delta       = prevExpense > 0 ? ((periodTotal - prevExpense) / prevExpense) * 100 : 0;
+  const isDown      = delta <= 0;
 
   const PERIOD_LABELS: Record<Period, string> = { weekly: 'This Week', monthly: 'This Month', yearly: 'This Year' };
 
@@ -251,7 +256,7 @@ export function SpendingTrendsScreen({ navigation }: Props) {
               {PERIOD_LABELS[period]} Spending
             </Text>
             <Text style={{ fontSize: fontSize.displayXl, fontFamily: fontFamily.bold, color: colors.expense, marginTop: spacing[1], letterSpacing: -1 }}>
-              {fmt(period === 'monthly' ? totalSpend : period === 'weekly' ? 844 : 46610)}
+              {fmt(periodTotal)}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 4 }}>
               <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: isDown ? colors.income : colors.expense }}>
@@ -282,17 +287,17 @@ export function SpendingTrendsScreen({ navigation }: Props) {
                 Spending by Day of Week
               </Text>
               <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 80, gap: 6 }}>
-                {DOW_BARS.map((d, i) => (
+                {dowBars.map((d, i) => (
                   <View key={i} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
                     <View style={{ flex: 1, justifyContent: 'flex-end', width: '100%' }}>
-                      <View style={{ height: `${d.pct * 100}%`, backgroundColor: d.pct === Math.max(...DOW_BARS.map(x => x.pct)) ? colors.expense : colors.expense + '60', borderRadius: 4 }} />
+                      <View style={{ height: `${Math.max(d.pct * 100, 4)}%`, backgroundColor: d.pct >= 0.99 ? colors.expense : colors.expense + '60', borderRadius: 4 }} />
                     </View>
                     <Text style={{ fontSize: 9, fontFamily: fontFamily.regular, color: colors.text.muted }}>{d.label}</Text>
                   </View>
                 ))}
               </View>
               <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: spacing[3] }}>
-                Saturdays have the highest spending on average.
+                {peakDow}s have the highest spending this month.
               </Text>
             </View>
           </Animated.View>
@@ -304,13 +309,11 @@ export function SpendingTrendsScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
               By Category {period === 'monthly' ? '(This Month)' : ''}
             </Text>
-            {(catTotals.length > 0 ? catTotals : [
-              { label: 'Bills & Utilities', icon: '💡', amount: 657, color: '#EF4444' },
-              { label: 'Food & Dining',     icon: '🍔', amount: 276, color: '#F97316' },
-              { label: 'Shopping',          icon: '🛍️', amount: 255, color: '#EC4899' },
-              { label: 'Health',            icon: '💊', amount: 272, color: '#22C55E' },
-              { label: 'Transport',         icon: '🚗', amount: 142, color: '#3B82F6' },
-            ]).slice(0, 6).map((cat, i, arr) => (
+            {catTotals.length === 0 ? (
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', paddingVertical: spacing[4] }}>
+                No expenses recorded this month.
+              </Text>
+            ) : catTotals.slice(0, 6).map((cat, i, arr) => (
               <View key={i} style={{ marginBottom: i < arr.length - 1 ? spacing[3] : 0 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 5 }}>
                   <Text style={{ fontSize: 14, marginRight: spacing[2] }}>{cat.icon}</Text>

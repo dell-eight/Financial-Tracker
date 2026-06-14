@@ -15,8 +15,13 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useAccounts } from '../../hooks/queries/useAccounts';
+import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
+import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
+import { addTransfer } from '../../services/finance.service';
+import { useQueryClient } from '@tanstack/react-query';
 import type { TransactionsStackParamList } from '../../navigation/types';
 import type { Account } from '../../types/models';
+import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 
 type Props = StackScreenProps<TransactionsStackParamList, 'AddTransfer'>;
 
@@ -146,6 +151,7 @@ export function AddTransferScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const queryClient = useQueryClient();
 
   const { data: accounts = [] } = useAccounts();
 
@@ -153,6 +159,8 @@ export function AddTransferScreen({ navigation }: Props) {
   const [fromAccount, setFromAccount] = useState<Account | null>(null);
   const [toAccount,   setToAccount]   = useState<Account | null>(null);
   const [note,        setNote]        = useState('');
+  const [saving,      setSaving]      = useState(false);
+  const [saveError,   setSaveError]   = useState<string | null>(null);
 
   const today       = useMemo(() => new Date(), []);
   const displayDate = useMemo(() => formatDateDisplay(today), [today]);
@@ -177,10 +185,28 @@ export function AddTransferScreen({ navigation }: Props) {
     setAmountStr(cleaned);
   }
 
-  function handleSave() {
-    if (!canSave) return;
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    navigation.goBack();
+  async function handleSave() {
+    if (!canSave || !fromAccount || !toAccount || saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await addTransfer({
+        fromAccountId:      fromAccount.id,
+        toAccountId:        toAccount.id,
+        fromCurrentBalance: fromAccount.balance,
+        toCurrentBalance:   toAccount.balance,
+        amount:             parsedAmount,
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ASSETS_KEY }),
+        queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+      ]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.navigate('TransactionList', undefined);
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to save transfer. Please try again.');
+      setSaving(false);
+    }
   }
 
   const H_PAD = spacing[5];
@@ -194,7 +220,7 @@ export function AddTransferScreen({ navigation }: Props) {
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
+        <Pressable onPress={() => navigation.navigate('TransactionList', undefined)} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>
             Cancel
           </Text>
@@ -202,9 +228,9 @@ export function AddTransferScreen({ navigation }: Props) {
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>
           Add Transfer
         </Text>
-        <Pressable onPress={handleSave} disabled={!canSave} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
-          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: canSave ? colors.accent.primary : colors.text.muted }}>
-            Save
+        <Pressable onPress={handleSave} disabled={!canSave || saving} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
+          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? colors.accent.primary : colors.text.muted }}>
+            {saving ? '…' : 'Save'}
           </Text>
         </Pressable>
       </View>
@@ -306,13 +332,18 @@ export function AddTransferScreen({ navigation }: Props) {
 
       {/* ── Save button ─────────────────────────────────────────────────────── */}
       <View style={[styles.saveWrap, { paddingHorizontal: H_PAD, paddingBottom: btmPad + spacing[3], paddingTop: spacing[3], borderTopColor: colors.border.subtle }]}>
+        {saveError && (
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.expense, textAlign: 'center', marginBottom: spacing[2] }}>
+            {saveError}
+          </Text>
+        )}
         <Pressable
           onPress={handleSave}
-          disabled={!canSave}
+          disabled={!canSave || saving}
           style={({ pressed }) => [
             styles.saveBtn,
             {
-              backgroundColor: !canSave
+              backgroundColor: (!canSave || saving)
                 ? colors.bg.surfaceMuted
                 : pressed
                   ? colors.accent.pressed
@@ -324,11 +355,12 @@ export function AddTransferScreen({ navigation }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Save transfer"
         >
-          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: canSave ? '#FFFFFF' : colors.text.muted }}>
-            Save Transfer
+          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? '#FFFFFF' : colors.text.muted }}>
+            {saving ? 'Saving…' : 'Save Transfer'}
           </Text>
         </Pressable>
       </View>
+      <LoadingOverlay visible={saving} message="Saving…" />
     </KeyboardAvoidingView>
   );
 }

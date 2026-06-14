@@ -13,14 +13,13 @@ import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing,
 } from 'react-native-reanimated';
 import type { StackScreenProps } from '@react-navigation/stack';
-import { useTheme } from '../../hooks/ui/useTheme';
-import { useSavingsGoals } from '../../hooks/queries/useSavingsGoals';
+import { useTheme }          from '../../hooks/ui/useTheme';
+import { useSavingsGoals }   from '../../hooks/queries/useSavingsGoals';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
+import { useMonthlyHistory }  from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<AnalyticsStackParamList, 'Forecast'>;
-
-const MONTHLY_SAVINGS = 2785;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -62,9 +61,10 @@ export function ForecastScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
 
-  const { data: goals  } = useSavingsGoals();
-  const { data: debts  } = useDebts();
-  const { data: assets } = useAssets();
+  const { data: goals         } = useSavingsGoals();
+  const { data: debts         } = useDebts();
+  const { data: assets        } = useAssets();
+  const { data: monthlyHistory } = useMonthlyHistory(6);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -79,12 +79,19 @@ export function ForecastScreen({ navigation }: Props) {
     [assets],
   );
 
-  const BASE_INVEST  = investValue || 128300;
-  const BASE_NW      = netWorth   || 876300;
+  const hist          = monthlyHistory ?? [];
+  const MONTHLY_SAVINGS = useMemo(() => {
+    if (hist.length === 0) return 0;
+    const recent = hist[hist.length - 1];
+    return Math.max(recent.savings, 0);
+  }, [hist]);
 
-  const inv1yr = investmentForecast(BASE_INVEST, 2000, 1);
-  const inv3yr = investmentForecast(BASE_INVEST, 2000, 3);
-  const inv5yr = investmentForecast(BASE_INVEST, 2000, 5);
+  const BASE_INVEST  = investValue || 0;
+  const BASE_NW      = netWorth   || 0;
+
+  const inv1yr = investmentForecast(BASE_INVEST, MONTHLY_SAVINGS, 1);
+  const inv3yr = investmentForecast(BASE_INVEST, MONTHLY_SAVINGS, 3);
+  const inv5yr = investmentForecast(BASE_INVEST, MONTHLY_SAVINGS, 5);
 
   const nw1yr = Math.round(BASE_NW + MONTHLY_SAVINGS * 12  + BASE_INVEST * 0.07);
   const nw3yr = Math.round(BASE_NW + MONTHLY_SAVINGS * 36  + BASE_INVEST * 0.231);
@@ -228,14 +235,15 @@ export function ForecastScreen({ navigation }: Props) {
           </View>
         </Animated.View>
 
-        {/* Investment Growth */}
+        {/* Investment Growth — only when there's an investment base or monthly savings */}
+        {(BASE_INVEST > 0 || MONTHLY_SAVINGS > 0) && (
         <Animated.View style={[as[3], { marginHorizontal: spacing[5], marginBottom: spacing[4] }]}>
           <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4] }]}>
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
               Investment Projection (7% Annual)
             </Text>
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginBottom: spacing[4] }}>
-              Starting from {fmtShort(BASE_INVEST)}, adding ₱2,000/mo
+              Starting from {fmtShort(BASE_INVEST)}, adding {fmtShort(MONTHLY_SAVINGS)}/mo
             </Text>
             {[
               { label: '1 Year',  value: inv1yr, color: colors.accent.primary },
@@ -254,6 +262,7 @@ export function ForecastScreen({ navigation }: Props) {
             ))}
           </View>
         </Animated.View>
+        )}
 
         {/* Disclaimer */}
         <Animated.View style={[as[4], { marginHorizontal: spacing[5] }]}>

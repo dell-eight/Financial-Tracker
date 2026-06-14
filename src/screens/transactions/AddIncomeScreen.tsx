@@ -16,9 +16,14 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { TRANSACTIONS_KEY } from '../../hooks/queries/useTransactions';
+import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
+import { useAccounts } from '../../hooks/queries/useAccounts';
+import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
+import { addIncome } from '../../services/finance.service';
 import type { TransactionsStackParamList } from '../../navigation/types';
-import type { Transaction } from '../../types/models';
+import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import type { CategoryKey } from '../../theme';
+import type { Account } from '../../types/models';
 
 type Props = StackScreenProps<TransactionsStackParamList, 'AddIncome'>;
 
@@ -40,10 +45,16 @@ export function AddIncomeScreen({ navigation }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
 
-  const [amountStr,   setAmountStr]   = useState('');
-  const [selectedCat, setSelectedCat] = useState<IncomeCatKey | null>(null);
-  const [description, setDescription] = useState('');
-  const [note,        setNote]        = useState('');
+  const { data: accounts = [] } = useAccounts();
+
+  const [amountStr,      setAmountStr]      = useState('');
+  const [selectedCat,    setSelectedCat]    = useState<IncomeCatKey | null>(null);
+  const [description,    setDescription]    = useState('');
+  const [note,           setNote]           = useState('');
+  const [toAccount,      setToAccount]      = useState<Account | null>(null);
+  const [accountPickerOpen, setAccountPickerOpen] = useState(false);
+  const [saving,         setSaving]         = useState(false);
+  const [saveError,      setSaveError]      = useState<string | null>(null);
 
   const today       = useMemo(() => new Date(), []);
   const todayStr    = useMemo(() => today.toISOString().split('T')[0], [today]);
@@ -63,30 +74,41 @@ export function AddIncomeScreen({ navigation }: Props) {
     setAmountStr(cleaned);
   }
 
-  function handleSave() {
-    if (!canSave || !selectedCat) return;
-    const cat     = INCOME_CATS.find(c => c.key === selectedCat)!;
-    const timeStr = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
+  const SOURCE_TYPE: Record<IncomeCatKey, string> = {
+    income_salary:    'salary',
+    income_freelance: 'freelance',
+    income_other:     'other',
+  };
 
-    const newTx: Transaction = {
-      id:            `t${Date.now()}`,
-      merchant:      description.trim() || cat.label,
-      category:      selectedCat,
-      categoryLabel: cat.label,
-      categoryIcon:  cat.icon,
-      amount:        parsedAmount,
-      type:          'income',
-      date:          todayStr,
-      time:          timeStr,
-      note:          note.trim() || undefined,
-    };
-
-    queryClient.setQueryData(
-      TRANSACTIONS_KEY,
-      (old: Transaction[] | undefined) => [newTx, ...(old ?? [])],
-    );
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    navigation.goBack();
+  async function handleSave() {
+    if (!canSave || !selectedCat || saving) return;
+    const cat = INCOME_CATS.find(c => c.key === selectedCat)!;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await addIncome({
+        description:      description.trim() || cat.label,
+        sourceName:       cat.label,
+        sourceType:       SOURCE_TYPE[selectedCat],
+        sourceIcon:       cat.icon,
+        amount:           parsedAmount,
+        date:             todayStr,
+        note:             note.trim() || undefined,
+        toAccountId:      toAccount?.id,
+        toCurrentBalance: toAccount?.balance,
+      });
+      const keys: Promise<void>[] = [
+        queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }),
+        queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+      ];
+      if (toAccount) keys.push(queryClient.invalidateQueries({ queryKey: ASSETS_KEY }));
+      await Promise.all(keys);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.navigate('TransactionList', undefined);
+    } catch (e: any) {
+      setSaveError(e?.message ?? 'Failed to save. Please try again.');
+      setSaving(false);
+    }
   }
 
   const H_PAD = spacing[5];
@@ -100,7 +122,7 @@ export function AddIncomeScreen({ navigation }: Props) {
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
+        <Pressable onPress={() => navigation.navigate('TransactionList', undefined)} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>
             Cancel
           </Text>
@@ -108,9 +130,9 @@ export function AddIncomeScreen({ navigation }: Props) {
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>
           Add Income
         </Text>
-        <Pressable onPress={handleSave} disabled={!canSave} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
-          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: canSave ? colors.accent.primary : colors.text.muted }}>
-            Save
+        <Pressable onPress={handleSave} disabled={!canSave || saving} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
+          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? colors.accent.primary : colors.text.muted }}>
+            {saving ? '…' : 'Save'}
           </Text>
         </Pressable>
       </View>
@@ -195,6 +217,110 @@ export function AddIncomeScreen({ navigation }: Props) {
           </View>
         </View>
 
+        {/* ── Deposit to Account ──────────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }}>
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }}>
+            DEPOSIT TO ACCOUNT
+          </Text>
+          <Pressable
+            onPress={() => { setAccountPickerOpen(o => !o); Haptics.selectionAsync(); }}
+            style={[
+              {
+                backgroundColor: colors.bg.surface,
+                borderRadius:    borderRadius.card,
+                borderWidth:     1,
+                borderColor:     accountPickerOpen ? colors.income : colors.border.subtle,
+                padding:         spacing[4],
+                flexDirection:   'row',
+                alignItems:      'center',
+              },
+              shadows.sm,
+            ]}
+          >
+            <Text style={{ fontSize: 18, marginRight: spacing[3] }}>🏦</Text>
+            <View style={{ flex: 1 }}>
+              {toAccount ? (
+                <>
+                  <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
+                    {toAccount.institutionName}
+                  </Text>
+                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
+                    {toAccount.maskedNumber} · ₱{toAccount.balance.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+                  </Text>
+                </>
+              ) : (
+                <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted }}>
+                  Select account (optional)
+                </Text>
+              )}
+            </View>
+            <Text style={{ fontSize: 14, color: accountPickerOpen ? colors.income : colors.text.muted }}>
+              {accountPickerOpen ? '▲' : '▼'}
+            </Text>
+          </Pressable>
+
+          {accountPickerOpen && (
+            <View style={[
+              {
+                backgroundColor: colors.bg.surfaceRaised,
+                borderRadius:    borderRadius.card,
+                marginTop:       spacing[1],
+                borderWidth:     1,
+                borderColor:     colors.border.subtle,
+                overflow:        'hidden',
+              },
+              shadows.card,
+            ]}>
+              {/* None option */}
+              <Pressable
+                onPress={() => { setToAccount(null); setAccountPickerOpen(false); Haptics.selectionAsync(); }}
+                style={({ pressed }) => ({
+                  flexDirection:    'row',
+                  alignItems:       'center',
+                  padding:          spacing[4],
+                  backgroundColor:  pressed ? colors.bg.surfaceMuted : 'transparent',
+                  borderBottomWidth: StyleSheet.hairlineWidth,
+                  borderBottomColor: colors.border.subtle,
+                })}
+              >
+                <Text style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: toAccount === null ? fontFamily.semiBold : fontFamily.regular, color: toAccount === null ? colors.income : colors.text.muted }}>
+                  None
+                </Text>
+                {toAccount === null && <Text style={{ fontSize: 14, color: colors.income }}>✓</Text>}
+              </Pressable>
+              {accounts.map((acc, i) => (
+                <Pressable
+                  key={acc.id}
+                  onPress={() => { setToAccount(acc); setAccountPickerOpen(false); Haptics.selectionAsync(); }}
+                  style={({ pressed }) => ({
+                    flexDirection:    'row',
+                    alignItems:       'center',
+                    padding:          spacing[4],
+                    backgroundColor:  pressed ? colors.bg.surfaceMuted : 'transparent',
+                    borderBottomWidth: i < accounts.length - 1 ? StyleSheet.hairlineWidth : 0,
+                    borderBottomColor: colors.border.subtle,
+                  })}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: fontSize.bodyMd, fontFamily: toAccount?.id === acc.id ? fontFamily.semiBold : fontFamily.medium, color: toAccount?.id === acc.id ? colors.income : colors.text.primary }}>
+                      {acc.institutionName}
+                    </Text>
+                    <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
+                      {acc.maskedNumber}
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
+                    ₱{acc.balance.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+                  </Text>
+                  {toAccount?.id === acc.id && (
+                    <Text style={{ fontSize: 14, color: colors.income, marginLeft: spacing[2] }}>✓</Text>
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+
         {/* ── Details ─────────────────────────────────────────────────────────── */}
         <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }}>
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }}>
@@ -240,13 +366,18 @@ export function AddIncomeScreen({ navigation }: Props) {
 
       {/* ── Save button ─────────────────────────────────────────────────────── */}
       <View style={[styles.saveWrap, { paddingHorizontal: H_PAD, paddingBottom: btmPad + spacing[3], paddingTop: spacing[3], borderTopColor: colors.border.subtle }]}>
+        {saveError && (
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.expense, textAlign: 'center', marginBottom: spacing[2] }}>
+            {saveError}
+          </Text>
+        )}
         <Pressable
           onPress={handleSave}
-          disabled={!canSave}
+          disabled={!canSave || saving}
           style={({ pressed }) => [
             styles.saveBtn,
             {
-              backgroundColor: !canSave
+              backgroundColor: (!canSave || saving)
                 ? colors.bg.surfaceMuted
                 : pressed
                   ? colors.accent.pressed
@@ -258,11 +389,12 @@ export function AddIncomeScreen({ navigation }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Save income"
         >
-          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: canSave ? '#FFFFFF' : colors.text.muted }}>
-            Save Income
+          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? '#FFFFFF' : colors.text.muted }}>
+            {saving ? 'Saving…' : 'Save Income'}
           </Text>
         </Pressable>
       </View>
+      <LoadingOverlay visible={saving} message="Saving…" />
     </KeyboardAvoidingView>
   );
 }

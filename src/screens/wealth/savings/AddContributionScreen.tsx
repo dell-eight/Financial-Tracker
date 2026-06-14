@@ -16,8 +16,12 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useSavingsGoals, SAVINGS_GOALS_KEY } from '../../../hooks/queries/useSavingsGoals';
+import { useAccounts } from '../../../hooks/queries/useAccounts';
+import { ASSETS_KEY } from '../../../hooks/queries/useNetWorth';
+import { addContribution } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
-import type { SavingsGoal } from '../../../types/models';
+import type { SavingsGoal, Account } from '../../../types/models';
+import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 
 type Props = StackScreenProps<WealthStackParamList, 'AddContribution'>;
 
@@ -38,8 +42,14 @@ export function AddContributionScreen({ navigation, route }: Props) {
   const queryClient = useQueryClient();
   const { goalId }  = route.params;
 
-  const [amountStr, setAmountStr] = useState('');
-  const [note,      setNote]      = useState('');
+  const { data: accounts = [] } = useAccounts();
+
+  const [amountStr,        setAmountStr]        = useState('');
+  const [note,             setNote]             = useState('');
+  const [fromAccount,      setFromAccount]      = useState<Account | null>(null);
+  const [accountPickerOpen, setAccountPickerOpen] = useState(false);
+  const [saving,           setSaving]           = useState(false);
+  const [error,            setError]            = useState<string | null>(null);
 
   const { data: goals } = useSavingsGoals();
   const goal = useMemo<SavingsGoal | undefined>(
@@ -51,31 +61,41 @@ export function AddContributionScreen({ navigation, route }: Props) {
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
   const H_PAD  = spacing[5];
 
-  const parsed     = parseFloat(amountStr) || 0;
-  const canSave    = parsed > 0;
-  const remaining  = goal ? Math.max(goal.targetAmount - goal.savedAmount, 0) : 0;
-  const willFinish = goal ? goal.savedAmount + parsed >= goal.targetAmount : false;
+  const parsed           = parseFloat(amountStr) || 0;
+  const insufficientFunds = fromAccount !== null && parsed > 0 && parsed > fromAccount.balance;
+  const canSave          = parsed > 0 && !insufficientFunds;
+  const remaining        = goal ? Math.max(goal.targetAmount - goal.savedAmount, 0) : 0;
+  const willFinish       = goal ? goal.savedAmount + parsed >= goal.targetAmount : false;
 
   function setPreset(v: number) {
     Haptics.selectionAsync();
     setAmountStr(String(v));
   }
 
-  function handleSave() {
-    if (!canSave || !goal) return;
-    const newSaved = goal.savedAmount + parsed;
-    queryClient.setQueryData(
-      SAVINGS_GOALS_KEY,
-      (old: SavingsGoal[] | undefined) =>
-        (old ?? []).map(g =>
-          g.id === goalId ? { ...g, savedAmount: Math.min(newSaved, g.targetAmount) } : g,
-        ),
-    );
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    if (willFinish) {
-      navigation.replace('GoalAchieved', { goalId });
-    } else {
-      navigation.goBack();
+  async function handleSave() {
+    if (!canSave || !goal || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const capped = Math.min(parsed, Math.max(goal.targetAmount - goal.savedAmount, 0));
+      const finalAmount = capped > 0 ? capped : parsed;
+      await addContribution(goalId, finalAmount, note, fromAccount?.id, fromAccount?.balance);
+      const keys: Promise<void>[] = [
+        queryClient.invalidateQueries({ queryKey: SAVINGS_GOALS_KEY }),
+        queryClient.invalidateQueries({ queryKey: ['contributions', goalId] }),
+        queryClient.invalidateQueries({ queryKey: ASSETS_KEY }),
+      ];
+      if (fromAccount) keys.push(queryClient.invalidateQueries({ queryKey: ['accounts'] }));
+      await Promise.all(keys);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      if (willFinish) {
+        navigation.replace('GoalAchieved', { goalId });
+      } else {
+        navigation.goBack();
+      }
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to save contribution. Please try again.');
+      setSaving(false);
     }
   }
 
@@ -196,6 +216,83 @@ export function AddContributionScreen({ navigation, route }: Props) {
           })}
         </View>
 
+        {/* ── Fund from Account ── */}
+        <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }}>
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>
+            FUND FROM ACCOUNT
+          </Text>
+          <Pressable
+            onPress={() => { setAccountPickerOpen(o => !o); Haptics.selectionAsync(); }}
+            style={{
+              backgroundColor: colors.bg.surface,
+              borderRadius:    borderRadius.input,
+              borderWidth:     1,
+              borderColor:     accountPickerOpen ? colors.accent.primary : colors.border.subtle,
+              paddingHorizontal: spacing[4],
+              paddingVertical:   spacing[3],
+              flexDirection:     'row',
+              alignItems:        'center',
+            }}
+          >
+            <Text style={{ fontSize: 16, marginRight: spacing[3] }}>🏦</Text>
+            <View style={{ flex: 1 }}>
+              {fromAccount ? (
+                <>
+                  <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>{fromAccount.institutionName}</Text>
+                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
+                    {fromAccount.maskedNumber} · ₱{fromAccount.balance.toLocaleString('en-PH', { minimumFractionDigits: 0 })}
+                  </Text>
+                </>
+              ) : (
+                <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted }}>Select account (optional)</Text>
+              )}
+            </View>
+            <Text style={{ fontSize: 14, color: accountPickerOpen ? colors.accent.primary : colors.text.muted }}>{accountPickerOpen ? '▲' : '▼'}</Text>
+          </Pressable>
+
+          {insufficientFunds && (
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.expense, marginTop: spacing[2] }}>
+              Insufficient funds — {fromAccount!.institutionName} only has ₱{fromAccount!.balance.toLocaleString('en-PH', { minimumFractionDigits: 2 })}
+            </Text>
+          )}
+
+          {accountPickerOpen && (
+            <View style={{ backgroundColor: colors.bg.surfaceRaised, borderRadius: borderRadius.card, marginTop: spacing[1], borderWidth: 1, borderColor: colors.border.subtle, overflow: 'hidden' }}>
+              <Pressable
+                onPress={() => { setFromAccount(null); setAccountPickerOpen(false); Haptics.selectionAsync(); }}
+                style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', padding: spacing[4], backgroundColor: pressed ? colors.bg.surfaceMuted : 'transparent', borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle })}
+              >
+                <Text style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fromAccount === null ? fontFamily.semiBold : fontFamily.regular, color: fromAccount === null ? colors.accent.primary : colors.text.muted }}>None</Text>
+                {fromAccount === null && <Text style={{ fontSize: 14, color: colors.accent.primary }}>✓</Text>}
+              </Pressable>
+              {accounts.map((acc, i) => {
+                const noFunds = acc.balance <= 0;
+                return (
+                  <Pressable
+                    key={acc.id}
+                    onPress={() => {
+                      if (noFunds) return;
+                      setFromAccount(acc);
+                      setAccountPickerOpen(false);
+                      Haptics.selectionAsync();
+                    }}
+                    style={({ pressed }) => ({ flexDirection: 'row', alignItems: 'center', padding: spacing[4], backgroundColor: pressed && !noFunds ? colors.bg.surfaceMuted : 'transparent', borderBottomWidth: i < accounts.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border.subtle, opacity: noFunds ? 0.4 : 1 })}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fromAccount?.id === acc.id ? fontFamily.semiBold : fontFamily.medium, color: fromAccount?.id === acc.id ? colors.accent.primary : colors.text.primary }}>{acc.institutionName}</Text>
+                      <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: noFunds ? colors.expense : colors.text.muted, marginTop: 2 }}>
+                        {acc.maskedNumber}{noFunds ? ' · No funds' : ''}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: noFunds ? colors.text.muted : colors.text.primary }}>₱{acc.balance.toLocaleString('en-PH', { minimumFractionDigits: 0 })}</Text>
+                    {fromAccount?.id === acc.id && <Text style={{ fontSize: 14, color: colors.accent.primary, marginLeft: spacing[2] }}>✓</Text>}
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
         {/* ── Note ── */}
         <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }}>
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>
@@ -223,15 +320,22 @@ export function AddContributionScreen({ navigation, route }: Props) {
           </View>
         </View>
 
+        {/* ── Error ── */}
+        {error && (
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.expense, textAlign: 'center', marginHorizontal: H_PAD, marginBottom: spacing[3] }}>
+            {error}
+          </Text>
+        )}
+
         {/* ── Save button ── */}
         <Pressable
           onPress={handleSave}
-          disabled={!canSave}
+          disabled={!canSave || saving}
           style={({ pressed }) => [
             styles.saveBtn,
             {
               marginHorizontal: H_PAD,
-              backgroundColor: !canSave
+              backgroundColor: (!canSave || saving)
                 ? colors.bg.surfaceMuted
                 : willFinish
                   ? pressed ? colors.income + 'cc' : colors.income
@@ -241,11 +345,12 @@ export function AddContributionScreen({ navigation, route }: Props) {
             },
           ]}
         >
-          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: canSave ? '#FFFFFF' : colors.text.muted }}>
-            {willFinish ? '🎉 Complete Goal' : 'Add Contribution'}
+          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? '#FFFFFF' : colors.text.muted }}>
+            {saving ? 'Saving…' : willFinish ? '🎉 Complete Goal' : 'Add Contribution'}
           </Text>
         </Pressable>
       </ScrollView>
+      <LoadingOverlay visible={saving} message="Saving…" />
     </KeyboardAvoidingView>
   );
 }

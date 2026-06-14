@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,12 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useTransactions, TRANSACTIONS_KEY } from '../../hooks/queries/useTransactions';
+import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
+import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { getCategoryBgColor } from '../../theme';
+import { deleteTransaction } from '../../services/finance.service';
 import type { TransactionsStackParamList } from '../../navigation/types';
+import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import type { Transaction } from '../../types/models';
 
 type Props = StackScreenProps<TransactionsStackParamList, 'TransactionDetail'>;
@@ -93,6 +97,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
   const { id, type } = route.params;
+  const [deleting, setDeleting] = useState(false);
 
   const { data: allTxns } = useTransactions();
   const tx = useMemo<Transaction | undefined>(
@@ -109,6 +114,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   const catBg     = tx ? getCategoryBgColor(tx.category) : colors.bg.surfaceMuted;
 
   function handleDelete() {
+    const txType = (tx?.type ?? type) as 'expense' | 'income';
     Alert.alert(
       'Delete Transaction',
       'This transaction will be permanently removed.',
@@ -117,12 +123,21 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
         {
           text:    'Delete',
           style:   'destructive',
-          onPress: () => {
+          onPress: async () => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            queryClient.setQueryData(
-              TRANSACTIONS_KEY,
-              (old: Transaction[] | undefined) => (old ?? []).filter(t => t.id !== id),
-            );
+            setDeleting(true);
+            try {
+              await deleteTransaction(id, txType);
+              await Promise.all([
+                queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }),
+                queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+                queryClient.invalidateQueries({ queryKey: ASSETS_KEY }),
+              ]);
+            } catch {
+              // navigate back regardless; list will re-fetch and show correct state
+            } finally {
+              setDeleting(false);
+            }
             navigation.goBack();
           },
         },
@@ -240,6 +255,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
           </Text>
         </Pressable>
       </ScrollView>
+      <LoadingOverlay visible={deleting} message="Deleting…" />
     </View>
   );
 }

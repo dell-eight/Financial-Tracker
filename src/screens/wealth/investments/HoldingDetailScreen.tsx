@@ -15,7 +15,9 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments, HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
+import { deleteHolding } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
+import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { InvestmentHolding } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'HoldingDetail'>;
@@ -86,11 +88,18 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
   const { holdingId } = route.params;
+  const [deleting, setDeleting] = useState(false);
 
   const { data: holdings } = useInvestments();
   const holding = useMemo<InvestmentHolding | undefined>(
     () => holdings?.find(h => h.id === holdingId),
     [holdings, holdingId],
+  );
+
+  // Must be declared before any early return to respect hooks order
+  const priceBars = useMemo(
+    () => holding ? generatePriceBars(holding.currentPrice) : [],
+    [holding],
   );
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
@@ -119,23 +128,28 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
   const pnlPct      = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
   const isPositive  = pnl >= 0;
   const pnlColor    = isPositive ? colors.income : colors.expense;
-  const priceBars   = useMemo(() => generatePriceBars(holding.currentPrice), [holding.currentPrice]);
 
   const TYPE_LABELS: Record<string, string> = { stock: 'Stock', etf: 'ETF', fund: 'Mutual Fund', bond: 'Bond', crypto: 'Crypto' };
 
   function handleDelete() {
+    if (!holding) return;
     const sym = holding.symbol;
     Alert.alert('Remove Holding', `Remove ${sym} from your portfolio?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          queryClient.setQueryData(
-            HOLDINGS_KEY,
-            (old: InvestmentHolding[] | undefined) => (old ?? []).filter(h => h.id !== holdingId),
-          );
+          setDeleting(true);
+          try {
+            await deleteHolding(holdingId);
+            await queryClient.invalidateQueries({ queryKey: HOLDINGS_KEY });
+          } catch {
+            // still navigate back even if delete fails
+          } finally {
+            setDeleting(false);
+          }
           navigation.goBack();
         },
       },
@@ -229,6 +243,7 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
           </Pressable>
         </View>
       </ScrollView>
+      <LoadingOverlay visible={deleting} message="Removing holding…" />
     </View>
   );
 }

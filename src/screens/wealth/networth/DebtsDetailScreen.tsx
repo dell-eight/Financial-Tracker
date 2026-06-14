@@ -10,6 +10,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,9 +18,14 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
-import { useDebts, DEBTS_KEY } from '../../../hooks/queries/useNetWorth';
+import { useDebts, DEBTS_KEY, ASSETS_KEY } from '../../../hooks/queries/useNetWorth';
+import { DASHBOARD_KEY } from '../../../hooks/queries/useDashboard';
+import { useAccounts, ACCOUNTS_KEY } from '../../../hooks/queries/useAccounts';
+import { TRANSACTIONS_KEY } from '../../../hooks/queries/useTransactions';
+import { createDebt, updateDebtBalance, addDebtCharge, deleteDebt, makeDebtPayment } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
 import type { DebtCategory, DebtItem } from '../../../types/models';
+import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 
 type Props = StackScreenProps<WealthStackParamList, 'DebtsDetail'>;
 
@@ -56,32 +62,198 @@ function monthsToPayoff(balance: number, monthly: number, rate: number): number 
   return Math.ceil(-Math.log(inside) / Math.log(1 + r));
 }
 
-// ─── EditDebtModal ────────────────────────────────────────────────────────────
+// ─── AddDebtModal ─────────────────────────────────────────────────────────────
 
-function EditDebtModal({
+const DEBT_TYPES: { key: DebtCategory; label: string; icon: string }[] = [
+  { key: 'credit_card',   label: 'Credit Card',    icon: '💳' },
+  { key: 'personal_loan', label: 'Personal Loan',  icon: '📋' },
+  { key: 'mortgage',      label: 'Mortgage',        icon: '🏠' },
+  { key: 'auto_loan',     label: 'Auto Loan',       icon: '🚗' },
+  { key: 'student_loan',  label: 'Student Loan',    icon: '📚' },
+];
+
+function AddDebtModal({
+  visible, onSave, onClose,
+}: {
+  visible: boolean;
+  onSave:  (params: { name: string; debtType: DebtCategory; balance: number; originalAmount: number; interestRate: number; monthlyPayment: number }) => Promise<void>;
+  onClose: () => void;
+}) {
+  const theme  = useTheme();
+  const insets = useSafeAreaInsets();
+  const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+
+  const [name,           setName]           = useState('');
+  const [debtType,       setDebtType]       = useState<DebtCategory>('credit_card');
+  const [balanceStr,     setBalanceStr]     = useState('');
+  const [originalStr,    setOriginalStr]    = useState('');
+  const [rateStr,        setRateStr]        = useState('');
+  const [monthlyStr,     setMonthlyStr]     = useState('');
+  const [saving,         setSaving]         = useState(false);
+  const [error,          setError]          = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!visible) {
+      setName(''); setDebtType('credit_card'); setBalanceStr(''); setOriginalStr('');
+      setRateStr(''); setMonthlyStr(''); setError(null); setSaving(false);
+    }
+  }, [visible]);
+
+  const balance  = parseFloat(balanceStr)  || 0;
+  const canSave  = name.trim().length > 0 && balance > 0;
+
+  function numField(v: string, setter: (s: string) => void) {
+    const c = v.replace(/[^0-9.]/g, '');
+    if (c.split('.').length <= 2) setter(c);
+  }
+
+  async function handleSave() {
+    if (!canSave || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const original = parseFloat(originalStr) || balance;
+      await onSave({
+        name:           name.trim(),
+        debtType,
+        balance,
+        originalAmount: original,
+        interestRate:   parseFloat(rateStr)    || 0,
+        monthlyPayment: parseFloat(monthlyStr) || 0,
+      });
+      onClose();
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to add debt. Please try again.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={s.modalOverlay} onPress={onClose} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalContainer}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          style={{ backgroundColor: colors.bg.surface, borderTopLeftRadius: borderRadius.cardLg, borderTopRightRadius: borderRadius.cardLg }}
+          contentContainerStyle={{ padding: spacing[5], paddingBottom: Math.max(insets.bottom, spacing[5]) }}
+        >
+          <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: colors.text.primary, marginBottom: spacing[4] }}>
+            Add Debt
+          </Text>
+
+          {/* Name */}
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>NAME</Text>
+          <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: name ? colors.expense : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[4] }]}>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="e.g. BPI Credit Card"
+              placeholderTextColor={colors.text.muted}
+              autoFocus
+              returnKeyType="next"
+              style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }}
+            />
+          </View>
+
+          {/* Type */}
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>TYPE</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2], marginBottom: spacing[4] }}>
+            {DEBT_TYPES.map(t => {
+              const active = debtType === t.key;
+              return (
+                <Pressable
+                  key={t.key}
+                  onPress={() => setDebtType(t.key)}
+                  style={[{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: borderRadius.full, borderWidth: 1, borderColor: active ? colors.expense : colors.border.subtle, backgroundColor: active ? colors.expense + '15' : colors.bg.base }]}
+                >
+                  <Text style={{ fontSize: 13, marginRight: 4 }}>{t.icon}</Text>
+                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: active ? fontFamily.semiBold : fontFamily.regular, color: active ? colors.expense : colors.text.secondary }}>{t.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Current Balance */}
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>CURRENT BALANCE</Text>
+          <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: balance > 0 ? colors.expense : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[4] }]}>
+            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <TextInput value={balanceStr} onChangeText={v => numField(v, setBalanceStr)} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.expense, padding: 0 }} />
+          </View>
+
+          {/* Original Amount */}
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>ORIGINAL AMOUNT <Text style={{ fontFamily: fontFamily.regular, color: colors.text.muted }}>(optional)</Text></Text>
+          <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: originalStr ? colors.border.subtle : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[4] }]}>
+            <Text style={{ fontSize: fontSize.bodyLg, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <TextInput value={originalStr} onChangeText={v => numField(v, setOriginalStr)} keyboardType="decimal-pad" placeholder={balanceStr || '0'} placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.bodyLg, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }} />
+          </View>
+
+          {/* Interest Rate & Monthly Payment side by side */}
+          <View style={{ flexDirection: 'row', gap: spacing[3], marginBottom: spacing[4] }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>INTEREST RATE %</Text>
+              <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: spacing[3], height: 50 }]}>
+                <TextInput value={rateStr} onChangeText={v => numField(v, setRateStr)} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }} />
+                <Text style={{ fontSize: fontSize.bodySm, color: colors.text.muted }}>%</Text>
+              </View>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>MONTHLY PAYMENT</Text>
+              <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: spacing[3], height: 50 }]}>
+                <Text style={{ fontSize: fontSize.bodySm, color: colors.text.muted, marginRight: 2 }}>₱</Text>
+                <TextInput value={monthlyStr} onChangeText={v => numField(v, setMonthlyStr)} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }} />
+              </View>
+            </View>
+          </View>
+
+          {error && <Text style={{ fontSize: fontSize.bodySm, color: colors.expense, textAlign: 'center', marginBottom: spacing[3] }}>{error}</Text>}
+
+          <View style={{ flexDirection: 'row', gap: spacing[3] }}>
+            <Pressable onPress={onClose} style={({ pressed }) => [{ flex: 1, height: 48, borderRadius: borderRadius.button, backgroundColor: colors.bg.surfaceMuted, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 }]}>
+              <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.secondary }}>Cancel</Text>
+            </Pressable>
+            <Pressable onPress={handleSave} disabled={!canSave || saving} style={({ pressed }) => [{ flex: 1, height: 48, borderRadius: borderRadius.button, backgroundColor: (canSave && !saving) ? (pressed ? colors.expense + 'cc' : colors.expense) : colors.bg.surfaceMuted, alignItems: 'center', justifyContent: 'center' }]}>
+              <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? '#FFFFFF' : colors.text.muted }}>{saving ? 'Saving…' : 'Add Debt'}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
+// ─── AddChargeModal ───────────────────────────────────────────────────────────
+
+function AddChargeModal({
   visible, debt, onSave, onClose,
 }: {
   visible: boolean;
   debt:    DebtItem | null;
-  onSave:  (id: string, newBalance: number) => void;
+  onSave:  (id: string, chargeAmount: number) => Promise<void>;
   onClose: () => void;
 }) {
-  const theme = useTheme();
-  const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
-  const [valueStr, setValueStr] = useState('');
+  const theme  = useTheme();
   const insets = useSafeAreaInsets();
+  const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const [amountStr, setAmountStr] = useState('');
+  const [saving,    setSaving]    = useState(false);
 
   React.useEffect(() => {
-    if (visible && debt) setValueStr(String(debt.balance));
-  }, [visible, debt]);
+    if (visible) { setAmountStr(''); setSaving(false); }
+  }, [visible]);
 
-  const parsed  = parseFloat(valueStr.replace(/[^0-9.]/g, '')) || 0;
-  const canSave = parsed >= 0;
+  const amount     = parseFloat(amountStr.replace(/[^0-9.]/g, '')) || 0;
+  const newBalance = (debt?.balance ?? 0) + amount;
+  const canSave    = amount > 0;
 
-  function handleSave() {
-    if (!debt) return;
-    onSave(debt.id, parsed);
-    onClose();
+  async function handleSave() {
+    if (!debt || !canSave || saving) return;
+    setSaving(true);
+    try {
+      await onSave(debt.id, amount);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -89,33 +261,41 @@ function EditDebtModal({
       <Pressable style={s.modalOverlay} onPress={onClose} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalContainer}>
         <View style={[s.modalSheet, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.cardLg, padding: spacing[5], paddingBottom: Math.max(insets.bottom, spacing[5]) }]}>
-          <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: colors.text.primary, marginBottom: spacing[4] }}>
-            Update Balance
+          <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: colors.text.primary, marginBottom: spacing[1] }}>
+            Add to Debt
           </Text>
           {debt && (
-            <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted, marginBottom: spacing[3] }}>
-              {debt.icon} {debt.name}
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginBottom: spacing[4] }}>
+              {debt.icon} {debt.name} · Current balance {fmt(debt.balance)}
             </Text>
           )}
-          <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: canSave ? colors.expense : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[4] }]}>
+
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>
+            AMOUNT TO ADD
+          </Text>
+          <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: amount > 0 ? colors.expense : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[2] }]}>
             <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
             <TextInput
-              value={valueStr}
+              value={amountStr}
               onChangeText={v => {
                 const c = v.replace(/[^0-9.]/g, '');
-                if (c.split('.').length <= 2) setValueStr(c);
+                if (c.split('.').length <= 2) setAmountStr(c);
               }}
               keyboardType="decimal-pad"
               autoFocus
-              selectTextOnFocus
+              placeholder="0"
+              placeholderTextColor={colors.text.muted}
               style={{ flex: 1, fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.expense, padding: 0 }}
             />
           </View>
-          {parsed === 0 && (
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.income, marginBottom: spacing[3] }}>
-              🎉 Setting to ₱0 marks this debt as paid off!
+
+          {amount > 0 && (
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginBottom: spacing[4] }}>
+              New balance: <Text style={{ fontFamily: fontFamily.semiBold, color: colors.expense }}>{fmt(newBalance)}</Text>
             </Text>
           )}
+          {amount === 0 && <View style={{ marginBottom: spacing[4] }} />}
+
           <View style={{ flexDirection: 'row', gap: spacing[3] }}>
             <Pressable
               onPress={onClose}
@@ -125,9 +305,12 @@ function EditDebtModal({
             </Pressable>
             <Pressable
               onPress={handleSave}
-              style={({ pressed }) => [{ flex: 1, height: 48, borderRadius: borderRadius.button, backgroundColor: pressed ? colors.expense + 'cc' : colors.expense, alignItems: 'center', justifyContent: 'center' }]}
+              disabled={!canSave || saving}
+              style={({ pressed }) => [{ flex: 1, height: 48, borderRadius: borderRadius.button, backgroundColor: (!canSave || saving) ? colors.bg.surfaceMuted : pressed ? colors.expense + 'cc' : colors.expense, alignItems: 'center', justifyContent: 'center' }]}
             >
-              <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: '#FFFFFF' }}>Update</Text>
+              <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: (!canSave || saving) ? colors.text.muted : '#FFFFFF' }}>
+                {saving ? 'Saving…' : 'Add Charge'}
+              </Text>
             </Pressable>
           </View>
         </View>
@@ -136,12 +319,180 @@ function EditDebtModal({
   );
 }
 
+// ─── PayDebtModal ─────────────────────────────────────────────────────────────
+
+function PayDebtModal({
+  visible, debt, onPay, onClose,
+}: {
+  visible: boolean;
+  debt:    DebtItem | null;
+  onPay:   (debtId: string, debtName: string, currentBalance: number, amount: number, fromAccountId?: string, fromCurrentBalance?: number) => Promise<void>;
+  onClose: () => void;
+}) {
+  const theme  = useTheme();
+  const insets = useSafeAreaInsets();
+  const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { data: accounts = [] } = useAccounts();
+
+  const [amountStr,      setAmountStr]      = useState('');
+  const [selectedAccId,  setSelectedAccId]  = useState<string | null>(null);
+  const [saving,         setSaving]         = useState(false);
+  const [error,          setError]          = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (visible && debt) {
+      setAmountStr(debt.balance > 0 ? String(debt.balance) : '');
+      setSelectedAccId(null);
+      setSaving(false);
+      setError(null);
+    }
+  }, [visible, debt]);
+
+  const amount         = parseFloat(amountStr.replace(/[^0-9.]/g, '')) || 0;
+  const selectedAcc    = accounts.find(a => a.id === selectedAccId) ?? null;
+  const insufficient   = selectedAcc !== null && amount > 0 && amount > selectedAcc.balance;
+  const willPayOff     = debt !== null && amount >= debt.balance && debt.balance > 0;
+  const newBalance     = debt ? Math.max(0, debt.balance - amount) : 0;
+  const canSave        = amount > 0 && !insufficient;
+
+  function numField(v: string) {
+    const c = v.replace(/[^0-9.]/g, '');
+    if (c.split('.').length <= 2) setAmountStr(c);
+  }
+
+  async function handlePay() {
+    if (!debt || !canSave || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onPay(
+        debt.id,
+        debt.name,
+        debt.balance,
+        amount,
+        selectedAcc?.id,
+        selectedAcc?.balance,
+      );
+      onClose();
+    } catch (e: any) {
+      setError(e?.message ?? 'Payment failed. Please try again.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <Pressable style={s.modalOverlay} onPress={onClose} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.modalContainer}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          style={{ backgroundColor: colors.bg.surface, borderTopLeftRadius: borderRadius.cardLg, borderTopRightRadius: borderRadius.cardLg }}
+          contentContainerStyle={{ padding: spacing[5], paddingBottom: Math.max(insets.bottom, spacing[5]) }}
+        >
+          <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: colors.text.primary, marginBottom: spacing[1] }}>
+            Make a Payment
+          </Text>
+          {debt && (
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginBottom: spacing[4] }}>
+              {debt.icon} {debt.name} · Balance {fmt(debt.balance)}
+            </Text>
+          )}
+
+          {/* Amount */}
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>PAYMENT AMOUNT</Text>
+          <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: amount > 0 ? colors.income : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[2] }]}>
+            <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>₱</Text>
+            <TextInput
+              value={amountStr}
+              onChangeText={numField}
+              keyboardType="decimal-pad"
+              autoFocus
+              placeholder="0"
+              placeholderTextColor={colors.text.muted}
+              style={{ flex: 1, fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.income, padding: 0 }}
+            />
+          </View>
+
+          {/* New balance preview */}
+          {amount > 0 && debt && (
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginBottom: spacing[3] }}>
+              New balance: <Text style={{ fontFamily: fontFamily.semiBold, color: willPayOff ? colors.income : colors.expense }}>{fmt(newBalance)}</Text>
+              {willPayOff && '  🎉 Paid off!'}
+            </Text>
+          )}
+
+          {/* Bank account picker */}
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>
+            PAY FROM (OPTIONAL)
+          </Text>
+          <View style={{ gap: spacing[2], marginBottom: spacing[4] }}>
+            <Pressable
+              onPress={() => setSelectedAccId(null)}
+              style={[{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: borderRadius.input, borderWidth: 1, borderColor: selectedAccId === null ? colors.income : colors.border.subtle, backgroundColor: selectedAccId === null ? colors.income + '15' : colors.bg.base }]}
+            >
+              <Text style={{ flex: 1, fontSize: fontSize.bodySm, fontFamily: selectedAccId === null ? fontFamily.semiBold : fontFamily.regular, color: selectedAccId === null ? colors.income : colors.text.secondary }}>
+                No account (track only)
+              </Text>
+            </Pressable>
+            {accounts.map(acc => {
+              const active   = selectedAccId === acc.id;
+              const noFunds  = acc.balance <= 0;
+              const willOver = amount > 0 && amount > acc.balance;
+              return (
+                <Pressable
+                  key={acc.id}
+                  onPress={() => !noFunds && setSelectedAccId(acc.id)}
+                  style={[{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: borderRadius.input, borderWidth: 1, borderColor: active ? colors.income : willOver && active ? colors.expense : colors.border.subtle, backgroundColor: active ? colors.income + '15' : colors.bg.base, opacity: noFunds ? 0.4 : 1 }]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: fontSize.bodySm, fontFamily: active ? fontFamily.semiBold : fontFamily.regular, color: active ? colors.income : colors.text.secondary }}>
+                      {acc.institutionName}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: noFunds ? colors.expense : colors.text.muted }}>
+                      {noFunds ? 'No funds' : `Balance: ${fmt(acc.balance)}`}
+                    </Text>
+                  </View>
+                  {active && <Text style={{ fontSize: 14 }}>✓</Text>}
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {insufficient && (
+            <Text style={{ fontSize: fontSize.bodySm, color: colors.expense, marginBottom: spacing[3] }}>
+              Insufficient funds — {selectedAcc?.institutionName} only has {fmt(selectedAcc?.balance ?? 0)}
+            </Text>
+          )}
+          {error && (
+            <Text style={{ fontSize: fontSize.bodySm, color: colors.expense, textAlign: 'center', marginBottom: spacing[3] }}>{error}</Text>
+          )}
+
+          <View style={{ flexDirection: 'row', gap: spacing[3] }}>
+            <Pressable onPress={onClose} style={({ pressed }) => [{ flex: 1, height: 48, borderRadius: borderRadius.button, backgroundColor: colors.bg.surfaceMuted, alignItems: 'center', justifyContent: 'center', opacity: pressed ? 0.7 : 1 }]}>
+              <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.secondary }}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              onPress={handlePay}
+              disabled={!canSave || saving}
+              style={({ pressed }) => [{ flex: 1, height: 48, borderRadius: borderRadius.button, backgroundColor: (canSave && !saving) ? (pressed ? colors.income + 'cc' : colors.income) : colors.bg.surfaceMuted, alignItems: 'center', justifyContent: 'center' }]}
+            >
+              <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? '#FFFFFF' : colors.text.muted }}>
+                {saving ? 'Processing…' : 'Pay Now'}
+              </Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Modal>
+  );
+}
+
 // ─── DebtCard ─────────────────────────────────────────────────────────────────
 
 function DebtCard({
-  debt, rank, onTap, onLongPress,
+  debt, rank, onTap, onLongPress, onPay,
 }: {
-  debt: DebtItem; rank?: number; onTap: () => void; onLongPress: () => void;
+  debt: DebtItem; rank?: number; onTap: () => void; onLongPress: () => void; onPay: () => void;
 }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
@@ -184,7 +535,7 @@ function DebtCard({
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.bold, color: colors.expense }}>
-            {fmtShort(debt.balance)}
+            {fmt(debt.balance)}
           </Text>
           <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>remaining</Text>
         </View>
@@ -194,7 +545,7 @@ function DebtCard({
       <View style={{ marginBottom: spacing[3] }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[1] }}>
           <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted }}>
-            {fmtShort(debt.originalAmount - debt.balance)} paid of {fmtShort(debt.originalAmount)}
+            {fmt(debt.originalAmount - debt.balance)} paid of {fmt(debt.originalAmount)}
           </Text>
           <Text style={{ fontSize: 10, fontFamily: fontFamily.semiBold, color: colors.income }}>
             {paidPct.toFixed(0)}% paid off
@@ -210,7 +561,7 @@ function DebtCard({
         <View>
           <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted }}>Monthly</Text>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginTop: 2 }}>
-            {fmtShort(debt.monthlyPayment)}
+            {fmt(debt.monthlyPayment)}
           </Text>
         </View>
         {months !== null && (
@@ -229,8 +580,29 @@ function DebtCard({
         </View>
       </View>
 
-      <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: spacing[3], textAlign: 'right' }}>
-        Tap to update balance · Long-press to remove
+      {/* Make Payment button — hidden once fully paid off */}
+      {debt.balance > 0 && (
+        <Pressable
+          onPress={e => { e.stopPropagation(); onPay(); }}
+          style={({ pressed }) => [{
+            marginTop:       spacing[3],
+            height:          40,
+            borderRadius:    borderRadius.button,
+            backgroundColor: pressed ? colors.income + 'cc' : colors.income + '20',
+            borderWidth:     1,
+            borderColor:     colors.income,
+            alignItems:      'center',
+            justifyContent:  'center',
+          }]}
+        >
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.income }}>
+            💳  Make Payment
+          </Text>
+        </Pressable>
+      )}
+
+      <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: spacing[2], textAlign: 'right' }}>
+        Tap to add charges · Long-press to remove
       </Text>
     </Pressable>
   );
@@ -245,7 +617,11 @@ export function DebtsDetailScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
 
   const { data: debts, isLoading } = useDebts();
-  const [editTarget, setEditTarget] = useState<DebtItem | null>(null);
+  const [editTarget,      setEditTarget]      = useState<DebtItem | null>(null);
+  const [payTarget,       setPayTarget]       = useState<DebtItem | null>(null);
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [mutating,        setMutating]        = useState(false);
+  const [mutatingMsg,     setMutatingMsg]     = useState('Saving…');
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -256,7 +632,9 @@ export function DebtsDetailScreen({ navigation }: Props) {
   );
 
   const totalMonthly = useMemo(
-    () => (debts ?? []).reduce((s, d) => s + d.monthlyPayment, 0),
+    () => (debts ?? [])
+      .filter(d => d.balance > 0)
+      .reduce((s, d) => s + Math.min(d.balance, d.monthlyPayment), 0),
     [debts],
   );
 
@@ -266,27 +644,72 @@ export function DebtsDetailScreen({ navigation }: Props) {
     [debts],
   );
 
-  function handleEditSave(id: string, newBalance: number) {
+  async function handleAddSave(params: { name: string; debtType: DebtCategory; balance: number; originalAmount: number; interestRate: number; monthlyPayment: number }) {
+    setMutatingMsg('Saving…');
+    setMutating(true);
+    try {
+      await createDebt(params);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: DEBTS_KEY }),
+        queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+      ]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handlePay(debtId: string, debtName: string, currentBalance: number, amount: number, fromAccountId?: string, fromCurrentBalance?: number) {
+    setMutatingMsg('Processing payment…');
+    setMutating(true);
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await makeDebtPayment({ debtId, debtName, currentBalance, paymentAmount: amount, date: today, fromAccountId, fromCurrentBalance });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: DEBTS_KEY }),
+        queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+        queryClient.invalidateQueries({ queryKey: ASSETS_KEY }),
+        queryClient.invalidateQueries({ queryKey: [...ACCOUNTS_KEY] }),
+        queryClient.invalidateQueries({ queryKey: [...TRANSACTIONS_KEY] }),
+      ]);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handleEditSave(id: string, chargeAmount: number) {
+    const debt = (debts ?? []).find(d => d.id === id);
+    if (!debt) return;
+    await addDebtCharge(id, debt.balance, debt.originalAmount, chargeAmount);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: DEBTS_KEY }),
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+    ]);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    queryClient.setQueryData(
-      DEBTS_KEY,
-      (old: DebtItem[] | undefined) => (old ?? []).map(d => d.id === id ? { ...d, balance: newBalance } : d),
-    );
   }
 
   function handleDelete(item: DebtItem) {
-    const itemName = item.name;
-    Alert.alert('Remove Debt', `Remove "${itemName}" from your debts?`, [
+    Alert.alert('Remove Debt', `Remove "${item.name}" from your debts?`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          queryClient.setQueryData(
-            DEBTS_KEY,
-            (old: DebtItem[] | undefined) => (old ?? []).filter(d => d.id !== item.id),
-          );
+          setMutatingMsg('Removing…');
+          setMutating(true);
+          try {
+            await deleteDebt(item.id);
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: DEBTS_KEY }),
+              queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+            ]);
+          } catch {
+            Alert.alert('Error', 'Failed to remove debt. Please try again.');
+          } finally {
+            setMutating(false);
+          }
         },
       },
     ]);
@@ -302,7 +725,9 @@ export function DebtsDetailScreen({ navigation }: Props) {
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>Debts</Text>
-        <View style={{ minWidth: 60 }} />
+        <Pressable onPress={() => setAddModalVisible(true)} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
+          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: colors.expense }}>+ Add</Text>
+        </Pressable>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: btmPad + spacing[8] }}>
@@ -313,7 +738,7 @@ export function DebtsDetailScreen({ navigation }: Props) {
             Total Debt
           </Text>
           <Text style={{ fontSize: fontSize.displayXl, fontFamily: fontFamily.bold, color: colors.expense, marginTop: spacing[1], letterSpacing: -1 }}>
-            {fmtShort(totalDebt)}
+            {fmt(totalDebt)}
           </Text>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 4 }}>
             {fmt(totalMonthly)}/mo total payments across {(debts ?? []).length} {(debts ?? []).length === 1 ? 'debt' : 'debts'}
@@ -328,7 +753,7 @@ export function DebtsDetailScreen({ navigation }: Props) {
               <View style={{ marginTop: spacing[4] }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing[1] }}>
                   <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted }}>
-                    {fmtShort(paidTotal)} paid off
+                    {fmt(paidTotal)} paid off
                   </Text>
                   <Text style={{ fontSize: 10, fontFamily: fontFamily.semiBold, color: colors.income }}>
                     {paidPct.toFixed(1)}% complete
@@ -365,7 +790,7 @@ export function DebtsDetailScreen({ navigation }: Props) {
 
         {isLoading ? (
           <View style={{ paddingVertical: spacing[8], alignItems: 'center' }}>
-            <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted }}>Loading debts…</Text>
+            <ActivityIndicator size="large" color={colors.expense} />
           </View>
         ) : (debts ?? []).length === 0 ? (
           <View style={{ marginHorizontal: spacing[5], backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[6], alignItems: 'center', borderWidth: 1, borderColor: colors.border.subtle }}>
@@ -386,51 +811,79 @@ export function DebtsDetailScreen({ navigation }: Props) {
                 rank={i + 1}
                 onTap={() => { Haptics.selectionAsync(); setEditTarget(debt); }}
                 onLongPress={() => handleDelete(debt)}
+                onPay={() => { Haptics.selectionAsync(); setPayTarget(debt); }}
               />
             ))}
           </View>
         )}
 
         {/* ── Monthly summary ── */}
-        {(debts ?? []).length > 0 && (
-          <View style={{ marginHorizontal: spacing[5], marginTop: spacing[5] }}>
-            <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4] }]}>
-              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: spacing[3] }}>
-                Monthly Commitment
-              </Text>
-              {sortedAvalanche.map((d, i) => (
-                <View
-                  key={d.id}
-                  style={{
-                    flexDirection:     'row',
-                    alignItems:        'center',
-                    paddingVertical:   spacing[2],
-                    borderBottomWidth: i < sortedAvalanche.length - 1 ? StyleSheet.hairlineWidth : 0,
-                    borderBottomColor: colors.border.subtle,
-                  }}
-                >
-                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginRight: 6 }}>{d.icon}</Text>
-                  <Text style={{ flex: 1, fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary }}>{d.name}</Text>
-                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.expense }}>
-                    {fmtShort(d.monthlyPayment)}/mo
-                  </Text>
+        {(() => {
+          const activeDebts = sortedAvalanche.filter(d => d.balance > 0);
+          return activeDebts.length > 0 ? (
+            <View style={{ marginHorizontal: spacing[5], marginTop: spacing[5] }}>
+              <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4] }]}>
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: spacing[3] }}>
+                  Monthly Commitment
+                </Text>
+                {activeDebts.map((d, i) => {
+                  const commitment    = Math.min(d.balance, d.monthlyPayment);
+                  const isFinalPayment = d.balance < d.monthlyPayment;
+                  return (
+                    <View
+                      key={d.id}
+                      style={{
+                        flexDirection:     'row',
+                        alignItems:        'center',
+                        paddingVertical:   spacing[2],
+                        borderBottomWidth: i < activeDebts.length - 1 ? StyleSheet.hairlineWidth : 0,
+                        borderBottomColor: colors.border.subtle,
+                      }}
+                    >
+                      <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginRight: 6 }}>{d.icon}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary }}>{d.name}</Text>
+                        {isFinalPayment && (
+                          <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.income }}>Final payment</Text>
+                        )}
+                      </View>
+                      <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.expense }}>
+                        {fmt(commitment)}/mo
+                      </Text>
+                    </View>
+                  );
+                })}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: colors.border.subtle }}>
+                  <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>Total</Text>
+                  <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.bold, color: colors.expense }}>{fmt(totalMonthly)}/mo</Text>
                 </View>
-              ))}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing[3], paddingTop: spacing[2], borderTopWidth: 1, borderTopColor: colors.border.subtle }}>
-                <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>Total</Text>
-                <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.bold, color: colors.expense }}>{fmt(totalMonthly)}/mo</Text>
               </View>
             </View>
-          </View>
-        )}
+          ) : null;
+        })()}
       </ScrollView>
 
-      <EditDebtModal
+      <AddDebtModal
+        visible={addModalVisible}
+        onSave={handleAddSave}
+        onClose={() => setAddModalVisible(false)}
+      />
+
+      <AddChargeModal
         visible={editTarget !== null}
         debt={editTarget}
         onSave={handleEditSave}
         onClose={() => setEditTarget(null)}
       />
+
+      <PayDebtModal
+        visible={payTarget !== null}
+        debt={payTarget}
+        onPay={handlePay}
+        onClose={() => setPayTarget(null)}
+      />
+
+      <LoadingOverlay visible={mutating} message={mutatingMsg} />
     </View>
   );
 }

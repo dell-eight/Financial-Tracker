@@ -65,12 +65,14 @@ function formatDateLabel(dateStr: string): string {
 }
 
 function getGreeting(): string {
-  const h = new Date().getHours();
-  if (h >= 5  && h < 12) return 'Good Morning';
-  if (h >= 12 && h < 18) return 'Good Afternoon';
-  if (h >= 18 && h < 23) return 'Good Evening';
-  if (h >= 23 && h < 4) return 'Its Midnight';
-  return 'Good Night';
+  const hour = new Date().getHours();
+
+  if (hour >= 5 && hour < 12) return 'Good Morning';
+  if (hour >= 12 && hour < 18) return 'Good Afternoon';
+  if (hour >= 18 && hour < 24) return 'Good Evening';
+  if (hour >= 24 && hour < 5) return "Good Night";
+
+  return 'Hello';
 }
 
 function getHealthBand(score: number): { label: string; color: string } {

@@ -30,9 +30,10 @@ import Svg, {
 } from 'react-native-svg';
 import type { StackScreenProps } from '@react-navigation/stack';
 
-import { useTheme }        from '../../hooks/ui/useTheme';
-import { useTransactions } from '../../hooks/queries/useTransactions';
-import { useBudgets }      from '../../hooks/queries/useBudgets';
+import { useTheme }          from '../../hooks/ui/useTheme';
+import { useTransactions }   from '../../hooks/queries/useTransactions';
+import { useBudgets }        from '../../hooks/queries/useBudgets';
+import { useMonthlyHistory, useWeeklyHistory } from '../../hooks/queries/useAnalytics';
 import { AnalyticsCard, ChartCard, SectionHeader } from '../../components';
 import { getCategoryBgColor } from '../../theme';
 import type { AnalyticsStackParamList } from '../../navigation/types';
@@ -53,40 +54,11 @@ const LINE_H     = 200;  // line chart height
 const BAR_H      = 200;  // bar chart height (includes x-axis)
 const BAR_PLOT_H = BAR_H - X_LABEL_H;
 
-// ─── Mock Data ─────────────────────────────────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface BarPoint  { label: string; income: number; expense: number }
 interface LinePoint { label: string; value: number }
-
 interface MonthPoint extends BarPoint { savings: number }
-
-const MONTHLY_HISTORY: MonthPoint[] = [
-  { label: 'Jan', income: 4800, expense: 3150, savings: 1650 },
-  { label: 'Feb', income: 4800, expense: 2890, savings: 1910 },
-  { label: 'Mar', income: 5100, expense: 3420, savings: 1680 },
-  { label: 'Apr', income: 4850, expense: 2600, savings: 2250 },
-  { label: 'May', income: 5050, expense: 2790, savings: 2260 },
-  { label: 'Jun', income: 5121, expense: 2336, savings: 2785 },
-];
-
-const WEEKLY_HISTORY: BarPoint[] = [
-  { label: 'Mon', income: 850,  expense: 99  },
-  { label: 'Tue', income: 0,    expense: 165 },
-  { label: 'Wed', income: 43,   expense: 112 },
-  { label: 'Thu', income: 0,    expense: 52  },
-  { label: 'Fri', income: 4228, expense: 118 },
-  { label: 'Sat', income: 0,    expense: 0   },
-  { label: 'Sun', income: 0,    expense: 0   },
-];
-
-const YEARLY_HISTORY: BarPoint[] = [
-  { label: "Q1'25", income: 14350, expense: 9460 },
-  { label: "Q2'25", income: 14500, expense: 8890 },
-  { label: "Q3'25", income: 15200, expense: 9100 },
-  { label: "Q4'25", income: 16400, expense: 10200 },
-  { label: "Q1'26", income: 14750, expense: 9460 },
-  { label: "Q2'26", income: 15292, expense: 7126 },
-];
 
 interface CatStat {
   key:    CategoryKey;
@@ -108,15 +80,6 @@ const MONTH_CATS: CatStat[] = [
 ];
 // Sum = 2335.77
 
-const BUDGET_PERF = [
-  { key: 'bills'         as CategoryKey, label: 'Bills',          color: '#EF4444', spent: 657.49, limit: 500.00 },
-  { key: 'food'          as CategoryKey, label: 'Food',           color: '#F97316', spent: 650.00, limit: 800.00 },
-  { key: 'shopping'      as CategoryKey, label: 'Shopping',       color: '#EC4899', spent: 348.73, limit: 700.00 },
-  { key: 'health'        as CategoryKey, label: 'Health',         color: '#22C55E', spent: 86.60,  limit: 300.00 },
-  { key: 'transport'     as CategoryKey, label: 'Transport',      color: '#3B82F6', spent: 85.70,  limit: 300.00 },
-  { key: 'entertainment' as CategoryKey, label: 'Entertainment',  color: '#A855F7', spent: 51.97,  limit: 250.00 },
-];
-
 interface PeriodMeta {
   total:           string;
   income:          string;
@@ -127,22 +90,10 @@ interface PeriodMeta {
   prevSavingsRate: number;
 }
 
-const PERIOD_META: Record<Period, PeriodMeta> = {
-  weekly: {
-    total: '₱548.09',    income: '₱5,121.25', net: '₱4,573.16',
-    delta: '12.1% less', vsLabel: 'vs last week',
-    savingsRate: 89.3, prevSavingsRate: 87.8,
-  },
-  monthly: {
-    total: '₱2,335.77',  income: '₱5,121.25', net: '₱2,785.48',
-    delta: '16.3% less', vsLabel: 'vs May 2026',
-    savingsRate: 54.4, prevSavingsRate: 44.8,
-  },
-  yearly: {
-    total: '₱22,382.50', income: '₱30,213.00', net: '₱7,830.50',
-    delta: '2.1% less',  vsLabel: 'vs same period 2025',
-    savingsRate: 25.9, prevSavingsRate: 22.4,
-  },
+const EMPTY_META: PeriodMeta = {
+  total: '₱0.00', income: '₱0.00', net: '₱0.00',
+  delta: '—', vsLabel: '',
+  savingsRate: 0, prevSavingsRate: 0,
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -342,11 +293,12 @@ function SpendingLineChart({
     value: d.value,
   }));
 
-  const line     = smoothPath(pts);
-  const lastPt   = pts[pts.length - 1];
-  const fillPath = line
-    + ` L ${lastPt.x.toFixed(2)},${(Y_PAD + PLOT_H).toFixed(2)}`
-    + ` L 0,${(Y_PAD + PLOT_H).toFixed(2)} Z`;
+  const hasPts   = pts.length >= 2;
+  const line     = hasPts ? smoothPath(pts) : '';
+  const lastPt   = pts[pts.length - 1] ?? { x: 0, y: Y_PAD + PLOT_H };
+  const fillPath = hasPts
+    ? line + ` L ${lastPt.x.toFixed(2)},${(Y_PAD + PLOT_H).toFixed(2)} L 0,${(Y_PAD + PLOT_H).toFixed(2)} Z`
+    : '';
 
   // Left-to-right reveal
   const reveal = useSharedValue(0);
@@ -757,10 +709,10 @@ function SavingsCard({
 
   const delta    = rate - prevRate;
   const positive = delta >= 0;
-  const maxSav   = Math.max(...history.map(h => h.savings), 1);
-  const ytdSaved = history.reduce((s, h) => s + h.savings, 0);
-  const avgSaved = Math.round(ytdSaved / history.length);
-  const thisMonth = history[history.length - 1].savings;
+  const maxSav    = Math.max(...history.map(h => h.savings), 1);
+  const ytdSaved  = history.reduce((s, h) => s + h.savings, 0);
+  const avgSaved  = history.length > 0 ? Math.round(ytdSaved / history.length) : 0;
+  const thisMonth = history.length > 0 ? (history[history.length - 1].savings ?? 0) : 0;
 
   return (
     <View
@@ -1030,8 +982,10 @@ export function AnalyticsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows, categoryColors } = theme;
 
-  const { data: txns }    = useTransactions();
-  const { data: budgets } = useBudgets();
+  const { data: txns }          = useTransactions();
+  const { data: budgets }       = useBudgets();
+  const { data: monthlyHistory } = useMonthlyHistory(6);
+  const { data: weeklyHistory }  = useWeeklyHistory();
 
   const [period, setPeriod] = useState<Period>('monthly');
 
@@ -1063,8 +1017,38 @@ export function AnalyticsScreen({ navigation }: Props) {
     }));
   }, [budgets]);
 
+  // Build quarterly history from monthly data for yearly view
+  const yearlyHistory = useMemo<BarPoint[]>(() => {
+    const src = monthlyHistory ?? [];
+    if (src.length === 0) return [];
+    const quarters = new Map<string, BarPoint>();
+    for (const m of src) {
+      // Find the data's actual date by position (approximation using index order)
+      const qLabel = `Q${Math.ceil((src.indexOf(m) + 1) / 3)}'${new Date().getFullYear().toString().slice(2)}`;
+      const cur = quarters.get(qLabel) ?? { label: qLabel, income: 0, expense: 0 };
+      quarters.set(qLabel, { label: qLabel, income: cur.income + m.income, expense: cur.expense + m.expense });
+    }
+    return [...quarters.values()];
+  }, [monthlyHistory]);
+
   const meta = useMemo<PeriodMeta>(() => {
-    if (period !== 'monthly') return PERIOD_META[period];
+    if (period === 'weekly') {
+      const wk = weeklyHistory ?? [];
+      const income  = wk.reduce((s, d) => s + d.income,  0);
+      const expense = wk.reduce((s, d) => s + d.expense, 0);
+      const net     = income - expense;
+      const sr      = income > 0 ? Math.round((net / income) * 1000) / 10 : 0;
+      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'this week', savingsRate: sr, prevSavingsRate: 0 };
+    }
+    if (period === 'yearly') {
+      const hist = monthlyHistory ?? [];
+      const income  = hist.reduce((s, d) => s + d.income,  0);
+      const expense = hist.reduce((s, d) => s + d.expense, 0);
+      const net     = income - expense;
+      const sr      = income > 0 ? Math.round((net / income) * 1000) / 10 : 0;
+      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'last 6 months', savingsRate: sr, prevSavingsRate: 0 };
+    }
+    // monthly
     const monthExpense = (txns ?? [])
       .filter(t => t.type === 'expense' && t.date.startsWith(_CURRENT_MONTH))
       .reduce((s, t) => s + t.amount, 0);
@@ -1073,32 +1057,37 @@ export function AnalyticsScreen({ navigation }: Props) {
       .reduce((s, t) => s + t.amount, 0);
     const net         = monthIncome - monthExpense;
     const savingsRate = monthIncome > 0 ? Math.round((net / monthIncome) * 1000) / 10 : 0;
+    const hist        = monthlyHistory ?? [];
+    const prev        = hist.length >= 2 ? hist[hist.length - 2] : null;
+    const prevExp     = prev?.expense ?? 0;
+    const deltaVal    = prevExp > 0 ? ((monthExpense - prevExp) / prevExp) * 100 : 0;
+    const deltaStr    = prevExp > 0 ? `${Math.abs(deltaVal).toFixed(1)}% ${deltaVal <= 0 ? 'less' : 'more'}` : '—';
+    const prevSR      = prev && prev.income > 0 ? Math.round(((prev.income - prev.expense) / prev.income) * 1000) / 10 : 0;
     return {
-      ...PERIOD_META.monthly,
-      total:       fmtFull(monthExpense),
-      income:      fmtFull(monthIncome),
-      net:         fmtFull(Math.max(0, net)),
+      total:           fmtFull(monthExpense),
+      income:          fmtFull(monthIncome),
+      net:             fmtFull(Math.max(0, net)),
+      delta:           deltaStr,
+      vsLabel:         prev ? `vs ${prev.label}` : '',
       savingsRate,
+      prevSavingsRate: prevSR,
     };
-  }, [period, txns]);
+  }, [period, txns, monthlyHistory, weeklyHistory]);
 
-  const PAD  = spacing[5];
-
-  // Card inner width = screen - 2×screen margin - 2×card padding
+  const PAD     = spacing[5];
   const CHART_W = SCREEN_W - PAD * 4;
 
-  // Dataset based on period
   const barData = useMemo<BarPoint[]>(() => {
-    if (period === 'weekly') return WEEKLY_HISTORY;
-    if (period === 'yearly') return YEARLY_HISTORY;
-    return MONTHLY_HISTORY;
-  }, [period]);
+    if (period === 'weekly')  return weeklyHistory  ?? [];
+    if (period === 'yearly')  return yearlyHistory;
+    return (monthlyHistory ?? []).map(d => ({ label: d.label, income: d.income, expense: d.expense }));
+  }, [period, weeklyHistory, monthlyHistory, yearlyHistory]);
 
   const lineData = useMemo<LinePoint[]>(() => {
-    if (period === 'weekly') return WEEKLY_HISTORY.map(d => ({ label: d.label, value: d.expense }));
-    if (period === 'yearly') return YEARLY_HISTORY.map(d => ({ label: d.label, value: d.expense }));
-    return MONTHLY_HISTORY.map(d => ({ label: d.label, value: d.expense }));
-  }, [period]);
+    if (period === 'weekly')  return (weeklyHistory  ?? []).map(d => ({ label: d.label, value: d.expense }));
+    if (period === 'yearly')  return yearlyHistory.map(d => ({ label: d.label, value: d.expense }));
+    return (monthlyHistory ?? []).map(d => ({ label: d.label, value: d.expense }));
+  }, [period, weeklyHistory, monthlyHistory, yearlyHistory]);
 
   // ── Entrance animations ────────────────────────────────────────────────────
   const a0 = useSharedValue(0);
@@ -1381,7 +1370,7 @@ export function AnalyticsScreen({ navigation }: Props) {
           <SavingsCard
             rate={meta.savingsRate}
             prevRate={meta.prevSavingsRate}
-            history={MONTHLY_HISTORY}
+            history={monthlyHistory ?? []}
           />
         </Animated.View>
 

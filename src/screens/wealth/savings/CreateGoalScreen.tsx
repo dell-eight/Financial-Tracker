@@ -16,8 +16,9 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { SAVINGS_GOALS_KEY } from '../../../hooks/queries/useSavingsGoals';
+import { createSavingsGoal } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
-import type { SavingsGoal } from '../../../types/models';
+import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 
 type Props = StackScreenProps<WealthStackParamList, 'CreateGoal'>;
 
@@ -42,10 +43,12 @@ export function CreateGoalScreen({ navigation }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
 
-  const [name,     setName]     = useState('');
-  const [emoji,    setEmoji]    = useState('🎯');
-  const [amountStr,setAmountStr]= useState('');
-  const [color,    setColor]    = useState(GOAL_COLORS[0].value);
+  const [name,      setName]      = useState('');
+  const [emoji,     setEmoji]     = useState('🎯');
+  const [amountStr, setAmountStr] = useState('');
+  const [color,     setColor]     = useState(GOAL_COLORS[0].value);
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState<string | null>(null);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -54,23 +57,24 @@ export function CreateGoalScreen({ navigation }: Props) {
   const parsed  = parseFloat(amountStr) || 0;
   const canSave = name.trim().length > 0 && parsed > 0;
 
-  function handleSave() {
-    if (!canSave) return;
-    const newGoal: SavingsGoal = {
-      id:           `g${Date.now()}`,
-      name:         name.trim(),
-      emoji,
-      targetAmount: parsed,
-      savedAmount:  0,
-      color,
-      priority:     99,
-    };
-    queryClient.setQueryData(
-      SAVINGS_GOALS_KEY,
-      (old: SavingsGoal[] | undefined) => [...(old ?? []), newGoal],
-    );
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    navigation.replace('GoalDetail', { goalId: newGoal.id });
+  async function handleSave() {
+    if (!canSave || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const newGoal = await createSavingsGoal({
+        name:         name.trim(),
+        emoji,
+        targetAmount: parsed,
+        color,
+      });
+      await queryClient.invalidateQueries({ queryKey: SAVINGS_GOALS_KEY });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.replace('GoalDetail', { goalId: newGoal.id });
+    } catch (e: any) {
+      setError(e?.message ?? 'Failed to create goal. Please try again.');
+      setSaving(false);
+    }
   }
 
   return (
@@ -88,12 +92,12 @@ export function CreateGoalScreen({ navigation }: Props) {
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>New Goal</Text>
         <Pressable
           onPress={handleSave}
-          disabled={!canSave}
+          disabled={!canSave || saving}
           hitSlop={12}
           style={{ minWidth: 60, alignItems: 'flex-end' }}
         >
-          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: canSave ? colors.accent.primary : colors.text.muted }}>
-            Save
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? colors.accent.primary : colors.text.muted }}>
+            {saving ? '…' : 'Save'}
           </Text>
         </Pressable>
       </View>
@@ -199,14 +203,21 @@ export function CreateGoalScreen({ navigation }: Props) {
           ))}
         </View>
 
+        {/* ── Error message ── */}
+        {error && (
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.expense, textAlign: 'center', marginBottom: spacing[3] }}>
+            {error}
+          </Text>
+        )}
+
         {/* ── Save button ── */}
         <Pressable
           onPress={handleSave}
-          disabled={!canSave}
+          disabled={!canSave || saving}
           style={({ pressed }) => [
             styles.saveBtn,
             {
-              backgroundColor: !canSave
+              backgroundColor: (!canSave || saving)
                 ? colors.bg.surfaceMuted
                 : pressed ? colors.accent.pressed : colors.accent.primary,
               borderRadius: borderRadius.button,
@@ -214,11 +225,12 @@ export function CreateGoalScreen({ navigation }: Props) {
             },
           ]}
         >
-          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: canSave ? '#FFFFFF' : colors.text.muted }}>
-            Create Goal
+          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? '#FFFFFF' : colors.text.muted }}>
+            {saving ? 'Saving…' : 'Create Goal'}
           </Text>
         </Pressable>
       </ScrollView>
+      <LoadingOverlay visible={saving} message="Creating goal…" />
     </KeyboardAvoidingView>
   );
 }

@@ -10,12 +10,15 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useSavingsGoals, SAVINGS_GOALS_KEY } from '../../../hooks/queries/useSavingsGoals';
+import { ASSETS_KEY } from '../../../hooks/queries/useNetWorth';
+import { getContributions, deleteSavingsGoal, type Contribution } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
+import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { SavingsGoal } from '../../../types/models';
 
 type Props = StackScreenProps<WealthStackParamList, 'GoalDetail'>;
@@ -30,25 +33,6 @@ function fmtShort(n: number): string {
   if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000)     return `₱${(n / 1_000).toFixed(1)}k`;
   return `₱${Math.round(n)}`;
-}
-
-// ─── Deterministic mock contribution history ───────────────────────────────────
-
-interface Contribution { date: string; amount: number; note: string }
-
-function generateContributions(goal: SavingsGoal): Contribution[] {
-  const monthly = Math.round(goal.savedAmount / 5);
-  const base    = new Date(2026, 5, 1); // June 2026
-  const notes   = ['Monthly transfer', 'Extra contribution', 'Bonus added', 'Savings deposit', 'Initial deposit'];
-  return Array.from({ length: 5 }).map((_, i) => {
-    const d = new Date(base);
-    d.setMonth(d.getMonth() - i);
-    return {
-      date:   d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }),
-      amount: i === 4 ? goal.savedAmount - monthly * 4 : monthly,
-      note:   notes[i] ?? 'Transfer',
-    };
-  }).reverse();
 }
 
 // ─── CircleProgress ───────────────────────────────────────────────────────────
@@ -128,6 +112,7 @@ export function GoalDetailScreen({ navigation, route }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const queryClient = useQueryClient();
   const { goalId }  = route.params;
+  const [deleting, setDeleting] = useState(false);
 
   const { data: goals } = useSavingsGoals();
   const goal = useMemo<SavingsGoal | undefined>(
@@ -135,10 +120,14 @@ export function GoalDetailScreen({ navigation, route }: Props) {
     [goals, goalId],
   );
 
+  const { data: contributions = [] } = useQuery<Contribution[]>({
+    queryKey: ['contributions', goalId],
+    queryFn:  () => getContributions(goalId),
+    staleTime: 30_000,
+  });
+
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
-
-  const contributions = useMemo(() => goal ? generateContributions(goal) : [], [goal]);
 
   if (!goal) {
     return (
@@ -171,12 +160,21 @@ export function GoalDetailScreen({ navigation, route }: Props) {
       {
         text: 'Delete',
         style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          queryClient.setQueryData(
-            SAVINGS_GOALS_KEY,
-            (old: SavingsGoal[] | undefined) => (old ?? []).filter(g => g.id !== goalId),
-          );
+          setDeleting(true);
+          try {
+            await deleteSavingsGoal(goalId);
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: SAVINGS_GOALS_KEY }),
+              queryClient.invalidateQueries({ queryKey: ASSETS_KEY }),
+              queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+            ]);
+          } catch {
+            // navigate back regardless
+          } finally {
+            setDeleting(false);
+          }
           navigation.goBack();
         },
       },
@@ -285,12 +283,22 @@ export function GoalDetailScreen({ navigation, route }: Props) {
             Contribution History
           </Text>
         </View>
-        <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], overflow: 'hidden' }]}>
-          {contributions.map((c, i) => (
-            <ContributionRow key={i} c={c} isLast={i === contributions.length - 1} />
-          ))}
-        </View>
+        {contributions.length === 0 ? (
+          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], padding: spacing[5], alignItems: 'center' }]}>
+            <Text style={{ fontSize: 32, marginBottom: spacing[2] }}>💰</Text>
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center' }}>
+              No contributions yet. Tap "+ Add Money" to start saving!
+            </Text>
+          </View>
+        ) : (
+          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], overflow: 'hidden' }]}>
+            {contributions.map((c, i) => (
+              <ContributionRow key={c.id} c={c} isLast={i === contributions.length - 1} />
+            ))}
+          </View>
+        )}
       </ScrollView>
+      <LoadingOverlay visible={deleting} message="Deleting goal…" />
     </View>
   );
 }

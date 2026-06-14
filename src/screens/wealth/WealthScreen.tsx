@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +15,7 @@ import { useTheme } from '../../hooks/ui/useTheme';
 import { useSavingsGoals } from '../../hooks/queries/useSavingsGoals';
 import { useInvestments } from '../../hooks/queries/useInvestments';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
+import { useNetWorthHistory } from '../../hooks/queries/useAnalytics';
 import type { WealthStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<WealthStackParamList, 'WealthMain'>;
@@ -32,12 +34,27 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
 
-  const { data: assets } = useAssets();
-  const { data: debts  } = useDebts();
+  const { data: assets  } = useAssets();
+  const { data: debts   } = useDebts();
+  const { data: nwHist  } = useNetWorthHistory(2);
 
   const totalAssets = useMemo(() => (assets ?? []).reduce((s, a) => s + a.balance, 0), [assets]);
   const totalDebts  = useMemo(() => (debts  ?? []).reduce((s, d) => s + d.balance,  0), [debts]);
   const netWorth    = totalAssets - totalDebts;
+
+  const { deltaAmt, deltaPct } = useMemo(() => {
+    const snaps = nwHist ?? [];
+    if (snaps.length < 2) return { deltaAmt: 0, deltaPct: 0 };
+    const curr = snaps[snaps.length - 1].nw;
+    const prev = snaps[snaps.length - 2].nw;
+    const amt  = curr - prev;
+    const pct  = prev !== 0 ? (amt / Math.abs(prev)) * 100 : 0;
+    return { deltaAmt: amt, deltaPct: pct };
+  }, [nwHist]);
+
+  function fmt(n: number): string {
+    return `₱${n.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  }
 
   function fmtShort(n: number): string {
     if (n >= 1_000_000) return `₱${(n / 1_000_000).toFixed(2)}M`;
@@ -68,11 +85,13 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
           Total Net Worth
         </Text>
         <Text style={{ fontSize: fontSize.displayXl, fontFamily: fontFamily.bold, color: colors.text.primary, marginTop: spacing[1], letterSpacing: -1 }}>
-          {fmtShort(netWorth)}
+          {fmt(netWorth)}
         </Text>
-        <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.income, marginTop: spacing[1] }}>
-          ↑ {fmtShort(netWorth * 0.009)} (+0.9%) this month
-        </Text>
+        {deltaAmt !== 0 && (
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: deltaAmt >= 0 ? colors.income : colors.expense, marginTop: spacing[1] }}>
+            {deltaAmt >= 0 ? '↑' : '↓'} {fmtShort(Math.abs(deltaAmt))} ({deltaAmt >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%) this month
+          </Text>
+        )}
 
         {/* Assets / Debts ratio bar */}
         {totalAssets > 0 && (
@@ -207,7 +226,7 @@ function SavingsOverview({ navigation }: { navigation: Props['navigation'] }) {
       {/* ── Goal cards ── */}
       {isLoading ? (
         <View style={{ paddingVertical: spacing[8], alignItems: 'center' }}>
-          <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted }}>Loading goals…</Text>
+          <ActivityIndicator size="large" color={colors.accent.primary} />
         </View>
       ) : (goals ?? []).length === 0 ? (
         <View style={[{ backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[6], alignItems: 'center', borderWidth: 1, borderColor: colors.border.subtle }]}>
@@ -354,7 +373,7 @@ function InvestmentsOverview({ navigation }: { navigation: Props['navigation'] }
       {/* ── Holdings list ── */}
       {isLoading ? (
         <View style={{ paddingVertical: spacing[8], alignItems: 'center' }}>
-          <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted }}>Loading holdings…</Text>
+          <ActivityIndicator size="large" color={colors.accent.primary} />
         </View>
       ) : (holdings ?? []).length === 0 ? (
         <View style={{ backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[6], alignItems: 'center', borderWidth: 1, borderColor: colors.border.subtle }}>
