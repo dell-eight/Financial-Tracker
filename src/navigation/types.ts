@@ -2,7 +2,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 
 // ── Shared filter state (passed between TransactionList ↔ FilterSheet) ─────────
 export type FilterState = {
-  type?:      'all' | 'income' | 'expense';
+  type?:      'all' | 'income' | 'expense' | 'transfer';
   period?:    'week' | 'month' | 'year';
   minAmount?: number;
   maxAmount?: number;
@@ -26,25 +26,16 @@ export type HomeStackParamList = {
   Notifications:     undefined;
   Profile:           undefined;
   EditProfile:       undefined;
-  MyAccounts:        undefined;
-  AccountTransactions: {
-    accountId:       string;
-    accountName:     string;
-    accountBalance:  number;
-    isDebt:          boolean;
-    accountIcon:     string;
-    accountCategory: string;
-  };
   DataExport:        undefined;
   SecuritySettings:  undefined;
   CurrencyPicker:    undefined;
-  TransactionDetail: { id: string; type: 'expense' | 'income' };
+  TransactionDetail: { id: string; type: 'expense' | 'income' | 'transfer' };
 };
 
 // ── Transactions stack ─────────────────────────────────────────────────────────
 export type TransactionsStackParamList = {
   TransactionList:   FilterState | undefined;
-  TransactionDetail: { id: string; type: 'expense' | 'income' };
+  TransactionDetail: { id: string; type: 'expense' | 'income' | 'transfer' };
   AddExpense:        undefined;
   AddIncome:         undefined;
   AddTransfer:       undefined;
@@ -75,6 +66,15 @@ export type WealthStackParamList = {
   Allocation:              undefined;
   AssetsDetail:            undefined;
   DebtsDetail:             undefined;
+  AccountTransactions: {
+    accountId:       string;
+    accountName:     string;
+    accountBalance:  number;
+    isDebt:          boolean;
+    accountIcon:     string;
+    accountCategory: string;
+  };
+  TransactionDetail: { id: string; type: 'expense' | 'income' | 'transfer' };
 };
 
 // ── Analytics stack ────────────────────────────────────────────────────────────

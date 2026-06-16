@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,9 @@ import {
   Platform,
   StyleSheet,
   Dimensions,
+  Modal,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
@@ -45,8 +47,19 @@ const EXPENSE_CATS = EXPENSE_CATEGORIES.map(c => ({
   icon:  c.emoji,
 }));
 
-function formatDateDisplay(d: Date): string {
+function toLocalDateStr(d: Date): string {
+  const y   = d.getFullYear();
+  const m   = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function formatDate(d: Date): string {
   return d.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function formatTime(d: Date): string {
+  return d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
 export function AddExpenseScreen({ navigation }: Props) {
@@ -62,18 +75,17 @@ export function AddExpenseScreen({ navigation }: Props) {
 
   const { data: accounts = [] } = useAccounts();
 
-  const [amountStr,       setAmountStr]       = useState('');
-  const [selectedCat,     setSelectedCat]     = useState<ExpenseCatKey | null>(null);
-  const [merchantName,    setMerchantName]    = useState('');
-  const [note,            setNote]            = useState('');
-  const [fromAccount,     setFromAccount]     = useState<Account | null>(null);
+  const [amountStr,         setAmountStr]         = useState('');
+  const [selectedCat,       setSelectedCat]       = useState<ExpenseCatKey | null>(null);
+  const [merchantName,      setMerchantName]      = useState('');
+  const [note,              setNote]              = useState('');
+  const [fromAccount,       setFromAccount]       = useState<Account | null>(null);
   const [accountPickerOpen, setAccountPickerOpen] = useState(false);
-  const [saving,          setSaving]          = useState(false);
-  const [saveError,       setSaveError]       = useState<string | null>(null);
-
-  const today       = useMemo(() => new Date(), []);
-  const todayStr    = useMemo(() => today.toISOString().split('T')[0], [today]);
-  const displayDate = useMemo(() => formatDateDisplay(today), [today]);
+  const [saving,            setSaving]            = useState(false);
+  const [saveError,         setSaveError]         = useState<string | null>(null);
+  const [selectedDate,      setSelectedDate]      = useState(() => new Date());
+  const [pickerMode,        setPickerMode]        = useState<'date' | 'time' | null>(null);
+  const [tempDate,          setTempDate]          = useState(() => new Date());
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -89,6 +101,23 @@ export function AddExpenseScreen({ navigation }: Props) {
     setAmountStr(cleaned);
   }
 
+  function openDatePicker() {
+    setTempDate(selectedDate);
+    setPickerMode('date');
+    Haptics.selectionAsync();
+  }
+
+  function openTimePicker() {
+    setTempDate(selectedDate);
+    setPickerMode('time');
+    Haptics.selectionAsync();
+  }
+
+  function confirmPicker() {
+    setSelectedDate(tempDate);
+    setPickerMode(null);
+  }
+
   async function handleSave() {
     if (!canSave || !selectedCat || saving) return;
     if (!isOnline) { setSaveError('No internet connection. Please try again when online.'); return; }
@@ -101,7 +130,7 @@ export function AddExpenseScreen({ navigation }: Props) {
         categoryName:        cat.label,
         categoryIcon:        cat.icon,
         amount:              parsedAmount,
-        date:                todayStr,
+        date:                toLocalDateStr(selectedDate),
         note:                note.trim() || undefined,
         fromAccountId:       fromAccount?.id,
         fromCurrentBalance:  fromAccount?.balance,
@@ -361,12 +390,27 @@ export function AddExpenseScreen({ navigation }: Props) {
               />
             </View>
             {/* Date */}
-            <View style={[styles.detailRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle, paddingHorizontal: spacing[4] }]}>
+            <Pressable
+              onPress={openDatePicker}
+              style={[styles.detailRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle, paddingHorizontal: spacing[4] }]}
+            >
               <Text style={{ fontSize: 16, marginRight: spacing[3] }}>📅</Text>
-              <Text style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.secondary, paddingVertical: spacing[3] }}>
-                {displayDate}
+              <Text style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.primary, paddingVertical: spacing[3] }}>
+                {formatDate(selectedDate)}
               </Text>
-            </View>
+              <Text style={{ fontSize: 12, color: colors.text.muted }}>›</Text>
+            </Pressable>
+            {/* Time */}
+            <Pressable
+              onPress={openTimePicker}
+              style={[styles.detailRow, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle, paddingHorizontal: spacing[4] }]}
+            >
+              <Text style={{ fontSize: 16, marginRight: spacing[3] }}>⏰</Text>
+              <Text style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.primary, paddingVertical: spacing[3] }}>
+                {formatTime(selectedDate)}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.text.muted }}>›</Text>
+            </Pressable>
             {/* Note */}
             <View style={[styles.detailRow, { paddingHorizontal: spacing[4] }]}>
               <Text style={{ fontSize: 16, marginRight: spacing[3] }}>📝</Text>
@@ -415,22 +459,104 @@ export function AddExpenseScreen({ navigation }: Props) {
         </Pressable>
       </View>
       <LoadingOverlay visible={saving} message="Saving…" />
+
+      {/* ── Android: native dialog (handles its own OK/Cancel) ──────────────── */}
+      {Platform.OS === 'android' && pickerMode !== null && (
+        <DateTimePicker
+          value={selectedDate}
+          mode={pickerMode}
+          display="default"
+          maximumDate={pickerMode === 'date' ? new Date() : undefined}
+          onChange={(event, picked) => {
+            if (event.type === 'set' && picked) {
+              if (pickerMode === 'date') {
+                const d = new Date(picked);
+                d.setHours(selectedDate.getHours(), selectedDate.getMinutes(), 0, 0);
+                setSelectedDate(d);
+              } else {
+                const d = new Date(selectedDate);
+                d.setHours(picked.getHours(), picked.getMinutes(), 0, 0);
+                setSelectedDate(d);
+              }
+            }
+            setPickerMode(null);
+          }}
+        />
+      )}
+
+      {/* ── iOS: bottom sheet with spinner ──────────────────────────────────── */}
+      {Platform.OS === 'ios' && (
+        <Modal
+          visible={pickerMode !== null}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setPickerMode(null)}
+        >
+          <Pressable style={styles.modalOverlay} onPress={() => setPickerMode(null)} />
+          <View style={[styles.pickerSheet, { backgroundColor: colors.bg.surface, paddingBottom: btmPad }]}>
+            <View style={[styles.pickerHeader, { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }]}>
+              <Pressable onPress={() => setPickerMode(null)} hitSlop={12}>
+                <Text style={{ fontSize: fontSize.bodyLg, color: colors.text.muted, fontFamily: fontFamily.medium }}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
+                {pickerMode === 'date' ? 'Select Date' : 'Select Time'}
+              </Text>
+              <Pressable onPress={confirmPicker} hitSlop={12}>
+                <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.semiBold }}>
+                  Done
+                </Text>
+              </Pressable>
+            </View>
+            {pickerMode !== null && (
+              <DateTimePicker
+                value={tempDate}
+                mode={pickerMode}
+                display="spinner"
+                maximumDate={pickerMode === 'date' ? new Date() : undefined}
+                onChange={(_, picked) => {
+                  if (!picked) return;
+                  if (pickerMode === 'date') {
+                    setTempDate(prev => {
+                      const d = new Date(picked);
+                      d.setHours(prev.getHours(), prev.getMinutes(), 0, 0);
+                      return d;
+                    });
+                  } else {
+                    setTempDate(prev => {
+                      const d = new Date(prev);
+                      d.setHours(picked.getHours(), picked.getMinutes(), 0, 0);
+                      return d;
+                    });
+                  }
+                }}
+                style={{ width: '100%' }}
+                textColor={colors.text.primary}
+              />
+            )}
+          </View>
+        </Modal>
+      )}
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen:       { flex: 1 },
-  header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  amountSection:{ alignItems: 'center' },
-  amountRow:    { flexDirection: 'row', alignItems: 'center' },
-  catGrid:      { flexDirection: 'row', flexWrap: 'wrap' },
-  catTile:      { alignItems: 'center', justifyContent: 'center' },
-  catIconCircle:{ alignItems: 'center', justifyContent: 'center' },
-  detailCard:   { overflow: 'hidden' },
-  detailRow:    { flexDirection: 'row', alignItems: 'center' },
-  saveWrap:     { borderTopWidth: StyleSheet.hairlineWidth },
-  saveBtn:      { alignItems: 'center', justifyContent: 'center' },
+  screen:        { flex: 1 },
+  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  amountSection: { alignItems: 'center' },
+  amountRow:     { flexDirection: 'row', alignItems: 'center' },
+  catGrid:       { flexDirection: 'row', flexWrap: 'wrap' },
+  catTile:       { alignItems: 'center', justifyContent: 'center' },
+  catIconCircle: { alignItems: 'center', justifyContent: 'center' },
+  detailCard:    { overflow: 'hidden' },
+  detailRow:     { flexDirection: 'row', alignItems: 'center' },
+  saveWrap:      { borderTopWidth: StyleSheet.hairlineWidth },
+  saveBtn:       { alignItems: 'center', justifyContent: 'center' },
+  modalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  pickerSheet:   { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingTop: 8 },
+  pickerHeader:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14 },
 });
 
 export default AddExpenseScreen;

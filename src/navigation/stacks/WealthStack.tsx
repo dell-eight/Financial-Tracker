@@ -13,6 +13,8 @@ import { LogTransactionScreen }           from '../../screens/wealth/investments
 import { AllocationScreen }               from '../../screens/wealth/investments/AllocationScreen';
 import { AssetsDetailScreen }             from '../../screens/wealth/networth/AssetsDetailScreen';
 import { DebtsDetailScreen }              from '../../screens/wealth/networth/DebtsDetailScreen';
+import { AccountTransactionsScreen }      from '../../screens/profile/AccountTransactionsScreen';
+import { TransactionDetailScreen }        from '../../screens/transactions/TransactionDetailScreen';
 
 const Stack = createStackNavigator<WealthStackParamList>();
 
@@ -31,6 +33,8 @@ export function WealthStack() {
       <Stack.Screen name="Allocation"              component={AllocationScreen} />
       <Stack.Screen name="AssetsDetail"            component={AssetsDetailScreen} />
       <Stack.Screen name="DebtsDetail"             component={DebtsDetailScreen} />
+      <Stack.Screen name="AccountTransactions"     component={AccountTransactionsScreen} />
+      <Stack.Screen name="TransactionDetail"       component={TransactionDetailScreen} />
     </Stack.Navigator>
   );
 }

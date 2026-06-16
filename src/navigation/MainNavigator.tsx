@@ -16,11 +16,56 @@ export function MainNavigator() {
       tabBar={props => <BottomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
     >
-      <Tab.Screen name="Home"         component={HomeStack} />
-      <Tab.Screen name="Transactions" component={TransactionsStack} />
-      <Tab.Screen name="Budget"       component={BudgetStack} />
-      <Tab.Screen name="Wealth"       component={WealthStack} />
-      <Tab.Screen name="Analytics"    component={AnalyticsStack} />
+      <Tab.Screen
+        name="Home"
+        component={HomeStack}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('Home', { screen: 'HomeMain' });
+          },
+        })}
+      />
+      <Tab.Screen
+        name="Transactions"
+        component={TransactionsStack}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('Transactions', { screen: 'TransactionList' });
+          },
+        })}
+      />
+      <Tab.Screen
+        name="Budget"
+        component={BudgetStack}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('Budget', { screen: 'BudgetOverview' });
+          },
+        })}
+      />
+      <Tab.Screen
+        name="Wealth"
+        component={WealthStack}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('Wealth', { screen: 'WealthMain' });
+          },
+        })}
+      />
+      <Tab.Screen
+        name="Analytics"
+        component={AnalyticsStack}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('Analytics', { screen: 'AnalyticsHome' });
+          },
+        })}
+      />
     </Tab.Navigator>
   );
 }

@@ -429,11 +429,6 @@ export function ProfileScreen({ navigation }: Props) {
               theme={theme}
             />
             <MenuItem
-              icon="💳" label="My Accounts" chevron
-              onPress={() => navigation.push('MyAccounts')}
-              theme={theme}
-            />
-            <MenuItem
               icon="💱" label="Currency" value={useAppStore(s => s.currency)} chevron
               onPress={() => navigation.push('CurrencyPicker')}
               theme={theme}

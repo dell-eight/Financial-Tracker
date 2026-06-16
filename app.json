@@ -40,7 +40,8 @@
           "defaultChannel": "budget-alerts",
           "sounds": []
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

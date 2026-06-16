@@ -32,12 +32,12 @@ import { ExpenseItem } from '../../components';
 import { updateAsset, updateDebt } from '../../services/finance.service';
 import { ASSETS_KEY, DEBTS_KEY } from '../../hooks/queries/useNetWorth';
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
-import type { HomeStackParamList } from '../../navigation/types';
+import type { WealthStackParamList } from '../../navigation/types';
 
-type Props = StackScreenProps<HomeStackParamList, 'AccountTransactions'>;
+type Props = StackScreenProps<WealthStackParamList, 'AccountTransactions'>;
 
 type Period     = 'week' | 'month' | 'year';
-type TypeFilter = 'all' | 'income' | 'expense';
+type TypeFilter = 'all' | 'income' | 'expense' | 'transfer';
 
 const _now       = new Date();
 const TODAY      = _now.toISOString().split('T')[0];
@@ -88,35 +88,6 @@ function PeriodToggle({ value, onChange }: { value: Period; onChange: (p: Period
   );
 }
 
-// ─── TypeToggle ───────────────────────────────────────────────────────────────
-
-function TypeToggle({ value, onChange }: { value: TypeFilter; onChange: (v: TypeFilter) => void }) {
-  const { colors, spacing, borderRadius, fontSize, fontFamily } = useTheme();
-  const opts: { key: TypeFilter; label: string; color?: string }[] = [
-    { key: 'all',     label: 'All'         },
-    { key: 'expense', label: '↓ Expenses', color: colors.expense },
-    { key: 'income',  label: '↑ Income',   color: colors.income  },
-  ];
-  return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full, padding: 2, height: 36 }}>
-      {opts.map(({ key, label, color }) => {
-        const active = key === value;
-        return (
-          <Pressable
-            key={key}
-            onPress={() => onChange(key)}
-            style={{ flex: 1, borderRadius: borderRadius.full, backgroundColor: active ? (color ? `${color}20` : colors.bg.surfaceRaised) : 'transparent', height: '100%', alignItems: 'center', justifyContent: 'center' }}
-          >
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: active ? fontFamily.semiBold : fontFamily.regular, color: active ? (color ?? colors.text.primary) : colors.text.muted, textAlign: 'center' }}>
-              {label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 // ─── StatCard ─────────────────────────────────────────────────────────────────
 
 function StatCard({ label, value, sub, icon, iconColor, iconBg }: {
@@ -158,9 +129,10 @@ export function AccountTransactionsScreen({ navigation, route }: Props) {
 
   const { data: rawTxns, isLoading } = useTransactions();
 
-  const [period,      setPeriod]      = useState<Period>('month');
-  const [typeFilter,  setTypeFilter]  = useState<TypeFilter>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [period,        setPeriod]        = useState<Period>('month');
+  const [typeFilter,    setTypeFilter]    = useState<TypeFilter>('all');
+  const [searchQuery,   setSearchQuery]   = useState('');
+  const [filterVisible, setFilterVisible] = useState(false);
 
   // ── Edit modal state ───────────────────────────────────────────────────────
   const [editVisible,  setEditVisible]  = useState(false);
@@ -282,7 +254,7 @@ export function AccountTransactionsScreen({ navigation, route }: Props) {
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>←</Text>
-            <Text style={{ fontSize: fontSize.bodySm, color: colors.accent.primary, fontFamily: fontFamily.medium }}>My Accounts</Text>
+            <Text style={{ fontSize: fontSize.bodySm, color: colors.accent.primary, fontFamily: fontFamily.medium }}>Assets</Text>
           </Pressable>
 
           <Pressable
@@ -310,9 +282,24 @@ export function AccountTransactionsScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {/* Period toggle */}
-        <View style={{ marginTop: spacing[3] }}>
+        {/* Period toggle + filter button */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[3] }}>
           <PeriodToggle value={period} onChange={setPeriod} />
+          <Pressable
+            onPress={() => setFilterVisible(true)}
+            hitSlop={8}
+            style={({ pressed }) => ({
+              width: 40, height: 40, borderRadius: 20,
+              backgroundColor: typeFilter !== 'all' ? colors.accent.muted : colors.bg.surfaceMuted,
+              alignItems: 'center', justifyContent: 'center',
+              opacity: pressed ? 0.7 : 1,
+            })}
+          >
+            <Text style={{ fontSize: 16, color: typeFilter !== 'all' ? colors.accent.primary : colors.text.secondary }}>≡</Text>
+            {typeFilter !== 'all' && (
+              <View style={{ position: 'absolute', top: 4, right: 4, width: 6, height: 6, borderRadius: 3, backgroundColor: colors.accent.primary }} />
+            )}
+          </Pressable>
         </View>
       </Animated.View>
 
@@ -378,16 +365,18 @@ export function AccountTransactionsScreen({ navigation, route }: Props) {
               </View>
             </View>
 
-            {/* ── Type toggle ─────────────────────────────────────────────── */}
-            <View style={{ paddingHorizontal: spacing[5], marginTop: spacing[3] }}>
-              <TypeToggle value={typeFilter} onChange={setTypeFilter} />
-            </View>
-
             {/* ── Result count ─────────────────────────────────────────────── */}
-            <View style={{ paddingHorizontal: spacing[5], marginTop: spacing[3] }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing[5], marginTop: spacing[3] }}>
               <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.text.muted }}>
                 {filtered.length} result{filtered.length !== 1 ? 's' : ''}
               </Text>
+              {typeFilter !== 'all' && (
+                <Pressable onPress={() => setTypeFilter('all')} hitSlop={8}>
+                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.accent.primary }}>
+                    {typeFilter === 'expense' ? '↓ Expenses' : typeFilter === 'income' ? '↑ Income' : '↔ Transfers'} ✕
+                  </Text>
+                </Pressable>
+              )}
             </View>
 
             {/* ── Transaction groups ──────────────────────────────────────── */}
@@ -441,6 +430,66 @@ export function AccountTransactionsScreen({ navigation, route }: Props) {
           </Animated.View>
         </ScrollView>
       )}
+
+      {/* ── Filter Sheet ────────────────────────────────────────────────────── */}
+      <Modal visible={filterVisible} transparent animationType="slide" onRequestClose={() => setFilterVisible(false)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }} onPress={() => setFilterVisible(false)} />
+        <View style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0,
+          backgroundColor: colors.bg.surface,
+          borderTopLeftRadius: borderRadius.cardLg, borderTopRightRadius: borderRadius.cardLg,
+          padding: spacing[5],
+          paddingBottom: Math.max(insets.bottom, spacing[5]),
+        }}>
+          <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border.subtle, alignSelf: 'center', marginBottom: spacing[4] }} />
+          <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: colors.text.primary, marginBottom: spacing[4] }}>
+            Filter Transactions
+          </Text>
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }}>
+            TRANSACTION TYPE
+          </Text>
+          <View style={{ flexDirection: 'row', gap: spacing[2], marginBottom: spacing[5] }}>
+            {([
+              { key: 'all'      as TypeFilter, label: 'All',       icon: '≡',   iconColor: colors.accent.primary, iconBg: colors.accent.muted },
+              { key: 'expense'  as TypeFilter, label: 'Expenses',  icon: '↓',   iconColor: colors.expense,        iconBg: colors.expenseBg    },
+              { key: 'income'   as TypeFilter, label: 'Income',    icon: '↑',   iconColor: colors.income,         iconBg: colors.incomeBg     },
+              { key: 'transfer' as TypeFilter, label: 'Transfers', icon: '↔',   iconColor: colors.accent.primary, iconBg: colors.accent.muted },
+            ]).map(({ key, label, icon, iconColor, iconBg }) => {
+              const active = typeFilter === key;
+              return (
+                <Pressable
+                  key={key}
+                  onPress={() => { Haptics.selectionAsync(); setTypeFilter(key); }}
+                  style={{
+                    flex: 1, paddingVertical: spacing[3], borderRadius: borderRadius.card,
+                    borderWidth: 1.5,
+                    borderColor: active ? iconColor : colors.border.subtle,
+                    backgroundColor: active ? iconColor + '15' : colors.bg.base,
+                    alignItems: 'center', gap: spacing[2],
+                  }}
+                >
+                  <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: active ? iconColor + '30' : iconBg, alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 13, color: iconColor, fontFamily: fontFamily.bold, lineHeight: 18 }}>{icon}</Text>
+                  </View>
+                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: active ? fontFamily.semiBold : fontFamily.regular, color: active ? iconColor : colors.text.secondary }}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Pressable
+            onPress={() => setFilterVisible(false)}
+            style={({ pressed }) => ({
+              height: 48, borderRadius: borderRadius.button,
+              backgroundColor: pressed ? colors.accent.pressed : colors.accent.primary,
+              alignItems: 'center', justifyContent: 'center',
+            })}
+          >
+            <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: '#FFFFFF' }}>Apply</Text>
+          </Pressable>
+        </View>
+      </Modal>
 
       {/* ── Edit Account Modal ───────────────────────────────────────────────── */}
       <Modal visible={editVisible} transparent animationType="slide" onRequestClose={() => setEditVisible(false)}>

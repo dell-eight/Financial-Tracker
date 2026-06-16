@@ -20,7 +20,7 @@ import { useTransactions, TRANSACTIONS_KEY } from '../../hooks/queries/useTransa
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
 import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { getCategoryBgColor } from '../../theme';
-import { deleteTransaction, updateExpense, updateIncome } from '../../services/finance.service';
+import { deleteTransaction, updateExpense, updateIncome, getTransferById, deleteTransfer } from '../../services/finance.service';
 import type { TransactionsStackParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
@@ -117,10 +117,11 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
 
-  const isExpense = (tx?.type ?? type) === 'expense';
-  const amtColor  = isExpense ? colors.expense : colors.income;
-  const catColor  = tx ? (theme.categoryColors[tx.category] ?? colors.accent.primary) : colors.accent.primary;
-  const catBg     = tx ? getCategoryBgColor(tx.category) : colors.bg.surfaceMuted;
+  const isExpense  = (tx?.type ?? type) === 'expense';
+  const isTransfer = (tx?.type ?? type) === 'transfer';
+  const amtColor   = isTransfer ? colors.accent.primary : isExpense ? colors.expense : colors.income;
+  const catColor   = tx ? (theme.categoryColors[tx.category] ?? colors.accent.primary) : colors.accent.primary;
+  const catBg      = tx ? getCategoryBgColor(tx.category) : colors.bg.surfaceMuted;
 
   function enterEdit() {
     if (!tx) return;
@@ -177,35 +178,39 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   }
 
   function handleDelete() {
-    const txType = (tx?.type ?? type) as 'expense' | 'income';
-    Alert.alert(
-      'Delete Transaction',
-      'This transaction will be permanently removed.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text:    'Delete',
-          style:   'destructive',
-          onPress: async () => {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-            setDeleting(true);
-            try {
-              await deleteTransaction(id, txType);
-              await Promise.all([
-                queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }),
-                queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
-                queryClient.invalidateQueries({ queryKey: ASSETS_KEY }),
-              ]);
-            } catch {
-              // navigate back regardless; list will re-fetch and show correct state
-            } finally {
-              setDeleting(false);
+    const txType = (tx?.type ?? type);
+    const label  = txType === 'transfer' ? 'Transfer' : 'Transaction';
+    const msg    = txType === 'transfer'
+      ? 'This transfer will be permanently removed and both account balances will be reversed.'
+      : 'This transaction will be permanently removed.';
+    Alert.alert(`Delete ${label}`, msg, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text:    'Delete',
+        style:   'destructive',
+        onPress: async () => {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+          setDeleting(true);
+          try {
+            if (txType === 'transfer') {
+              await deleteTransfer(id);
+            } else {
+              await deleteTransaction(id, txType as 'expense' | 'income');
             }
-            navigation.goBack();
-          },
+            await Promise.all([
+              queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }),
+              queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+              queryClient.invalidateQueries({ queryKey: ASSETS_KEY }),
+            ]);
+          } catch {
+            // navigate back regardless; list will re-fetch and show correct state
+          } finally {
+            setDeleting(false);
+          }
+          navigation.goBack();
         },
-      ],
-    );
+      },
+    ]);
   }
 
   // ── Not found ────────────────────────────────────────────────────────────────
@@ -233,7 +238,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
     );
   }
 
-  const prefix      = isExpense ? '-' : '+';
+  const prefix      = isTransfer ? '↔ ' : isExpense ? '-' : '+';
   const displayDate = formatDisplayDate(tx.date);
   const displayTime = formatTime(tx.time);
 
@@ -352,11 +357,15 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>
           Transaction
         </Text>
-        <Pressable onPress={enterEdit} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
-          <Text style={{ fontSize: fontSize.bodyMd, color: colors.accent.primary, fontFamily: fontFamily.medium }}>
-            Edit
-          </Text>
-        </Pressable>
+        {!isTransfer ? (
+          <Pressable onPress={enterEdit} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: fontSize.bodyMd, color: colors.accent.primary, fontFamily: fontFamily.medium }}>
+              Edit
+            </Text>
+          </Pressable>
+        ) : (
+          <View style={{ minWidth: 60 }} />
+        )}
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: btmPad + spacing[8] }}>
@@ -386,9 +395,15 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
         <View style={[styles.detailCard, shadows.card, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5] }]}>
           <DetailRow label="Date"     value={displayDate} />
           <DetailRow label="Time"     value={displayTime} />
-          <DetailRow label="Type"     value={isExpense ? 'Expense' : 'Income'} valueColor={amtColor} />
-          <DetailRow label="Category" value={tx.categoryLabel} />
-          {tx.accountId && (
+          <DetailRow label="Type"     value={isTransfer ? 'Transfer' : isExpense ? 'Expense' : 'Income'} valueColor={amtColor} />
+          {!isTransfer && <DetailRow label="Category" value={tx.categoryLabel} />}
+          {isTransfer && (
+            <>
+              <DetailRow label="From" value={tx.accountName     ?? '—'} />
+              <DetailRow label="To"   value={tx.counterpartName ?? '—'} />
+            </>
+          )}
+          {!isTransfer && tx.accountId && (
             <DetailRow
               label={isExpense ? 'Paid from' : 'Deposited to'}
               value={tx.accountName ?? 'Linked account'}

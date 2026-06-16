@@ -18,7 +18,7 @@ export interface ExpenseItemProps {
   categoryLabel: string;
   categoryIcon: React.ReactNode;
   amount: string;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'transfer';
   date: string;
   time?: string;
   onPress?: (id: string) => void;
@@ -44,8 +44,9 @@ export function ExpenseItem({
   const { colors, spacing, borderRadius, fontSize, fontFamily, layout, categoryColors } = theme;
 
   const isIncome     = type === 'income';
-  const amountColor  = isIncome ? colors.income : colors.expense;
-  const amountPrefix = isIncome ? '+' : '-';
+  const isTransfer   = type === 'transfer';
+  const amountColor  = isTransfer ? colors.accent.primary : isIncome ? colors.income : colors.expense;
+  const amountPrefix = isTransfer ? '↔ ' : isIncome ? '+' : '-';
   const iconBg       = getCategoryBgColor(categoryKey);
   const iconColor    = categoryColors[categoryKey];
 

@@ -166,7 +166,7 @@ export async function getDashboard(): Promise<DashboardSummary> {
 export async function getTransactions(): Promise<Transaction[]> {
   const userId = await uid();
 
-  const [expRes, incRes] = await Promise.all([
+  const [expRes, incRes, trRes] = await Promise.all([
     supabase
       .from('expenses')
       .select('id, description, amount, date, created_at, notes, account_id, expense_categories(name, icon, color), asset_accounts(name)')
@@ -180,6 +180,15 @@ export async function getTransactions(): Promise<Transaction[]> {
       .select('id, description, amount, date, created_at, notes, account_id, income_sources(name, type, icon), asset_accounts(name)')
       .eq('user_id', userId)
       .is('deleted_at', null)
+      .order('date', { ascending: false })
+      .limit(100),
+
+    supabase
+      .from('transfers')
+      .select(`id, amount, date, created_at, notes, from_account_id, to_account_id,
+               from:asset_accounts!from_account_id(name),
+               to:asset_accounts!to_account_id(name)`)
+      .eq('user_id', userId)
       .order('date', { ascending: false })
       .limit(100),
   ]);
@@ -224,7 +233,26 @@ export async function getTransactions(): Promise<Transaction[]> {
     };
   });
 
-  return [...expenses, ...income].sort(
+  const transfers: Transaction[] = (trRes.data ?? []).map((t: any) => {
+    const time = t.created_at ? new Date(t.created_at).toTimeString().slice(0, 5) : '00:00';
+    return {
+      id:              t.id,
+      merchant:        `${t.from?.name ?? 'Account'} → ${t.to?.name ?? 'Account'}`,
+      category:        'transfer' as CategoryKey,
+      categoryLabel:   'Transfer',
+      categoryIcon:    '🔄',
+      amount:          Number(t.amount),
+      type:            'transfer' as const,
+      date:            t.date,
+      time,
+      note:            t.notes ?? undefined,
+      accountId:       t.from_account_id,
+      accountName:     t.from?.name,
+      counterpartName: t.to?.name,
+    };
+  });
+
+  return [...expenses, ...income, ...transfers].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 }
@@ -504,12 +532,17 @@ export async function addIncome(params: {
 export async function addTransfer(params: {
   fromAccountId:      string;
   toAccountId:        string;
+  fromAccountName:    string;
+  toAccountName:      string;
   fromCurrentBalance: number;
   toCurrentBalance:   number;
   amount:             number;
+  date:               string;
+  note?:              string;
 }): Promise<void> {
   const userId = await uid();
-  const [r1, r2] = await Promise.all([
+
+  const [r1, r2, r3] = await Promise.all([
     supabase
       .from('asset_accounts')
       .update({ balance: params.fromCurrentBalance - params.amount })
@@ -520,9 +553,66 @@ export async function addTransfer(params: {
       .update({ balance: params.toCurrentBalance + params.amount })
       .eq('id', params.toAccountId)
       .eq('user_id', userId),
+    supabase.from('transfers').insert({
+      user_id:         userId,
+      from_account_id: params.fromAccountId,
+      to_account_id:   params.toAccountId,
+      amount:          params.amount,
+      date:            params.date,
+      notes:           params.note ?? null,
+    }),
   ]);
+
   if (r1.error) throw r1.error;
   if (r2.error) throw r2.error;
+  if (r3.error) throw r3.error;
+}
+
+export async function getTransferById(rawId: string) {
+  const transferId = rawId;
+  const { data, error } = await supabase
+    .from('transfers')
+    .select(`*, from:asset_accounts!from_account_id(name), to:asset_accounts!to_account_id(name)`)
+    .eq('id', transferId)
+    .single();
+  if (error) return null;
+  return data as {
+    id: string; amount: number; date: string; notes: string | null; created_at: string;
+    from_account_id: string; to_account_id: string;
+    from: { name: string }; to: { name: string };
+  };
+}
+
+export async function deleteTransfer(rawId: string): Promise<void> {
+  const userId     = await uid();
+  const transferId = rawId;
+
+  const { data: transfer, error: fetchErr } = await supabase
+    .from('transfers')
+    .select('amount, from_account_id, to_account_id')
+    .eq('id', transferId)
+    .eq('user_id', userId)
+    .single();
+  if (fetchErr) throw fetchErr;
+
+  const [fromAcct, toAcct] = await Promise.all([
+    supabase.from('asset_accounts').select('balance').eq('id', transfer.from_account_id).eq('user_id', userId).single(),
+    supabase.from('asset_accounts').select('balance').eq('id', transfer.to_account_id).eq('user_id', userId).single(),
+  ]);
+
+  const [r1, r2, r3] = await Promise.all([
+    supabase.from('transfers').delete().eq('id', transferId).eq('user_id', userId),
+    fromAcct.data
+      ? supabase.from('asset_accounts').update({ balance: fromAcct.data.balance + transfer.amount }).eq('id', transfer.from_account_id).eq('user_id', userId)
+      : Promise.resolve({ error: null }),
+    toAcct.data
+      ? supabase.from('asset_accounts').update({ balance: toAcct.data.balance - transfer.amount }).eq('id', transfer.to_account_id).eq('user_id', userId)
+      : Promise.resolve({ error: null }),
+  ]);
+
+  if (r1.error) throw r1.error;
+  if (r2.error) throw r2.error;
+  if (r3.error) throw r3.error;
 }
 
 // ── Budgets ────────────────────────────────────────────────────────────────────

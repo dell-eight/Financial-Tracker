@@ -43,7 +43,7 @@ interface Transaction {
   label:       string;
   icon:        string;
   amount:      number;
-  type:        'income' | 'expense';
+  type:        'income' | 'expense' | 'transfer';
   date:        string;   // YYYY-MM-DD
   time:        string;
   note?:       string;
@@ -51,7 +51,7 @@ interface Transaction {
 }
 
 type Period     = 'week' | 'month' | 'year';
-type TypeFilter = 'all' | 'income' | 'expense';
+type TypeFilter = 'all' | 'income' | 'expense' | 'transfer';
 
 // ─── Dynamic date constants ───────────────────────────────────────────────────
 
@@ -520,9 +520,10 @@ function TypeToggle({ value, onChange }: { value: TypeFilter; onChange: (v: Type
   const { colors, spacing, borderRadius, fontSize, fontFamily } = theme;
 
   const opts: { key: TypeFilter; label: string; color?: string }[] = [
-    { key: 'all',     label: 'All'      },
-    { key: 'expense', label: '↓ Expenses', color: colors.expense },
-    { key: 'income',  label: '↑ Income',   color: colors.income  },
+    { key: 'all',      label: 'All'           },
+    { key: 'expense',  label: '↓ Expenses',   color: colors.expense        },
+    { key: 'income',   label: '↑ Income',     color: colors.income         },
+    { key: 'transfer', label: '↔ Transfers',  color: colors.accent.primary },
   ];
 
   return (
@@ -687,7 +688,7 @@ function TransactionGroup({
   dateLabel:  string;
   items:      Transaction[];
   dayTotal:   number;
-  onPressTx?: (id: string, type: 'income' | 'expense') => void;
+  onPressTx?: (id: string, type: 'income' | 'expense' | 'transfer') => void;
 }) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;

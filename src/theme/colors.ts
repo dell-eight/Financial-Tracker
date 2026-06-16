@@ -30,6 +30,7 @@ export const categoryColors = {
   income_salary:    '#22C55E',   // green
   income_freelance: '#14B8A6',   // teal
   income_other:     '#6366F1',   // indigo
+  transfer:         '#755DEF',   // brand purple
 } as const;
 
 export type CategoryKey = keyof typeof categoryColors;

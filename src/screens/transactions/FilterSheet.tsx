@@ -18,7 +18,7 @@ import type { TransactionsStackParamList, FilterState } from '../../navigation/t
 
 type Props = StackScreenProps<TransactionsStackParamList, 'Filter'>;
 
-type TxType  = 'all' | 'income' | 'expense';
+type TxType  = 'all' | 'income' | 'expense' | 'transfer';
 type Period  = 'week' | 'month' | 'year';
 
 // ─── SegmentedControl ─────────────────────────────────────────────────────────
@@ -217,9 +217,10 @@ export function FilterSheet({ navigation, route }: Props) {
         <SectionLabel title="TRANSACTION TYPE" />
         <SegmentedControl
           options={[
-            { key: 'all',     label: 'All'      },
-            { key: 'expense', label: 'Expenses' },
-            { key: 'income',  label: 'Income'   },
+            { key: 'all',      label: 'All'       },
+            { key: 'expense',  label: 'Expenses'  },
+            { key: 'income',   label: 'Income'    },
+            { key: 'transfer', label: 'Transfers' },
           ]}
           value={txType}
           onChange={setTxType}
@@ -256,7 +257,7 @@ export function FilterSheet({ navigation, route }: Props) {
             </Text>
             {txType !== 'all' && (
               <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary }}>
-                • Type: {txType === 'expense' ? 'Expenses only' : 'Income only'}
+                • Type: {txType === 'expense' ? 'Expenses only' : txType === 'income' ? 'Income only' : 'Transfers only'}
               </Text>
             )}
             {period !== 'month' && (

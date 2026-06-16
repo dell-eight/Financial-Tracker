@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing,
 } from 'react-native-reanimated';
+import { File, Paths } from 'expo-file-system';
+import { StorageAccessFramework } from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useTransactions } from '../../hooks/queries/useTransactions';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
+import { useBudgets } from '../../hooks/queries/useBudgets';
 import type { HomeStackParamList } from '../../navigation/types';
+import type { Transaction, Budget, AssetItem, DebtItem } from '../../types/models';
 
 type Props   = StackScreenProps<HomeStackParamList, 'DataExport'>;
 type Format  = 'csv' | 'pdf' | 'json';
@@ -37,32 +43,99 @@ const RANGE_OPTIONS: { value: Range; label: string; months: number }[] = [
   { value: 'all',     label: 'All Time',      months: 24 },
 ];
 
+// ─── CSV helpers ──────────────────────────────────────────────────────────────
+
+function escapeCsv(v: string | number | undefined | null): string {
+  const s = String(v ?? '');
+  return s.includes(',') || s.includes('"') || s.includes('\n')
+    ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function buildCsv(
+  txns:    Transaction[],
+  budgets: Budget[]    | undefined,
+  assets:  AssetItem[] | undefined,
+  debts:   DebtItem[]  | undefined,
+  opts:    { inclTxns: boolean; inclBudgets: boolean; inclNetWorth: boolean },
+): string {
+  const sections: string[] = [];
+
+  if (opts.inclTxns && txns.length > 0) {
+    const header = ['Date', 'Time', 'Type', 'Merchant', 'Category', 'Amount', 'Account', 'Note'];
+    const rows   = txns.map(t =>
+      [t.date, t.time, t.type, t.merchant, t.categoryLabel, t.amount, t.accountName ?? '', t.note ?? '']
+        .map(escapeCsv).join(','),
+    );
+    sections.push('TRANSACTIONS\n' + [header.join(','), ...rows].join('\n'));
+  }
+
+  if (opts.inclBudgets && budgets && budgets.length > 0) {
+    const header = ['Category', 'Limit', 'Spent', 'Remaining'];
+    const rows   = budgets.map(b =>
+      [b.label, b.limit, b.spent, b.limit - b.spent].map(escapeCsv).join(','),
+    );
+    sections.push('BUDGET CATEGORIES\n' + [header.join(','), ...rows].join('\n'));
+  }
+
+  if (opts.inclNetWorth) {
+    if (assets && assets.length > 0) {
+      const rows = assets.map(a => [a.name, a.category, a.balance].map(escapeCsv).join(','));
+      sections.push('ASSETS\nName,Category,Balance\n' + rows.join('\n'));
+    }
+    if (debts && debts.length > 0) {
+      const rows = debts.map(d => [d.name, d.category, d.balance, d.interestRate].map(escapeCsv).join(','));
+      sections.push('DEBTS\nName,Category,Balance,Interest Rate\n' + rows.join('\n'));
+    }
+  }
+
+  return sections.join('\n\n');
+}
+
+function buildJson(
+  txns:    Transaction[],
+  budgets: Budget[]    | undefined,
+  assets:  AssetItem[] | undefined,
+  debts:   DebtItem[]  | undefined,
+  opts:    { inclTxns: boolean; inclBudgets: boolean; inclNetWorth: boolean },
+): string {
+  const payload: Record<string, any> = { exportedAt: new Date().toISOString() };
+  if (opts.inclTxns)     payload.transactions = txns;
+  if (opts.inclBudgets)  payload.budgets      = budgets  ?? [];
+  if (opts.inclNetWorth) { payload.assets = assets ?? []; payload.debts = debts ?? []; }
+  return JSON.stringify(payload, null, 2);
+}
+
+// ─── DataExportScreen ─────────────────────────────────────────────────────────
+
 export function DataExportScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
 
-  const { data: txns   } = useTransactions();
-  const { data: assets } = useAssets();
-  const { data: debts  } = useDebts();
+  const { data: txns    } = useTransactions();
+  const { data: assets  } = useAssets();
+  const { data: debts   } = useDebts();
+  const { data: budgets } = useBudgets();
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
 
-  const [format, setFormat]         = useState<Format>('csv');
-  const [range, setRange]           = useState<Range>('month');
-  const [inclTxns, setInclTxns]     = useState(true);
-  const [inclBudgets, setInclBudgets] = useState(true);
+  const [format, setFormat]             = useState<Format>('csv');
+  const [range, setRange]               = useState<Range>('month');
+  const [inclTxns, setInclTxns]         = useState(true);
+  const [inclBudgets, setInclBudgets]   = useState(true);
   const [inclNetWorth, setInclNetWorth] = useState(false);
-  const [exporting, setExporting]   = useState(false);
-  const [exported, setExported]     = useState(false);
+  const [exporting, setExporting]       = useState(false);
+  const [exported, setExported]         = useState(false);
 
-  const selectedRange  = RANGE_OPTIONS.find(r => r.value === range)!;
-  const cutoff         = new Date();
+  const exportUriRef = useRef<string | null>(null);
+
+  const selectedRange = RANGE_OPTIONS.find(r => r.value === range)!;
+  const cutoff        = new Date();
   cutoff.setMonth(cutoff.getMonth() - selectedRange.months);
-  const filteredTxns   = (txns ?? []).filter(t => range === 'all' || new Date(t.date) >= cutoff);
-  const recordCount    = filteredTxns.length + (inclNetWorth ? (assets?.length ?? 0) + (debts?.length ?? 0) : 0);
-  const fileSizeKB     = format === 'pdf' ? Math.max(48, recordCount * 2.1) : format === 'json' ? recordCount * 0.8 : recordCount * 0.3;
+  const filteredTxns  = (txns ?? []).filter(t => range === 'all' || new Date(t.date) >= cutoff);
+  const recordCount   = filteredTxns.length + (inclNetWorth ? (assets?.length ?? 0) + (debts?.length ?? 0) : 0);
+  const fileSizeKB    = format === 'pdf' ? Math.max(48, recordCount * 2.1) : format === 'json' ? recordCount * 0.8 : recordCount * 0.3;
 
   const a = [0, 1, 2, 3].map(() => useSharedValue(0));
   useEffect(() => {
@@ -76,23 +149,85 @@ export function DataExportScreen({ navigation }: Props) {
   const progress = useSharedValue(0);
   const progressStyle = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` as any }));
 
-  function handleExport() {
+  async function handleExport() {
+    if (format === 'pdf') {
+      Alert.alert('PDF Export', 'PDF export is not yet available. Please use CSV or JSON.');
+      return;
+    }
+
     setExporting(true);
     setExported(false);
+    exportUriRef.current = null;
     progress.value = 0;
-    progress.value = withTiming(1, { duration: 1800, easing: Easing.out(Easing.quad) });
-    setTimeout(() => {
-      setExporting(false);
+    progress.value = withTiming(0.8, { duration: 1200, easing: Easing.out(Easing.quad) });
+
+    try {
+      const content = format === 'csv'
+        ? buildCsv(filteredTxns, budgets, assets, debts, { inclTxns, inclBudgets, inclNetWorth })
+        : buildJson(filteredTxns, budgets, assets, debts, { inclTxns, inclBudgets, inclNetWorth });
+
+      const filename = `financial-export-${new Date().toISOString().slice(0, 10)}.${format}`;
+      const file     = new File(Paths.cache, filename);
+      file.write(content);
+
+      exportUriRef.current = file.uri;
+      progress.value = withTiming(1, { duration: 200 });
       setExported(true);
-    }, 1900);
+    } catch {
+      Alert.alert('Export Failed', 'Could not generate the export file. Please try again.');
+    } finally {
+      setExporting(false);
+    }
   }
 
-  function handleDownload() {
-    Alert.alert(
-      'Export Ready',
-      `Your ${format.toUpperCase()} export (${Math.round(fileSizeKB)}KB) has been prepared. In a production app this would download to your device.`,
-      [{ text: 'OK', onPress: () => setExported(false) }],
-    );
+  async function handleDownload() {
+    const uri = exportUriRef.current;
+    if (!uri) return;
+
+    const mimeType = format === 'json' ? 'application/json' : 'text/csv';
+    const filename  = uri.split('/').pop() ?? `export.${format}`;
+
+    if (Platform.OS === 'android') {
+      try {
+        const file    = new File(uri);
+        const content = await file.text();
+
+        // Reuse a previously granted Downloads permission if available
+        let directoryUri = await AsyncStorage.getItem('downloads_saf_uri');
+
+        if (!directoryUri) {
+          // First time: open folder picker pre-navigated to Downloads
+          const downloadsUri = StorageAccessFramework.getUriForDirectoryInRoot('Download');
+          const result = await StorageAccessFramework.requestDirectoryPermissionsAsync(downloadsUri);
+          if (!result.granted) return;
+          directoryUri = result.directoryUri;
+          await AsyncStorage.setItem('downloads_saf_uri', directoryUri);
+        }
+
+        try {
+          const destUri = await StorageAccessFramework.createFileAsync(directoryUri, filename, mimeType);
+          await StorageAccessFramework.writeAsStringAsync(destUri, content);
+          Alert.alert('Saved to Downloads', `${filename} is now in your Downloads folder.`);
+        } catch {
+          // Saved URI may have been revoked — clear it and ask again next time
+          await AsyncStorage.removeItem('downloads_saf_uri');
+          Alert.alert('Permission Expired', 'Please tap Save again to re-grant Downloads access.');
+        }
+      } catch {
+        Alert.alert('Save Failed', 'Could not save to Downloads. Please try again.');
+      }
+    } else {
+      // iOS — share sheet with "Save to Files" is the standard save mechanism
+      try {
+        await Sharing.shareAsync(uri, {
+          mimeType,
+          dialogTitle: 'Save export to Files',
+          UTI: format === 'json' ? 'public.json' : 'public.comma-separated-values-text',
+        });
+      } catch {
+        Alert.alert('Save Failed', 'Unable to open the save dialog. Please try again.');
+      }
+    }
   }
 
   return (
@@ -116,7 +251,8 @@ export function DataExportScreen({ navigation }: Props) {
             </Text>
             <View style={{ flexDirection: 'row', gap: spacing[2] }}>
               {FORMAT_OPTIONS.map(opt => {
-                const active = format === opt.value;
+                const active  = format === opt.value;
+                const isPdf   = opt.value === 'pdf';
                 return (
                   <Pressable
                     key={opt.value}
@@ -129,11 +265,14 @@ export function DataExportScreen({ navigation }: Props) {
                       backgroundColor: active ? colors.accent.primary + '20' : colors.bg.surfaceMuted,
                       borderWidth: 1.5,
                       borderColor: active ? colors.accent.primary : 'transparent',
+                      opacity: isPdf ? 0.5 : 1,
                     }}
                   >
                     <Text style={{ fontSize: 22, marginBottom: 4 }}>{opt.icon}</Text>
                     <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.bold, color: active ? colors.accent.primary : colors.text.primary }}>{opt.label}</Text>
-                    <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', marginTop: 2 }}>{opt.desc}</Text>
+                    <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', marginTop: 2 }}>
+                      {isPdf ? 'Coming soon' : opt.desc}
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -178,9 +317,9 @@ export function DataExportScreen({ navigation }: Props) {
               Include
             </Text>
             {[
-              { label: 'Transactions',       icon: '💳', count: filteredTxns.length,                                  value: inclTxns,     set: setInclTxns },
-              { label: 'Budget Categories',  icon: '📊', count: 8,                                                    value: inclBudgets,  set: setInclBudgets },
-              { label: 'Assets & Net Worth', icon: '🏦', count: (assets?.length ?? 0) + (debts?.length ?? 0),        value: inclNetWorth, set: setInclNetWorth },
+              { label: 'Transactions',       icon: '💳', count: filteredTxns.length,                                   value: inclTxns,     set: setInclTxns     },
+              { label: 'Budget Categories',  icon: '📊', count: budgets?.length ?? 0,                                  value: inclBudgets,  set: setInclBudgets  },
+              { label: 'Assets & Net Worth', icon: '🏦', count: (assets?.length ?? 0) + (debts?.length ?? 0),         value: inclNetWorth, set: setInclNetWorth },
             ].map((item, i, arr) => (
               <View key={item.label} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing[3], borderBottomWidth: i < arr.length - 1 ? StyleSheet.hairlineWidth : 0, borderBottomColor: colors.border.subtle }}>
                 <Text style={{ fontSize: 18, marginRight: spacing[3] }}>{item.icon}</Text>
@@ -235,7 +374,7 @@ export function DataExportScreen({ navigation }: Props) {
                   onPress={handleDownload}
                   style={{ backgroundColor: colors.income, borderRadius: borderRadius.button, height: 48, alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: colors.white }}>⬇ Download {format.toUpperCase()}</Text>
+                  <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: colors.white }}>⬇ Share / Save {format.toUpperCase()}</Text>
                 </Pressable>
               </View>
             ) : (

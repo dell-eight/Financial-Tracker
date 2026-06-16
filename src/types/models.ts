@@ -25,12 +25,13 @@ export interface Transaction {
   categoryLabel: string;
   categoryIcon: string;
   amount: number;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'transfer';
   date: string;
   time: string;
   note?: string;
-  accountId?:   string;
-  accountName?: string;
+  accountId?:      string;
+  accountName?:    string;
+  counterpartName?: string;
 }
 
 export interface Budget {
