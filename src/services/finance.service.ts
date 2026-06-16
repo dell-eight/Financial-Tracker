@@ -169,7 +169,7 @@ export async function getTransactions(): Promise<Transaction[]> {
   const [expRes, incRes] = await Promise.all([
     supabase
       .from('expenses')
-      .select('id, description, amount, date, created_at, notes, expense_categories(name, icon, color)')
+      .select('id, description, amount, date, created_at, notes, account_id, expense_categories(name, icon, color), asset_accounts(name)')
       .eq('user_id', userId)
       .is('deleted_at', null)
       .order('date', { ascending: false })
@@ -177,7 +177,7 @@ export async function getTransactions(): Promise<Transaction[]> {
 
     supabase
       .from('income_records')
-      .select('id, description, amount, date, created_at, notes, income_sources(name, type, icon)')
+      .select('id, description, amount, date, created_at, notes, account_id, income_sources(name, type, icon), asset_accounts(name)')
       .eq('user_id', userId)
       .is('deleted_at', null)
       .order('date', { ascending: false })
@@ -199,6 +199,8 @@ export async function getTransactions(): Promise<Transaction[]> {
       date:          e.date,
       time,
       note:          e.notes ?? undefined,
+      accountId:     e.account_id ?? undefined,
+      accountName:   e.asset_accounts?.name ?? undefined,
     };
   });
 
@@ -217,6 +219,8 @@ export async function getTransactions(): Promise<Transaction[]> {
       date:          r.date,
       time,
       note:          r.notes ?? undefined,
+      accountId:     r.account_id ?? undefined,
+      accountName:   r.asset_accounts?.name ?? undefined,
     };
   });
 
@@ -999,6 +1003,17 @@ export async function updateAssetBalance(id: string, balance: number): Promise<v
   if (error) throw error;
 }
 
+export async function updateAsset(id: string, params: { name: string; category: string; balance: number }): Promise<void> {
+  const userId = await uid();
+  const dbType = CATEGORY_TO_DB_TYPE[params.category] ?? 'other';
+  const { error } = await supabase
+    .from('asset_accounts')
+    .update({ name: params.name, asset_type: dbType, balance: params.balance })
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
 export async function deleteAsset(id: string): Promise<void> {
   const userId = await uid();
   const { error } = await supabase
@@ -1007,6 +1022,15 @@ export async function deleteAsset(id: string): Promise<void> {
     .eq('id', id)
     .eq('user_id', userId);
   if (error) throw error;
+}
+
+export async function hasTransactionsForAccount(accountId: string): Promise<number> {
+  const userId = await uid();
+  const [expRes, incRes] = await Promise.all([
+    supabase.from('expenses').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('account_id', accountId).is('deleted_at', null),
+    supabase.from('income_records').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('account_id', accountId),
+  ]);
+  return (expRes.count ?? 0) + (incRes.count ?? 0);
 }
 
 export async function getAssets(): Promise<AssetItem[]> {
@@ -1253,6 +1277,16 @@ export async function updateDebtBalance(id: string, newBalance: number): Promise
   const { error } = await supabase
     .from('debt_accounts')
     .update({ balance: newBalance })
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (error) throw error;
+}
+
+export async function updateDebt(id: string, params: { name: string; balance: number }): Promise<void> {
+  const userId = await uid();
+  const { error } = await supabase
+    .from('debt_accounts')
+    .update({ name: params.name, balance: params.balance })
     .eq('id', id)
     .eq('user_id', userId);
   if (error) throw error;

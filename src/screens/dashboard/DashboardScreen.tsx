@@ -37,6 +37,7 @@ import { useAuthStore }               from '../../store/auth.store';
 import { ProgressBar, SectionHeader, ExpenseItem } from '../../components';
 import type { HomeStackParamList, MainTabParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
+import { computeHealthScore } from '../../utils/healthScore';
 
 type Props = StackScreenProps<HomeStackParamList, 'HomeMain'>;
 
@@ -441,25 +442,17 @@ export function DashboardScreen({ navigation }: Props) {
 
   const healthScore = useMemo(() => {
     if (!dashboard) return null;
-
-    const savingsFactor  = Math.min(dashboard.savingsRate / 20, 1);
     const emergencyMonths = dashboard.monthlyExpenses > 0
       ? dashboard.totalBalance / dashboard.monthlyExpenses : 0;
-    const emergencyFactor = Math.min(emergencyMonths / 6, 1);
-    const annualIncome   = dashboard.monthlyIncome * 12;
-    const debtFactor     = annualIncome > 0
-      ? Math.max(0, 1 - (dashboard.totalDebts / annualIncome) / 0.30) : 1;
-    const avgGoalProgress = goals && goals.length > 0
-      ? goals.reduce((s, g) => s + g.savedAmount / g.targetAmount, 0) / goals.length : 0;
-
-    const raw = (
-      0.30 * savingsFactor +
-      0.25 * emergencyFactor +
-      0.25 * Math.min(debtFactor, 1) +
-      0.20 * avgGoalProgress
-    ) * 100;
-
-    return Math.round(raw);
+    const annualIncome = dashboard.monthlyIncome * 12;
+    const { total } = computeHealthScore({
+      savingsRate:     dashboard.savingsRate,
+      emergencyMonths,
+      debtRatio:       annualIncome > 0 ? dashboard.totalDebts / annualIncome : 0,
+      goalProgress:    goals && goals.length > 0
+        ? goals.reduce((s, g) => s + g.savedAmount / g.targetAmount, 0) / goals.length : 0,
+    });
+    return total;
   }, [dashboard, goals]);
 
   // ── Derived data ───────────────────────────────────────────────────────────

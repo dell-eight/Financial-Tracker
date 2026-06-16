@@ -37,16 +37,17 @@ const { width: SCREEN_W } = Dimensions.get('window');
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Transaction {
-  id:       string;
-  merchant: string;
-  category: CategoryKey;
-  label:    string;
-  icon:     string;
-  amount:   number;
-  type:     'income' | 'expense';
-  date:     string;   // YYYY-MM-DD
-  time:     string;
-  note?:    string;
+  id:          string;
+  merchant:    string;
+  category:    CategoryKey;
+  label:       string;
+  icon:        string;
+  amount:      number;
+  type:        'income' | 'expense';
+  date:        string;   // YYYY-MM-DD
+  time:        string;
+  note?:       string;
+  accountId?:  string;
 }
 
 type Period     = 'week' | 'month' | 'year';
@@ -886,16 +887,17 @@ export function ExpenseScreen({ navigation, route }: Props) {
   // Map seed Transaction shape → local Transaction shape
   const allTransactions = useMemo<Transaction[]>(() => {
     return (rawTxns ?? []).map(t => ({
-      id:       t.id,
-      merchant: t.merchant,
-      category: t.category,
-      label:    t.categoryLabel,
-      icon:     t.categoryIcon,
-      amount:   t.amount,
-      type:     t.type,
-      date:     t.date,
-      time:     t.time,
-      note:     t.note,
+      id:         t.id,
+      merchant:   t.merchant,
+      category:   t.category,
+      label:      t.categoryLabel,
+      icon:       t.categoryIcon,
+      amount:     t.amount,
+      type:       t.type,
+      date:       t.date,
+      time:       t.time,
+      note:       t.note,
+      accountId:  t.accountId,
     }));
   }, [rawTxns]);
 
@@ -906,6 +908,8 @@ export function ExpenseScreen({ navigation, route }: Props) {
   const [typeFilter,   setTypeFilter]   = useState<TypeFilter>('all');
   const [minAmount,    setMinAmount]    = useState<number | null>(null);
   const [maxAmount,    setMaxAmount]    = useState<number | null>(null);
+  const [accountId,    setAccountId]    = useState<string | null>(null);
+  const [accountName,  setAccountName]  = useState<string | null>(null);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
@@ -914,6 +918,9 @@ export function ExpenseScreen({ navigation, route }: Props) {
   const filtered = useMemo<Transaction[]>(() => {
     let result = allTransactions.filter(tx => isInPeriod(tx.date, period));
 
+    if (accountId !== null) {
+      result = result.filter(tx => tx.accountId === accountId);
+    }
     if (typeFilter !== 'all') {
       result = result.filter(tx => tx.type === typeFilter);
     }
@@ -931,7 +938,7 @@ export function ExpenseScreen({ navigation, route }: Props) {
     if (minAmount !== null) result = result.filter(tx => tx.amount >= minAmount);
     if (maxAmount !== null) result = result.filter(tx => tx.amount <= maxAmount);
     return result;
-  }, [allTransactions, period, typeFilter, catFilter, searchQuery, minAmount, maxAmount]);
+  }, [allTransactions, period, typeFilter, catFilter, searchQuery, minAmount, maxAmount, accountId]);
 
   // ── Grouped by date ─────────────────────────────────────────────────────────
   const grouped = useMemo(() => {
@@ -988,12 +995,14 @@ export function ExpenseScreen({ navigation, route }: Props) {
     return map;
   }, [allTransactions, period, typeFilter, searchQuery]);
 
-  // ── Sync incoming filter params (from FilterSheet) ─────────────────────────
+  // ── Sync incoming filter params (from FilterSheet or MyAccounts drill-down) ──
   useEffect(() => {
     const p = route.params;
     if (!p) return;
-    if (p.type    !== undefined) setTypeFilter(p.type as TypeFilter);
-    if (p.period  !== undefined) setPeriod(p.period as Period);
+    if (p.type       !== undefined) setTypeFilter(p.type as TypeFilter);
+    if (p.period     !== undefined) setPeriod(p.period as Period);
+    if (p.accountId  !== undefined) setAccountId(p.accountId ?? null);
+    if (p.accountName !== undefined) setAccountName(p.accountName ?? null);
     setMinAmount(p.minAmount ?? null);
     setMaxAmount(p.maxAmount ?? null);
   }, [route.params]);
@@ -1005,9 +1014,11 @@ export function ExpenseScreen({ navigation, route }: Props) {
     setTypeFilter('all');
     setMinAmount(null);
     setMaxAmount(null);
+    setAccountId(null);
+    setAccountName(null);
   }, []);
 
-  const hasActiveFilters = catFilter !== 'all' || typeFilter !== 'all' || searchQuery.length > 0 || minAmount !== null || maxAmount !== null;
+  const hasActiveFilters = catFilter !== 'all' || typeFilter !== 'all' || searchQuery.length > 0 || minAmount !== null || maxAmount !== null || accountId !== null;
 
   // ── Entrance animations ─────────────────────────────────────────────────────
   const headerAnim  = useSharedValue(0);
@@ -1059,20 +1070,19 @@ export function ExpenseScreen({ navigation, route }: Props) {
         contentContainerStyle={[scr.scroll, { paddingTop: topPad + spacing[2], paddingBottom: btmPad + spacing[8] }]}
       >
         {/* ── 1. Header ──────────────────────────────────────────────────────── */}
-        <Animated.View style={[scr.headerRow, headerStyle, { paddingHorizontal: spacing[5] }]}>
-          <View>
-            <Text style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: colors.text.primary, letterSpacing: -0.4, lineHeight: 28 }}>
-              Transactions
-            </Text>
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
-              {allTransactions.length} total transactions
-            </Text>
-          </View>
+        <Animated.View style={[headerStyle, { paddingHorizontal: spacing[5] }]}>
+          {/* Row 1 — title + subtitle */}
+          <Text numberOfLines={1} style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: colors.text.primary, letterSpacing: -0.4, lineHeight: 28 }}>
+            {accountName ? accountName : 'Transactions'}
+          </Text>
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
+            {accountName ? `${filtered.length} transactions` : `${allTransactions.length} total transactions`}
+          </Text>
 
-          <View style={scr.headerRight}>
+          {/* Row 2 — period toggle + filter button */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[3] }}>
             <PeriodToggle value={period} onChange={setPeriod} />
 
-            {/* Filter button */}
             <Pressable
               onPress={() => navigation.push('Filter', {
                 current: { type: typeFilter, period, minAmount: minAmount ?? undefined, maxAmount: maxAmount ?? undefined },
@@ -1090,19 +1100,6 @@ export function ExpenseScreen({ navigation, route }: Props) {
               accessibilityLabel="Filter transactions"
             >
               <Text style={{ fontSize: 16, color: hasActiveFilters ? colors.accent.primary : colors.text.secondary }}>≡</Text>
-            </Pressable>
-
-            {/* Add button */}
-            <Pressable
-              onPress={() => navigation.getParent()?.getParent()?.navigate('QuickAddSheet')}
-              style={[
-                scr.addBtn,
-                { backgroundColor: colors.accent.primary, borderRadius: borderRadius.full },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Add new transaction"
-            >
-              <Text style={{ fontSize: 20, color: '#FFFFFF', fontFamily: fontFamily.bold, lineHeight: 24 }}>+</Text>
             </Pressable>
           </View>
         </Animated.View>

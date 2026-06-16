@@ -425,12 +425,12 @@ export function ProfileScreen({ navigation }: Props) {
           <MenuGroup theme={theme}>
             <MenuItem
               icon="✏️" label="Edit Profile" chevron
-              onPress={() => Alert.alert('Edit Profile', 'Coming soon')}
+              onPress={() => navigation.push('EditProfile')}
               theme={theme}
             />
             <MenuItem
-              icon="💳" label="Payment Methods" chevron
-              onPress={() => Alert.alert('Payment Methods', 'Coming soon')}
+              icon="💳" label="My Accounts" chevron
+              onPress={() => navigation.push('MyAccounts')}
               theme={theme}
             />
             <MenuItem

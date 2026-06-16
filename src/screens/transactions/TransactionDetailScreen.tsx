@@ -388,6 +388,12 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
           <DetailRow label="Time"     value={displayTime} />
           <DetailRow label="Type"     value={isExpense ? 'Expense' : 'Income'} valueColor={amtColor} />
           <DetailRow label="Category" value={tx.categoryLabel} />
+          {tx.accountId && (
+            <DetailRow
+              label={isExpense ? 'Paid from' : 'Deposited to'}
+              value={tx.accountName ?? 'Linked account'}
+            />
+          )}
           <DetailRow
             label="Note"
             value={tx.note ?? '—'}

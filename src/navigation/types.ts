@@ -6,6 +6,8 @@ export type FilterState = {
   period?:    'week' | 'month' | 'year';
   minAmount?: number;
   maxAmount?: number;
+  accountId?:   string;
+  accountName?: string;
 };
 
 // ── Auth stack ─────────────────────────────────────────────────────────────────
@@ -23,6 +25,16 @@ export type HomeStackParamList = {
   Search:            undefined;
   Notifications:     undefined;
   Profile:           undefined;
+  EditProfile:       undefined;
+  MyAccounts:        undefined;
+  AccountTransactions: {
+    accountId:       string;
+    accountName:     string;
+    accountBalance:  number;
+    isDebt:          boolean;
+    accountIcon:     string;
+    accountCategory: string;
+  };
   DataExport:        undefined;
   SecuritySettings:  undefined;
   CurrencyPicker:    undefined;

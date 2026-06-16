@@ -9,7 +9,8 @@
     "web": "expo start --web",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@expo-google-fonts/urbanist": "^0.2.3",
@@ -51,13 +52,21 @@
     "@types/jest": "^30.0.0",
     "@types/react": "~19.1.0",
     "babel-preset-expo": "~54.0.10",
+    "docx": "^9.7.1",
     "jest-expo": "~54.0.17",
     "typescript": "~5.9.2"
   },
   "jest": {
     "preset": "jest-expo",
-    "setupFilesAfterEnv": ["./jest.setup.ts"],
-    "moduleFileExtensions": ["ts", "tsx", "js", "jsx"]
+    "setupFilesAfterEnv": [
+      "./jest.setup.ts"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "jsx"
+    ]
   },
   "private": true
 }

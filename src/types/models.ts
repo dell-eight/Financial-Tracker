@@ -29,6 +29,8 @@ export interface Transaction {
   date: string;
   time: string;
   note?: string;
+  accountId?:   string;
+  accountName?: string;
 }
 
 export interface Budget {

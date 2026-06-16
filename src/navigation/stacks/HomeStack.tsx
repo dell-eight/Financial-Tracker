@@ -6,6 +6,9 @@ import { HealthScoreDetailScreen } from '../../screens/home/HealthScoreDetailScr
 import { SearchScreen }           from '../../screens/home/SearchScreen';
 import { NotificationsSheet }     from '../../screens/home/NotificationsSheet';
 import { ProfileScreen }          from '../../screens/profile/ProfileScreen';
+import { EditProfileScreen }      from '../../screens/profile/EditProfileScreen';
+import { MyAccountsScreen }           from '../../screens/profile/MyAccountsScreen';
+import { AccountTransactionsScreen }  from '../../screens/profile/AccountTransactionsScreen';
 import { DataExportScreen }       from '../../screens/profile/DataExportScreen';
 import { SecuritySettingsScreen } from '../../screens/profile/SecuritySettingsScreen';
 import { CurrencyPickerScreen }   from '../../screens/profile/CurrencyPickerScreen';
@@ -21,6 +24,9 @@ export function HomeStack() {
       <Stack.Screen name="Search"            component={SearchScreen} />
       <Stack.Screen name="Notifications"     component={NotificationsSheet} />
       <Stack.Screen name="Profile"           component={ProfileScreen} />
+      <Stack.Screen name="EditProfile"       component={EditProfileScreen} />
+      <Stack.Screen name="MyAccounts"            component={MyAccountsScreen} />
+      <Stack.Screen name="AccountTransactions"  component={AccountTransactionsScreen} />
       <Stack.Screen name="DataExport"        component={DataExportScreen} />
       <Stack.Screen name="SecuritySettings"  component={SecuritySettingsScreen} />
       <Stack.Screen name="CurrencyPicker"    component={CurrencyPickerScreen} />

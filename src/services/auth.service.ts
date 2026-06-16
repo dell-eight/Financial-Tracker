@@ -148,10 +148,11 @@ export async function updateProfile(userId: string, updates: Partial<User>) {
     const { data, error } = await supabase
       .from('users')
       .update({
-        display_name: updates.display_name,
-        avatar_url: updates.avatar_url,
-        base_currency: updates.base_currency,
-        timezone: updates.timezone,
+        display_name:      updates.display_name,
+        avatar_url:        updates.avatar_url,
+        base_currency:     updates.base_currency,
+        timezone:          updates.timezone,
+        fiscal_year_start: updates.fiscal_year_start,
       })
       .eq('id', userId)
       .select()
