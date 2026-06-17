@@ -1,0 +1,58 @@
+appId: com.financialtracker.app
+---
+# Critical flow 3: set a Food budget below current spending and verify the over-budget indicator
+# Depends on: 01_login.yaml (auth) and 02_add-expense.yaml (₱250 Food expense exists)
+
+- launchApp
+
+- assertVisible:
+    text: "Recent Transactions"
+    timeout: 10000
+
+# Navigate to Budget tab
+- tapOn: "Budget"
+
+- assertVisible:
+    text: "Budget"
+    timeout: 5000
+
+# Open BudgetSetupWizard
+- tapOn: "Edit"
+
+# ── Step 1: Monthly income ─────────────────────────────────────────────────────
+- assertVisible:
+    text: "Continue"
+    timeout: 5000
+
+- tapOn:
+    hint: "0.00"
+- clearText
+- inputText: "50000"
+
+- tapOn: "Continue"
+
+# ── Step 2: Category allocations ──────────────────────────────────────────────
+# Food is the first expense category; its TextInput has placeholder "0".
+# Set it to ₱100 so the ₱250 expense from flow 02 triggers "Over by".
+- assertVisible:
+    text: "Food"
+    timeout: 5000
+
+- tapOn:
+    hint: "0"
+    index: 0
+- clearText
+- inputText: "100"
+
+- tapOn: "Continue"
+
+# ── Step 3: Review ─────────────────────────────────────────────────────────────
+- tapOn: "Save Budget"
+
+# After saving, navigate back to Budget overview
+- tapOn: "Budget"
+
+# BudgetCard renders "Over by ₱X" in red when spent > limit
+- assertVisible:
+    text: "Over by"
+    timeout: 8000

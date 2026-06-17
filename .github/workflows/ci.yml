@@ -35,3 +35,76 @@ jobs:
 
       - name: Test
         run: npm test -- --forceExit --ci
+
+  e2e:
+    name: E2E (Maestro · iOS Simulator)
+    runs-on: macos-latest
+    needs: check
+    # Only run on pushes to main — PRs skip this to save macOS runner minutes
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Setup EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      # Download the latest iOS simulator build from EAS
+      - name: Download EAS development build (iOS simulator)
+        run: |
+          eas build:download \
+            --platform ios \
+            --profile development \
+            --output ./sim-build.tar.gz \
+            --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Extract simulator build
+        run: tar -xzf sim-build.tar.gz
+
+      # Boot an iPhone 15 simulator on the latest available iOS runtime
+      - name: Boot iOS simulator
+        run: |
+          RUNTIME=$(xcrun simctl list runtimes -j | \
+            python3 -c "
+          import sys, json
+          rts = json.load(sys.stdin)['runtimes']
+          ios = [r for r in rts if 'iOS' in r.get('name', '') and r.get('isAvailable')]
+          print(ios[-1]['identifier'])
+          ")
+          UDID=$(xcrun simctl create "E2E-iPhone-15" \
+            com.apple.CoreSimulator.SimDeviceType.iPhone-15 \
+            "$RUNTIME")
+          xcrun simctl boot "$UDID"
+          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+
+      - name: Install app on simulator
+        run: xcrun simctl install "$SIM_UDID" *.app
+
+      - name: Install Maestro CLI
+        run: |
+          curl -Ls "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+
+      - name: Run Maestro flows
+        run: maestro test .maestro/
+        env:
+          E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+          E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+      - name: Upload Maestro results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-results
+          path: ~/.maestro/tests/

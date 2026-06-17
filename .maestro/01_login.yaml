@@ -1,0 +1,29 @@
+appId: com.financialtracker.app
+---
+# Critical flow 1: sign in and verify the dashboard renders
+
+- launchApp:
+    clearState: true
+
+# Auth gate — login screen must appear
+- assertVisible:
+    text: "Welcome Back"
+    timeout: 5000
+
+# Enter credentials (E2E_EMAIL / E2E_PASSWORD set in CI secrets)
+- tapOn:
+    hint: "john@example.com"
+- clearText
+- inputText: ${E2E_EMAIL}
+
+- tapOn:
+    hint: "Your password"
+- clearText
+- inputText: ${E2E_PASSWORD}
+
+- tapOn: "Sign In"
+
+# Dashboard must render — "Recent Transactions" section header is always present
+- assertVisible:
+    text: "Recent Transactions"
+    timeout: 10000

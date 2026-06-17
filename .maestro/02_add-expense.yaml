@@ -1,0 +1,38 @@
+appId: com.financialtracker.app
+---
+# Critical flow 2: add a Food expense via QuickAdd and verify it appears in the list
+# Depends on: 01_login.yaml already ran (auth session persisted)
+
+- launchApp
+
+- assertVisible:
+    text: "Recent Transactions"
+    timeout: 10000
+
+# Open the QuickAdd sheet via the centre "+" tab-bar button
+- tapOn:
+    label: "Add transaction"
+
+# Sheet must appear
+- assertVisible:
+    text: "Add Expense"
+    timeout: 5000
+
+# Enter amount
+- tapOn:
+    hint: "0.00"
+- clearText
+- inputText: "250"
+
+# Select Food category tile (accessibilityLabel = category label)
+- tapOn:
+    label: "Food"
+
+# Save
+- tapOn: "Save"
+
+# After save the app navigates to TransactionList
+# Assert the newly-added amount is visible somewhere in the list
+- assertVisible:
+    text: "₱250"
+    timeout: 8000
