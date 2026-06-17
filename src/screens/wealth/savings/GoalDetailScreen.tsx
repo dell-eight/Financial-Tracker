@@ -280,7 +280,7 @@ export function GoalDetailScreen({ navigation, route }: Props) {
           <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], padding: spacing[5], alignItems: 'center' }]}>
             <Text style={{ fontSize: 32, marginBottom: spacing[2] }}>💰</Text>
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center' }}>
-              No contributions yet. Tap "+ Add Money" to start saving!
+              {'No contributions yet. Tap "+ Add Money" to start saving!'}
             </Text>
           </View>
         ) : (

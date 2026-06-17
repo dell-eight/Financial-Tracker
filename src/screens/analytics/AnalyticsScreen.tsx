@@ -519,6 +519,7 @@ function CategoryDonut({
                 fontFamily={fontFamily.regular}
                 fill={colors.text.muted}
               >
+                {/* eslint-disable-next-line react-native/no-raw-text */}
                 {sel.pct}%
               </SvgText>
             )}

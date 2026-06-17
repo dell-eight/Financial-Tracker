@@ -10,7 +10,9 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ --ext .ts,.tsx",
+    "lint:fix": "eslint src/ --ext .ts,.tsx --fix"
   },
   "dependencies": {
     "@expo-google-fonts/urbanist": "^0.2.3",
@@ -54,8 +56,14 @@
     "@testing-library/react-native": "^14.0.0",
     "@types/jest": "^30.0.0",
     "@types/react": "~19.1.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
     "babel-preset-expo": "~54.0.10",
     "docx": "^9.7.1",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "eslint-plugin-react-native": "^4.1.0",
     "jest-expo": "~54.0.17",
     "typescript": "~5.9.2"
   },

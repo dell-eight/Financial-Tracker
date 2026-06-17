@@ -104,6 +104,7 @@ export type RootStackParamList = {
 
 // ── Global typed navigation helpers ───────────────────────────────────────────
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace ReactNavigation {
     interface RootParamList extends RootStackParamList {}
   }
