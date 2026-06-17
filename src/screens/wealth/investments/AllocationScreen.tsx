@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -15,6 +16,7 @@ import { useInvestments } from '../../../hooks/queries/useInvestments';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
 import type { AssetType, InvestmentHolding } from '../../../types/models';
+import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'Allocation'>;
 
@@ -110,6 +112,8 @@ export function AllocationScreen({ navigation }: Props) {
 
   const { data: holdings } = useInvestments();
 
+  const [headerStyle, donutStyle, listStyle] = useScreenAnimation(3);
+
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
 
@@ -145,18 +149,18 @@ export function AllocationScreen({ navigation }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>Allocation</Text>
         <View style={{ minWidth: 60 }} />
-      </View>
+      </Animated.View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: btmPad + spacing[8] }}>
 
         {/* ── Donut + total ── */}
-        <View style={{ alignItems: 'center', paddingVertical: spacing[6] }}>
+        <Animated.View style={[{ alignItems: 'center', paddingVertical: spacing[6] }, donutStyle]}>
           <View style={{ position: 'relative', width: 160, height: 160, alignItems: 'center', justifyContent: 'center' }}>
             <DonutChart segments={byType.map(t => ({ pct: t.pct, color: t.color }))} />
             {/* Center label */}
@@ -167,13 +171,14 @@ export function AllocationScreen({ navigation }: Props) {
               </Text>
             </View>
           </View>
-        </View>
+        </Animated.View>
 
         {/* ── By asset type ── */}
-        <View style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}>
-          <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>By Asset Type</Text>
-        </View>
-        <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], paddingHorizontal: spacing[4], marginBottom: spacing[5] }]}>
+        <Animated.View style={listStyle}>
+          <View style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}>
+            <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>By Asset Type</Text>
+          </View>
+          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], paddingHorizontal: spacing[4], marginBottom: spacing[5] }]}>
           {byType.map((t, i) => (
             <AllocationRow
               key={t.type}
@@ -184,39 +189,40 @@ export function AllocationScreen({ navigation }: Props) {
               isLast={i === byType.length - 1}
             />
           ))}
-        </View>
+          </View>
 
-        {/* ── By holding ── */}
-        <View style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}>
-          <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>By Holding</Text>
-        </View>
-        <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], overflow: 'hidden' }]}>
-          {byHolding.map((h, i) => {
-            const value = h.shares * h.currentPrice;
-            const pct   = totalValue > 0 ? (value / totalValue) * 100 : 0;
-            return (
-              <Pressable
-                key={h.id}
-                onPress={() => navigation.push('HoldingDetail', { holdingId: h.id })}
-                style={({ pressed }) => [
-                  styles.holdingRow,
-                  {
-                    paddingHorizontal: spacing[4],
-                    paddingVertical:   spacing[3],
-                    borderBottomWidth: i < byHolding.length - 1 ? StyleSheet.hairlineWidth : 0,
-                    borderBottomColor: colors.border.subtle,
-                    opacity:           pressed ? 0.7 : 1,
-                  },
-                ]}
-              >
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: h.color, marginRight: spacing[3] }} />
-                <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.bold, color: h.color, minWidth: 56 }}>{h.symbol}</Text>
-                <Text style={{ flex: 1, fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginHorizontal: spacing[2] }} numberOfLines={1}>{h.name}</Text>
-                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.secondary }}>{pct.toFixed(1)}%</Text>
-              </Pressable>
-            );
-          })}
-        </View>
+          {/* ── By holding ── */}
+          <View style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}>
+            <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>By Holding</Text>
+          </View>
+          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], overflow: 'hidden' }]}>
+            {byHolding.map((h, i) => {
+              const value = h.shares * h.currentPrice;
+              const pct   = totalValue > 0 ? (value / totalValue) * 100 : 0;
+              return (
+                <Pressable
+                  key={h.id}
+                  onPress={() => navigation.push('HoldingDetail', { holdingId: h.id })}
+                  style={({ pressed }) => [
+                    styles.holdingRow,
+                    {
+                      paddingHorizontal: spacing[4],
+                      paddingVertical:   spacing[3],
+                      borderBottomWidth: i < byHolding.length - 1 ? StyleSheet.hairlineWidth : 0,
+                      borderBottomColor: colors.border.subtle,
+                      opacity:           pressed ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: h.color, marginRight: spacing[3] }} />
+                  <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.bold, color: h.color, minWidth: 56 }}>{h.symbol}</Text>
+                  <Text style={{ flex: 1, fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginHorizontal: spacing[2] }} numberOfLines={1}>{h.name}</Text>
+                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.secondary }}>{pct.toFixed(1)}%</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Animated.View>
 
         {/* ── Diversification score ── */}
         <View style={{ paddingHorizontal: spacing[5], marginTop: spacing[5] }}>

@@ -9,6 +9,7 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
@@ -23,6 +24,7 @@ import type { WealthStackParamList } from '../../../navigation/types';
 import type { SavingsGoal, Account } from '../../../types/models';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import { useCurrency } from '../../../utils/currency';
+import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'AddContribution'>;
 
@@ -56,6 +58,8 @@ export function AddContributionScreen({ navigation, route }: Props) {
     () => goals?.find(g => g.id === goalId),
     [goals, goalId],
   );
+
+  const [headerStyle, accountStyle, amountStyle] = useScreenAnimation(3);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -107,13 +111,13 @@ export function AddContributionScreen({ navigation, route }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>Add Money</Text>
         <View style={{ minWidth: 60 }} />
-      </View>
+      </Animated.View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -123,7 +127,7 @@ export function AddContributionScreen({ navigation, route }: Props) {
       >
         {/* ── Goal context card ── */}
         {goal && (
-          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: H_PAD, padding: spacing[4], marginBottom: spacing[5] }]}>
+          <Animated.View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: H_PAD, padding: spacing[4], marginBottom: spacing[5] }, accountStyle]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
               <View style={{ backgroundColor: goal.color + '22', borderRadius: borderRadius.full, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
                 <Text style={{ fontSize: 22, lineHeight: 28 }}>{goal.emoji}</Text>
@@ -149,11 +153,11 @@ export function AddContributionScreen({ navigation, route }: Props) {
             <View style={{ height: 4, backgroundColor: colors.bg.surfaceMuted, borderRadius: 99, marginTop: spacing[3], overflow: 'hidden' }}>
               <View style={{ height: '100%', width: `${Math.min((goal.savedAmount / goal.targetAmount) * 100, 100)}%`, backgroundColor: goal.color, borderRadius: 99 }} />
             </View>
-          </View>
+          </Animated.View>
         )}
 
         {/* ── Amount input ── */}
-        <View style={{ alignItems: 'center', paddingVertical: spacing[6] }}>
+        <Animated.View style={[{ alignItems: 'center', paddingVertical: spacing[6] }, amountStyle]}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={{ fontSize: 44, fontFamily: fontFamily.bold, color: parsed > 0 ? colors.income : colors.text.muted, lineHeight: 52, marginRight: 4 }}>
               {symbol}
@@ -185,7 +189,7 @@ export function AddContributionScreen({ navigation, route }: Props) {
               Will be capped at {fmt(remaining)}
             </Text>
           )}
-        </View>
+        </Animated.View>
 
         {/* ── Quick presets ── */}
         <View style={[styles.presetRow, { paddingHorizontal: H_PAD, gap: spacing[3], marginBottom: spacing[5] }]}>

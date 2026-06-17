@@ -1,4 +1,6 @@
 ﻿import React, { useMemo, useState } from 'react';
+import Animated from 'react-native-reanimated';
+import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import {
   View,
   Text,
@@ -192,6 +194,8 @@ export function CategoryBudgetDetailScreen({ navigation, route }: Props) {
     );
   }
 
+  const [headerStyle, statsStyle, listStyle] = useScreenAnimation(3);
+
   const ratio       = budget.limit > 0 ? budget.spent / budget.limit : 0;
   const remaining   = budget.limit - budget.spent;
   const isOver      = budget.spent > budget.limit;
@@ -221,7 +225,7 @@ export function CategoryBudgetDetailScreen({ navigation, route }: Props) {
       )}
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
@@ -231,11 +235,12 @@ export function CategoryBudgetDetailScreen({ navigation, route }: Props) {
         <Pressable onPress={() => setEditingLimit(true)} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.accent.primary }}>Edit Limit</Text>
         </Pressable>
-      </View>
+      </Animated.View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: btmPad + spacing[8] }}>
 
         {/* ── Hero ────────────────────────────────────────────────────────────── */}
+        <Animated.View style={statsStyle}>
         <View style={[styles.hero, { paddingVertical: spacing[6], paddingHorizontal: spacing[5] }]}>
           {/* Category icon */}
           <View style={[styles.catCircle, { backgroundColor: catBg, borderRadius: borderRadius.full, width: 72, height: 72 }]}>
@@ -287,8 +292,10 @@ export function CategoryBudgetDetailScreen({ navigation, route }: Props) {
           <StatTile label="Transactions"  value={String(monthTxns.length)} />
           <StatTile label="Days elapsed"  value={String(daysPassed)} />
         </View>
+        </Animated.View>
 
         {/* ── Transactions section ─────────────────────────────────────────────── */}
+        <Animated.View style={listStyle}>
         <View style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}>
           <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
             This Month
@@ -324,6 +331,7 @@ export function CategoryBudgetDetailScreen({ navigation, route }: Props) {
             ))}
           </View>
         )}
+        </Animated.View>
       </ScrollView>
     </View>
   );

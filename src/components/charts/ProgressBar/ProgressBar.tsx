@@ -4,6 +4,7 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  withDelay,
   Easing,
 } from 'react-native-reanimated';
 import { useTheme } from '../../../hooks/ui/useTheme';
@@ -26,21 +27,26 @@ export function ProgressBar({
   const theme = useTheme();
   const { colors, borderRadius, progressBarConfig, animation } = theme;
 
-  const barHeight   = height ?? progressBarConfig.height;
+  const barHeight    = height ?? progressBarConfig.height;
   const clampedRatio = Math.min(ratio, 1);
-  const fillColor   = getProgressColor(ratio, colors);
+  const fillColor    = getProgressColor(ratio, colors);
 
-  const progress = useSharedValue(0);
+  const progress  = useSharedValue(0);
+  const isMounted = React.useRef(false);
 
   useEffect(() => {
     if (animated) {
-      progress.value = withTiming(clampedRatio, {
+      const timing = withTiming(clampedRatio, {
         duration: animation.duration.slow,
         easing:   Easing.out(Easing.cubic),
       });
+      // Delay the initial fill so it fires after the screen entry animation.
+      // Subsequent ratio changes (live updates) animate immediately.
+      progress.value = isMounted.current ? timing : withDelay(200, timing);
     } else {
       progress.value = clampedRatio;
     }
+    isMounted.current = true;
   }, [clampedRatio, animated]);
 
   const animatedFill = useAnimatedStyle(() => ({

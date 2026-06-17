@@ -9,6 +9,7 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
@@ -21,6 +22,7 @@ import type { WealthStackParamList } from '../../../navigation/types';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import { useCurrency } from '../../../utils/currency';
 import type { AssetType } from '../../../types/models';
+import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'AddHolding'>;
 
@@ -54,6 +56,7 @@ export function AddHoldingScreen({ navigation, route }: Props) {
   const [color,     setColor]     = useState(HOLDING_COLORS[0]);
   const [saving,    setSaving]    = useState(false);
   const [error,     setError]     = useState<string | null>(null);
+  const [headerStyle, typeStyle, formStyle] = useScreenAnimation(3);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -106,7 +109,7 @@ export function AddHoldingScreen({ navigation, route }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>Cancel</Text>
         </Pressable>
@@ -114,7 +117,7 @@ export function AddHoldingScreen({ navigation, route }: Props) {
         <Pressable onPress={handleSave} disabled={!canSave || saving} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? colors.accent.primary : colors.text.muted }}>{saving ? '…' : 'Save'}</Text>
         </Pressable>
-      </View>
+      </Animated.View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -124,7 +127,7 @@ export function AddHoldingScreen({ navigation, route }: Props) {
       >
 
         {/* ── Preview badge ── */}
-        <View style={{ alignItems: 'center', marginVertical: spacing[5] }}>
+        <Animated.View style={[{ alignItems: 'center', marginVertical: spacing[5] }, typeStyle]}>
           <View style={[styles.previewBadge, { backgroundColor: color + '20', borderRadius: borderRadius.lg, paddingHorizontal: spacing[5], paddingVertical: spacing[3], borderWidth: 2, borderColor: color }]}>
             <Text style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color, letterSpacing: 1 }}>
               {symbol.trim().toUpperCase() || 'TICKER'}
@@ -140,8 +143,9 @@ export function AddHoldingScreen({ navigation, route }: Props) {
               {pnl >= 0 ? '+' : ''}{pnl.toFixed(0)} ({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%) unrealised
             </Text>
           )}
-        </View>
+        </Animated.View>
 
+        <Animated.View style={formStyle}>
         {/* ── Symbol ── */}
         <Text style={[styles.label, { color: colors.text.muted, marginBottom: spacing[2] }]}>TICKER SYMBOL</Text>
         <View style={[styles.inputRow, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: symbol ? color : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[4] }]}>
@@ -268,6 +272,7 @@ export function AddHoldingScreen({ navigation, route }: Props) {
             {saving ? 'Saving…' : 'Add to Portfolio'}
           </Text>
         </Pressable>
+        </Animated.View>
       </ScrollView>
       <LoadingOverlay visible={saving} message="Adding holding…" />
     </KeyboardAvoidingView>

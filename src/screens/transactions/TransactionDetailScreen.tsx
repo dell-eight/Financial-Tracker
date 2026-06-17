@@ -1,4 +1,6 @@
 ﻿import React, { useMemo, useState } from 'react';
+import Animated from 'react-native-reanimated';
+import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import {
   View,
   Text,
@@ -238,6 +240,8 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
     );
   }
 
+  const [headerStyle, detailStyle, actionStyle] = useScreenAnimation(3);
+
   const prefix      = isTransfer ? '↔ ' : isExpense ? '-' : '+';
   const displayDate = formatDisplayDate(tx.date);
   const displayTime = formatTime(tx.time);
@@ -348,7 +352,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>
             ← Back
@@ -366,11 +370,12 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
         ) : (
           <View style={{ minWidth: 60 }} />
         )}
-      </View>
+      </Animated.View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: btmPad + spacing[8] }}>
 
         {/* ── Hero ────────────────────────────────────────────────────────────── */}
+        <Animated.View style={detailStyle}>
         <View style={[styles.hero, { paddingTop: spacing[6], paddingBottom: spacing[8] }]}>
           <View style={[styles.catCircle, { backgroundColor: catBg, borderRadius: borderRadius.full, width: 72, height: 72 }]}>
             <Text style={{ fontSize: 32, lineHeight: 40 }}>{tx.categoryIcon}</Text>
@@ -416,8 +421,10 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
             isLast
           />
         </View>
+        </Animated.View>
 
         {/* ── Delete button ────────────────────────────────────────────────────── */}
+        <Animated.View style={actionStyle}>
         <Pressable
           onPress={handleDelete}
           style={({ pressed }) => [
@@ -439,6 +446,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
             Delete Transaction
           </Text>
         </Pressable>
+        </Animated.View>
       </ScrollView>
       <LoadingOverlay visible={deleting} message="Deleting…" />
     </View>

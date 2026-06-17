@@ -6,10 +6,12 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
+import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import type { RootStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<RootStackParamList, 'QuickAddSheet'>;
@@ -50,6 +52,8 @@ export function QuickAddSheet({ navigation }: Props) {
 
   const bottomPad = insets.bottom > 0 ? insets.bottom : 24;
 
+  const [headerStyle, optionsStyle] = useScreenAnimation(2);
+
   return (
     <View style={styles.root}>
       {/* Dimmed backdrop — tap to close */}
@@ -74,6 +78,7 @@ export function QuickAddSheet({ navigation }: Props) {
         <View style={[styles.handle, { backgroundColor: colors.border.default }]} />
 
         {/* Title */}
+        <Animated.View style={headerStyle}>
         <Text
           style={{
             fontSize:   fontSize.headingMd,
@@ -86,9 +91,10 @@ export function QuickAddSheet({ navigation }: Props) {
         >
           Add Transaction
         </Text>
+        </Animated.View>
 
         {/* Options */}
-        <View style={[styles.options, { paddingHorizontal: spacing[5], gap: spacing[3] }]}>
+        <Animated.View style={[styles.options, { paddingHorizontal: spacing[5], gap: spacing[3] }, optionsStyle]}>
           {OPTIONS.map(opt => (
             <Pressable
               key={opt.key}
@@ -145,7 +151,7 @@ export function QuickAddSheet({ navigation }: Props) {
               <Text style={{ fontSize: 18, color: colors.text.muted }}>›</Text>
             </Pressable>
           ))}
-        </View>
+        </Animated.View>
 
         {/* Cancel */}
         <Pressable

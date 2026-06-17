@@ -12,6 +12,7 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
@@ -25,6 +26,7 @@ import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
 import { createAsset, deleteAsset, hasTransactionsForAccount } from '../../../services/finance.service';
 import type { AssetCategory, AssetItem } from '../../../types/models';
+import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'AssetsDetail'>;
 
@@ -166,6 +168,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
 
   const [formVisible, setFormVisible] = useState(false);
   const [mutating,    setMutating]    = useState(false);
+  const [headerStyle, listStyle] = useScreenAnimation(2);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -261,7 +264,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={[s.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[s.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
@@ -269,7 +272,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
         <Pressable onPress={() => setFormVisible(true)} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
           <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: colors.accent.primary }}>+ Add</Text>
         </Pressable>
-      </View>
+      </Animated.View>
 
       {isLoading || mutating ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -279,14 +282,14 @@ export function AssetsDetailScreen({ navigation }: Props) {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: btmPad + spacing[8] }}>
 
           {/* ── Hero ── */}
-          <View style={[shadows.hero, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.cardLg, marginHorizontal: spacing[5], padding: spacing[5], marginBottom: spacing[5] }]}>
+          <Animated.View style={[shadows.hero, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.cardLg, marginHorizontal: spacing[5], padding: spacing[5], marginBottom: spacing[5] }, listStyle]}>
             <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase' }}>
               Total Assets
             </Text>
             <Text style={{ fontSize: fontSize.displayXl, fontFamily: fontFamily.bold, color: colors.text.primary, marginTop: spacing[1], letterSpacing: -1 }}>
               {fmt(totalAssets)}
             </Text>
-          </View>
+          </Animated.View>
 
           {/* ── Empty state ── */}
           {(assets ?? []).length === 0 && (

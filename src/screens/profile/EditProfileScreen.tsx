@@ -13,6 +13,7 @@ import {
   FlatList,
   Image,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,6 +22,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useAuthStore } from '../../store/auth.store';
 import { getUserProfile, updateProfile, uploadAvatar, syncDisplayNameToAuth } from '../../services/auth.service';
+import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import type { HomeStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<HomeStackParamList, 'EditProfile'>;
@@ -161,6 +163,8 @@ export function EditProfileScreen({ navigation }: Props) {
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const email  = authUser?.email ?? '';
 
+  const [headerStyle, avatarStyle, formStyle] = useScreenAnimation(3);
+
   // Initialise from the profiles table (source of truth for profile fields).
   // Prefer the DB avatar_url; fall back to user_metadata for freshly set values.
   useEffect(() => {
@@ -250,7 +254,7 @@ export function EditProfileScreen({ navigation }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
@@ -263,11 +267,12 @@ export function EditProfileScreen({ navigation }: Props) {
             : <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.semiBold }}>Save</Text>
           }
         </Pressable>
-      </View>
+      </Animated.View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}>
 
         {/* Avatar */}
+        <Animated.View style={avatarStyle}>
         <Pressable onPress={handlePickAvatar} style={{ alignItems: 'center', marginVertical: spacing[6] }}>
           <View style={[styles.avatar, { backgroundColor: colors.accent.muted, borderColor: colors.accent.primary, overflow: 'hidden' }]}>
             {avatarUrl ? (
@@ -282,7 +287,9 @@ export function EditProfileScreen({ navigation }: Props) {
             {avatarUrl ? 'Change Photo' : 'Add Photo'}
           </Text>
         </Pressable>
+        </Animated.View>
 
+        <Animated.View style={formStyle}>
         {/* Display Name */}
         <FieldRow label="Display Name">
           <TextInput
@@ -372,6 +379,7 @@ export function EditProfileScreen({ navigation }: Props) {
             <Text style={{ fontSize: 18, color: colors.text.muted }}>›</Text>
           </Pressable>
         </FieldRow>
+        </Animated.View>
 
       </ScrollView>
 

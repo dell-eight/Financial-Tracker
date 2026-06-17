@@ -1,4 +1,6 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react';
+import Animated from 'react-native-reanimated';
+import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import {
   View,
   Text,
@@ -193,6 +195,8 @@ export function BudgetSetupWizard({ navigation }: Props) {
   function updateAlloc(key: string, value: string) {
     setAllocMap(prev => ({ ...prev, [key]: value }));
   }
+
+  const [headerStyle, contentStyle, footerStyle] = useScreenAnimation(3);
 
   // ── Step-local style sheets ────────────────────────────────────────────────
   const step1Styles = StyleSheet.create({
@@ -404,7 +408,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => step > 1 ? setStep(s => s - 1) : navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>
             {step > 1 ? '← Back' : 'Cancel'}
@@ -412,8 +416,9 @@ export function BudgetSetupWizard({ navigation }: Props) {
         </Pressable>
         <StepIndicator current={step} total={3} />
         <View style={{ minWidth: 60 }} />
-      </View>
+      </Animated.View>
 
+      <Animated.View style={[{ flex: 1 }, contentStyle]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -424,9 +429,10 @@ export function BudgetSetupWizard({ navigation }: Props) {
         {step === 2 && step2}
         {step === 3 && step3}
       </ScrollView>
+      </Animated.View>
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
-      <View style={[styles.footer, { paddingHorizontal: H_PAD, paddingBottom: btmPad + spacing[3], paddingTop: spacing[3], borderTopColor: colors.border.subtle }]}>
+      <Animated.View style={[styles.footer, { paddingHorizontal: H_PAD, paddingBottom: btmPad + spacing[3], paddingTop: spacing[3], borderTopColor: colors.border.subtle }, footerStyle]}>
         {saveError && step === 3 && (
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.expense, textAlign: 'center', marginBottom: spacing[3] }}>
             {saveError}
@@ -453,7 +459,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
             {step < 3 ? 'Continue' : 'Save Budget'}
           </Text>
         </Pressable>
-      </View>
+      </Animated.View>
     </KeyboardAvoidingView>
   );
 }

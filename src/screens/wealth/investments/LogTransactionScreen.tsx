@@ -9,6 +9,7 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
@@ -21,6 +22,7 @@ import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { InvestmentHolding } from '../../../types/models';
+import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'LogTransaction'>;
 
@@ -47,6 +49,8 @@ export function LogTransactionScreen({ navigation, route }: Props) {
     () => holdings?.find(h => h.id === holdingId),
     [holdings, holdingId],
   );
+
+  const [headerStyle, toggleStyle, formStyle] = useScreenAnimation(3);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -99,13 +103,13 @@ export function LogTransactionScreen({ navigation, route }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Cancel</Text>
         </Pressable>
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>Log Trade</Text>
         <View style={{ minWidth: 60 }} />
-      </View>
+      </Animated.View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -115,7 +119,7 @@ export function LogTransactionScreen({ navigation, route }: Props) {
       >
         {/* ── Holding context ── */}
         {holding && (
-          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: H_PAD, padding: spacing[4], marginBottom: spacing[5] }]}>
+          <Animated.View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: H_PAD, padding: spacing[4], marginBottom: spacing[5] }, toggleStyle]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
               <View style={{ backgroundColor: holding.color + '20', borderRadius: borderRadius.lg, paddingHorizontal: spacing[3], paddingVertical: spacing[2] }}>
                 <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: holding.color, letterSpacing: 1 }}>{holding.symbol}</Text>
@@ -127,11 +131,11 @@ export function LogTransactionScreen({ navigation, route }: Props) {
                 </Text>
               </View>
             </View>
-          </View>
+          </Animated.View>
         )}
 
         {/* ── Buy / Sell toggle ── */}
-        <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }}>
+        <Animated.View style={[{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }, formStyle]}>
           <View style={[styles.toggle, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full, padding: 3 }]}>
             {(['buy', 'sell'] as TxType[]).map(t => {
               const active = txType === t;
@@ -149,7 +153,7 @@ export function LogTransactionScreen({ navigation, route }: Props) {
               );
             })}
           </View>
-        </View>
+        </Animated.View>
 
         {/* ── Shares ── */}
         <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[4] }}>

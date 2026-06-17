@@ -8,6 +8,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -18,6 +19,7 @@ import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useNetWorthHistory } from '../../hooks/queries/useAnalytics';
 import type { WealthStackParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
+import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'WealthMain'>;
 
@@ -429,6 +431,7 @@ export function WealthScreen({ navigation }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
 
   const [activeTab, setActiveTab] = useState<SubTab>('networth');
+  const [headerStyle, tabsStyle, contentStyle] = useScreenAnimation(3);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
 
@@ -437,14 +440,14 @@ export function WealthScreen({ navigation }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[3], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[3], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, headerStyle]}>
         <Text style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: colors.text.primary, letterSpacing: -0.4 }}>
           Wealth
         </Text>
-      </View>
+      </Animated.View>
 
       {/* ── Sub-tab bar ── */}
-      <View style={[styles.subTabBar, { paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.subTabBar, { paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, tabsStyle]}>
         <View style={[styles.subTabTrack, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full, padding: 3 }]}>
           {SUB_TABS.map(tab => {
             const active = activeTab === tab.key;
@@ -475,14 +478,14 @@ export function WealthScreen({ navigation }: Props) {
             );
           })}
         </View>
-      </View>
+      </Animated.View>
 
       {/* ── Sub-tab content ── */}
-      <View style={{ flex: 1 }}>
+      <Animated.View style={[{ flex: 1 }, contentStyle]}>
         {activeTab === 'networth'    && <NetWorthOverview       navigation={navigation} />}
         {activeTab === 'savings'     && <SavingsOverview        navigation={navigation} />}
         {activeTab === 'investments' && <InvestmentsOverview    navigation={navigation} />}
-      </View>
+      </Animated.View>
     </View>
   );
 }

@@ -9,6 +9,7 @@ import {
   Platform,
   StyleSheet,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
@@ -21,6 +22,7 @@ import type { WealthStackParamList } from '../../../navigation/types';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import { useCurrency, formatFull } from '../../../utils/currency';
 import { useAppStore } from '../../../store/app.store';
+import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'CreateGoal'>;
 
@@ -52,6 +54,7 @@ export function CreateGoalScreen({ navigation }: Props) {
   const [color,     setColor]     = useState(GOAL_COLORS[0].value);
   const [saving,    setSaving]    = useState(false);
   const [error,     setError]     = useState<string | null>(null);
+  const [headerStyle, pickersStyle, formStyle] = useScreenAnimation(3);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -88,7 +91,7 @@ export function CreateGoalScreen({ navigation }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>Cancel</Text>
         </Pressable>
@@ -103,7 +106,7 @@ export function CreateGoalScreen({ navigation }: Props) {
             {saving ? '…' : 'Save'}
           </Text>
         </Pressable>
-      </View>
+      </Animated.View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -112,7 +115,7 @@ export function CreateGoalScreen({ navigation }: Props) {
         contentContainerStyle={{ paddingHorizontal: H_PAD, paddingBottom: btmPad + spacing[6] }}
       >
         {/* ── Preview circle ── */}
-        <View style={{ alignItems: 'center', marginVertical: spacing[6] }}>
+        <Animated.View style={[{ alignItems: 'center', marginVertical: spacing[6] }, pickersStyle]}>
           <View style={[styles.previewCircle, { backgroundColor: color + '20', borderRadius: borderRadius.full, width: 88, height: 88, borderWidth: 3, borderColor: color }]}>
             <Text style={{ fontSize: 40, lineHeight: 48 }}>{emoji}</Text>
           </View>
@@ -124,114 +127,116 @@ export function CreateGoalScreen({ navigation }: Props) {
               Target: {fmt(parsed)}
             </Text>
           )}
-        </View>
+        </Animated.View>
 
-        {/* ── Goal name ── */}
-        <Text style={[styles.label, { fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }]}>
-          GOAL NAME
-        </Text>
-        <View style={[styles.inputWrap, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: name ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[5] }]}>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="e.g. House Down Payment"
-            placeholderTextColor={colors.text.muted}
-            maxLength={40}
-            returnKeyType="next"
-            style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }}
-          />
-        </View>
-
-        {/* ── Target amount ── */}
-        <Text style={[styles.label, { fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }]}>
-          TARGET AMOUNT
-        </Text>
-        <View style={[styles.inputWrap, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: parsed > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[5] }]}>
-          <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, fontFamily: fontFamily.medium, marginRight: 4 }}>{symbol}</Text>
-          <TextInput
-            value={amountStr}
-            onChangeText={v => {
-              const c = v.replace(/[^0-9.]/g, '');
-              if (c.split('.').length <= 2) setAmountStr(c);
-            }}
-            placeholder="0"
-            placeholderTextColor={colors.text.muted}
-            keyboardType="decimal-pad"
-            style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }}
-          />
-        </View>
-
-        {/* ── Emoji picker ── */}
-        <Text style={[styles.label, { fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }]}>
-          ICON
-        </Text>
-        <View style={[styles.emojiGrid, { marginBottom: spacing[5] }]}>
-          {EMOJIS.map(e => (
-            <Pressable
-              key={e}
-              onPress={() => { Haptics.selectionAsync(); setEmoji(e); }}
-              style={[styles.emojiTile, {
-                backgroundColor: emoji === e ? color + '22' : colors.bg.surface,
-                borderRadius:    borderRadius.lg,
-                borderWidth:     1,
-                borderColor:     emoji === e ? color : colors.border.subtle,
-                width:           52,
-                height:          52,
-              }]}
-            >
-              <Text style={{ fontSize: 24, lineHeight: 30 }}>{e}</Text>
-            </Pressable>
-          ))}
-        </View>
-
-        {/* ── Color picker ── */}
-        <Text style={[styles.label, { fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }]}>
-          COLOR
-        </Text>
-        <View style={[styles.colorRow, { marginBottom: spacing[6] }]}>
-          {GOAL_COLORS.map(gc => (
-            <Pressable
-              key={gc.value}
-              onPress={() => { Haptics.selectionAsync(); setColor(gc.value); }}
-              style={[styles.colorDot, {
-                backgroundColor: gc.value,
-                borderRadius:    borderRadius.full,
-                width:           36,
-                height:          36,
-                borderWidth:     color === gc.value ? 3 : 0,
-                borderColor:     '#FFFFFF',
-                transform:       [{ scale: color === gc.value ? 1.15 : 1 }],
-              }]}
+        <Animated.View style={formStyle}>
+          {/* ── Goal name ── */}
+          <Text style={[styles.label, { fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }]}>
+            GOAL NAME
+          </Text>
+          <View style={[styles.inputWrap, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: name ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[5] }]}>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="e.g. House Down Payment"
+              placeholderTextColor={colors.text.muted}
+              maxLength={40}
+              returnKeyType="next"
+              style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }}
             />
-          ))}
-        </View>
+          </View>
 
-        {/* ── Error message ── */}
-        {error && (
-          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.expense, textAlign: 'center', marginBottom: spacing[3] }}>
-            {error}
+          {/* ── Target amount ── */}
+          <Text style={[styles.label, { fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }]}>
+            TARGET AMOUNT
           </Text>
-        )}
+          <View style={[styles.inputWrap, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: parsed > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[5] }]}>
+            <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, fontFamily: fontFamily.medium, marginRight: 4 }}>{symbol}</Text>
+            <TextInput
+              value={amountStr}
+              onChangeText={v => {
+                const c = v.replace(/[^0-9.]/g, '');
+                if (c.split('.').length <= 2) setAmountStr(c);
+              }}
+              placeholder="0"
+              placeholderTextColor={colors.text.muted}
+              keyboardType="decimal-pad"
+              style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }}
+            />
+          </View>
 
-        {/* ── Save button ── */}
-        <Pressable
-          onPress={handleSave}
-          disabled={!canSave || saving}
-          style={({ pressed }) => [
-            styles.saveBtn,
-            {
-              backgroundColor: (!canSave || saving)
-                ? colors.bg.surfaceMuted
-                : pressed ? colors.accent.pressed : colors.accent.primary,
-              borderRadius: borderRadius.button,
-              height: 52,
-            },
-          ]}
-        >
-          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? '#FFFFFF' : colors.text.muted }}>
-            {saving ? 'Saving…' : 'Create Goal'}
+          {/* ── Emoji picker ── */}
+          <Text style={[styles.label, { fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }]}>
+            ICON
           </Text>
-        </Pressable>
+          <View style={[styles.emojiGrid, { marginBottom: spacing[5] }]}>
+            {EMOJIS.map(e => (
+              <Pressable
+                key={e}
+                onPress={() => { Haptics.selectionAsync(); setEmoji(e); }}
+                style={[styles.emojiTile, {
+                  backgroundColor: emoji === e ? color + '22' : colors.bg.surface,
+                  borderRadius:    borderRadius.lg,
+                  borderWidth:     1,
+                  borderColor:     emoji === e ? color : colors.border.subtle,
+                  width:           52,
+                  height:          52,
+                }]}
+              >
+                <Text style={{ fontSize: 24, lineHeight: 30 }}>{e}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          {/* ── Color picker ── */}
+          <Text style={[styles.label, { fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }]}>
+            COLOR
+          </Text>
+          <View style={[styles.colorRow, { marginBottom: spacing[6] }]}>
+            {GOAL_COLORS.map(gc => (
+              <Pressable
+                key={gc.value}
+                onPress={() => { Haptics.selectionAsync(); setColor(gc.value); }}
+                style={[styles.colorDot, {
+                  backgroundColor: gc.value,
+                  borderRadius:    borderRadius.full,
+                  width:           36,
+                  height:          36,
+                  borderWidth:     color === gc.value ? 3 : 0,
+                  borderColor:     '#FFFFFF',
+                  transform:       [{ scale: color === gc.value ? 1.15 : 1 }],
+                }]}
+              />
+            ))}
+          </View>
+
+          {/* ── Error message ── */}
+          {error && (
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.expense, textAlign: 'center', marginBottom: spacing[3] }}>
+              {error}
+            </Text>
+          )}
+
+          {/* ── Save button ── */}
+          <Pressable
+            onPress={handleSave}
+            disabled={!canSave || saving}
+            style={({ pressed }) => [
+              styles.saveBtn,
+              {
+                backgroundColor: (!canSave || saving)
+                  ? colors.bg.surfaceMuted
+                  : pressed ? colors.accent.pressed : colors.accent.primary,
+                borderRadius: borderRadius.button,
+                height: 52,
+              },
+            ]}
+          >
+            <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: (canSave && !saving) ? '#FFFFFF' : colors.text.muted }}>
+              {saving ? 'Saving…' : 'Create Goal'}
+            </Text>
+          </Pressable>
+        </Animated.View>
       </ScrollView>
       <LoadingOverlay visible={saving} message="Creating goal…" />
     </KeyboardAvoidingView>

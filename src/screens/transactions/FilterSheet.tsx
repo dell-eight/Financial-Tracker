@@ -1,4 +1,6 @@
 ﻿import React, { useState } from 'react';
+import Animated from 'react-native-reanimated';
+import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import {
   View,
   Text,
@@ -182,12 +184,14 @@ export function FilterSheet({ navigation, route }: Props) {
 
   const H_PAD = spacing[5];
 
+  const [headerStyle, contentStyle] = useScreenAnimation(2);
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3], borderBottomColor: colors.border.subtle }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3], borderBottomColor: colors.border.subtle }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>
             ← Back
@@ -205,8 +209,9 @@ export function FilterSheet({ navigation, route }: Props) {
         ) : (
           <View style={{ minWidth: 60 }} />
         )}
-      </View>
+      </Animated.View>
 
+      <Animated.View style={[{ flex: 1 }, contentStyle]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -278,6 +283,7 @@ export function FilterSheet({ navigation, route }: Props) {
           </View>
         )}
       </ScrollView>
+      </Animated.View>
 
       {/* ── Apply button ────────────────────────────────────────────────────── */}
       <View style={[styles.applyWrap, { paddingHorizontal: H_PAD, paddingBottom: btmPad + spacing[3], paddingTop: spacing[3], borderTopColor: colors.border.subtle }]}>

@@ -1,4 +1,6 @@
 ﻿import React, { useState } from 'react';
+import Animated from 'react-native-reanimated';
+import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import {
   View,
   Text,
@@ -158,6 +160,8 @@ export function AddExpenseScreen({ navigation }: Props) {
     }
   }
 
+  const [headerStyle, categoryStyle, formStyle] = useScreenAnimation(3);
+
   const TILE_GAP  = spacing[2];
   const H_PAD     = spacing[5];
   const TILE_SIZE = (SCREEN_W - H_PAD * 2 - TILE_GAP * 3) / 4;
@@ -170,7 +174,7 @@ export function AddExpenseScreen({ navigation }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.navigate('TransactionList', undefined)} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>
             Cancel
@@ -184,7 +188,7 @@ export function AddExpenseScreen({ navigation }: Props) {
             {saving ? '…' : 'Save'}
           </Text>
         </Pressable>
-      </View>
+      </Animated.View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -193,7 +197,7 @@ export function AddExpenseScreen({ navigation }: Props) {
         contentContainerStyle={{ paddingBottom: spacing[4] }}
       >
         {/* ── Amount ──────────────────────────────────────────────────────────── */}
-        <View style={[styles.amountSection, { paddingVertical: spacing[5], paddingHorizontal: H_PAD }]}>
+        <Animated.View style={[styles.amountSection, { paddingVertical: spacing[5], paddingHorizontal: H_PAD }, categoryStyle]}>
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }}>
             AMOUNT
           </Text>
@@ -218,10 +222,10 @@ export function AddExpenseScreen({ navigation }: Props) {
           </View>
           {/* Underline */}
           <View style={{ width: 160, height: 2, backgroundColor: amountStr ? colors.expense : colors.border.subtle, borderRadius: 1, marginTop: spacing[2] }} />
-        </View>
+        </Animated.View>
 
         {/* ── Category ────────────────────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }}>
+        <Animated.View style={[{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }, formStyle]}>
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }}>
             CATEGORY
           </Text>
@@ -265,9 +269,10 @@ export function AddExpenseScreen({ navigation }: Props) {
               );
             })}
           </View>
-        </View>
+        </Animated.View>
 
         {/* ── Deduct from Account ─────────────────────────────────────────────── */}
+        <Animated.View style={formStyle}>
         <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }}>
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }}>
             DEDUCT FROM ACCOUNT
@@ -426,6 +431,7 @@ export function AddExpenseScreen({ navigation }: Props) {
             </View>
           </View>
         </View>
+        </Animated.View>
       </ScrollView>
 
       {/* ── Save button ─────────────────────────────────────────────────────── */}

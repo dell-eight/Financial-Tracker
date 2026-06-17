@@ -8,6 +8,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
@@ -21,6 +22,7 @@ import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { SavingsGoal } from '../../../types/models';
+import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'GoalDetail'>;
 
@@ -106,6 +108,7 @@ export function GoalDetailScreen({ navigation, route }: Props) {
   const queryClient = useQueryClient();
   const { goalId }  = route.params;
   const [deleting, setDeleting] = useState(false);
+  const [headerStyle, progressStyle, listStyle] = useScreenAnimation(3);
 
   const { data: goals } = useSavingsGoals();
   const goal = useMemo<SavingsGoal | undefined>(
@@ -179,7 +182,7 @@ export function GoalDetailScreen({ navigation, route }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={[s.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[s.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
@@ -189,12 +192,12 @@ export function GoalDetailScreen({ navigation, route }: Props) {
         <Pressable onPress={handleDelete} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.expense }}>Delete</Text>
         </Pressable>
-      </View>
+      </Animated.View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: btmPad + spacing[6] }}>
 
         {/* ── Hero ── */}
-        <View style={[s.hero, { paddingVertical: spacing[6], paddingHorizontal: spacing[5] }]}>
+        <Animated.View style={[s.hero, { paddingVertical: spacing[6], paddingHorizontal: spacing[5] }, progressStyle]}>
           <CircleProgress ratio={ratio} color={goal.color} emoji={goal.emoji} />
 
           <Text style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: colors.text.primary, marginTop: spacing[4], textAlign: 'center' }}>
@@ -244,7 +247,7 @@ export function GoalDetailScreen({ navigation, route }: Props) {
               </Text>
             )}
           </View>
-        </View>
+        </Animated.View>
 
         {/* ── CTA Buttons ── */}
         <View style={[s.ctaRow, { paddingHorizontal: spacing[5], gap: spacing[3], marginBottom: spacing[5] }]}>
@@ -271,25 +274,27 @@ export function GoalDetailScreen({ navigation, route }: Props) {
         </View>
 
         {/* ── Contribution history ── */}
-        <View style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}>
-          <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
-            Contribution History
-          </Text>
-        </View>
-        {contributions.length === 0 ? (
-          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], padding: spacing[5], alignItems: 'center' }]}>
-            <Text style={{ fontSize: 32, marginBottom: spacing[2] }}>💰</Text>
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center' }}>
-              {'No contributions yet. Tap "+ Add Money" to start saving!'}
+        <Animated.View style={listStyle}>
+          <View style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}>
+            <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
+              Contribution History
             </Text>
           </View>
-        ) : (
-          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], overflow: 'hidden' }]}>
-            {contributions.map((c, i) => (
-              <ContributionRow key={c.id} c={c} isLast={i === contributions.length - 1} />
-            ))}
-          </View>
-        )}
+          {contributions.length === 0 ? (
+            <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], padding: spacing[5], alignItems: 'center' }]}>
+              <Text style={{ fontSize: 32, marginBottom: spacing[2] }}>💰</Text>
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center' }}>
+                {'No contributions yet. Tap "+ Add Money" to start saving!'}
+              </Text>
+            </View>
+          ) : (
+            <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], overflow: 'hidden' }]}>
+              {contributions.map((c, i) => (
+                <ContributionRow key={c.id} c={c} isLast={i === contributions.length - 1} />
+              ))}
+            </View>
+          )}
+        </Animated.View>
       </ScrollView>
       <LoadingOverlay visible={deleting} message="Deleting goal…" />
     </View>

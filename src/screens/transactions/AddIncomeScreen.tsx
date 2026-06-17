@@ -1,4 +1,6 @@
 ﻿import React, { useState } from 'react';
+import Animated from 'react-native-reanimated';
+import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import {
   View,
   Text,
@@ -147,6 +149,8 @@ export function AddIncomeScreen({ navigation }: Props) {
 
   const H_PAD = spacing[5];
 
+  const [headerStyle, categoryStyle, formStyle] = useScreenAnimation(3);
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -155,7 +159,7 @@ export function AddIncomeScreen({ navigation }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.navigate('TransactionList', undefined)} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>
             Cancel
@@ -169,7 +173,7 @@ export function AddIncomeScreen({ navigation }: Props) {
             {saving ? '…' : 'Save'}
           </Text>
         </Pressable>
-      </View>
+      </Animated.View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -178,7 +182,7 @@ export function AddIncomeScreen({ navigation }: Props) {
         contentContainerStyle={{ paddingBottom: spacing[4] }}
       >
         {/* ── Amount ──────────────────────────────────────────────────────────── */}
-        <View style={[styles.amountSection, { paddingVertical: spacing[5], paddingHorizontal: H_PAD }]}>
+        <Animated.View style={[styles.amountSection, { paddingVertical: spacing[5], paddingHorizontal: H_PAD }, categoryStyle]}>
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }}>
             AMOUNT
           </Text>
@@ -196,10 +200,10 @@ export function AddIncomeScreen({ navigation }: Props) {
             />
           </View>
           <View style={{ width: 160, height: 2, backgroundColor: amountStr ? colors.income : colors.border.subtle, borderRadius: 1, marginTop: spacing[2] }} />
-        </View>
+        </Animated.View>
 
         {/* ── Income source ────────────────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }}>
+        <Animated.View style={[{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }, formStyle]}>
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }}>
             SOURCE
           </Text>
@@ -249,9 +253,10 @@ export function AddIncomeScreen({ navigation }: Props) {
               );
             })}
           </View>
-        </View>
+        </Animated.View>
 
         {/* ── Deposit to Account ──────────────────────────────────────────────── */}
+        <Animated.View style={formStyle}>
         <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }}>
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }}>
             DEPOSIT TO ACCOUNT
@@ -411,6 +416,7 @@ export function AddIncomeScreen({ navigation }: Props) {
             </View>
           </View>
         </View>
+        </Animated.View>
       </ScrollView>
 
       {/* ── Save button ─────────────────────────────────────────────────────── */}

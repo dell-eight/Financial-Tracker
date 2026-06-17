@@ -8,6 +8,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
@@ -20,6 +21,7 @@ import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { InvestmentHolding } from '../../../types/models';
+import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'HoldingDetail'>;
 
@@ -81,6 +83,7 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
   const queryClient = useQueryClient();
   const { holdingId } = route.params;
   const [deleting, setDeleting] = useState(false);
+  const [headerStyle, statsStyle, detailsStyle] = useScreenAnimation(3);
 
   const { data: holdings } = useInvestments();
   const holding = useMemo<InvestmentHolding | undefined>(
@@ -153,7 +156,7 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={[s.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[s.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
@@ -163,12 +166,12 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
         <Pressable onPress={handleDelete} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.expense }}>Remove</Text>
         </Pressable>
-      </View>
+      </Animated.View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: btmPad + spacing[6] }}>
 
         {/* ── Hero ── */}
-        <View style={[s.hero, { paddingVertical: spacing[5], paddingHorizontal: spacing[5] }]}>
+        <Animated.View style={[s.hero, { paddingVertical: spacing[5], paddingHorizontal: spacing[5] }, statsStyle]}>
           <View style={[s.symbolBadge, { backgroundColor: holding.color + '20', borderRadius: borderRadius.lg, paddingHorizontal: spacing[4], paddingVertical: spacing[2] }]}>
             <Text style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: holding.color, letterSpacing: 1 }}>
               {holding.symbol}
@@ -195,13 +198,13 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
               ({isPositive ? '+' : ''}{pnlPct.toFixed(2)}%)
             </Text>
           </View>
-        </View>
+        </Animated.View>
 
         {/* ── 7-day chart ── */}
-        <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], padding: spacing[4], marginBottom: spacing[4] }]}>
+        <Animated.View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], padding: spacing[4], marginBottom: spacing[4] }, detailsStyle]}>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.muted, marginBottom: spacing[3] }}>7-DAY TREND</Text>
           <PriceChart prices={priceBars} color={holding.color} />
-        </View>
+        </Animated.View>
 
         {/* ── Position stats ── */}
         <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], paddingHorizontal: spacing[4], marginBottom: spacing[4] }]}>

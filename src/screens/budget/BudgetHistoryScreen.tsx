@@ -1,4 +1,6 @@
 ﻿import React, { useMemo } from 'react';
+import Animated from 'react-native-reanimated';
+import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import {
   View,
   Text,
@@ -152,12 +154,14 @@ export function BudgetHistoryScreen({ navigation }: Props) {
   const bestMonth   = useMemo(() => history.reduce((best, h) => h.spent < best.spent ? h : best), [history]);
   const worstMonth  = useMemo(() => history.reduce((worst, h) => h.spent > worst.spent ? h : worst), [history]);
 
+  const [headerStyle, contentStyle] = useScreenAnimation(2);
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
@@ -165,8 +169,9 @@ export function BudgetHistoryScreen({ navigation }: Props) {
           Budget History
         </Text>
         <View style={{ minWidth: 60 }} />
-      </View>
+      </Animated.View>
 
+      <Animated.View style={[{ flex: 1 }, contentStyle]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: btmPad + spacing[8] }}>
 
         {/* ── Summary stats ────────────────────────────────────────────────────── */}
@@ -269,6 +274,7 @@ export function BudgetHistoryScreen({ navigation }: Props) {
           </View>
         </View>
       </ScrollView>
+      </Animated.View>
     </View>
   );
 }

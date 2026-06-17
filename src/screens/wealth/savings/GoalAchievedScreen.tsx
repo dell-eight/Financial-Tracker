@@ -7,6 +7,16 @@ import {
   Animated,
   Platform,
 } from 'react-native';
+import ReAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+  interpolate,
+  Easing,
+} from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -69,27 +79,44 @@ export function GoalAchievedScreen({ navigation, route }: Props) {
   const btmPad    = insets.bottom > 0 ? insets.bottom : 24;
   const goalColor = goal?.color ?? colors.income;
 
-  // Hero entrance animations
-  const trophyScale   = useRef(new Animated.Value(0)).current;
-  const trophyOpacity = useRef(new Animated.Value(0)).current;
-  const textOpacity   = useRef(new Animated.Value(0)).current;
-  const btnOpacity    = useRef(new Animated.Value(0)).current;
+  // Hero entrance animations — Reanimated (runs on UI thread)
+  const trophyEntrance = useSharedValue(0);  // 0→1 fade+scale in
+  const trophyScale    = useSharedValue(1);  // pulse after entrance
+  const textAnim       = useSharedValue(0);
+  const btnAnim        = useSharedValue(0);
 
+  const trophyStyle = useAnimatedStyle(() => ({
+    opacity:   trophyEntrance.value,
+    transform: [{
+      scale: interpolate(trophyEntrance.value, [0, 1], [0.4, 1]) * trophyScale.value,
+    }],
+  }));
+  const textStyle = useAnimatedStyle(() => ({
+    opacity:   textAnim.value,
+    transform: [{ translateY: interpolate(textAnim.value, [0, 1], [16, 0]) }],
+  }));
+  const btnStyle = useAnimatedStyle(() => ({
+    opacity:   btnAnim.value,
+    transform: [{ translateY: interpolate(btnAnim.value, [0, 1], [12, 0]) }],
+  }));
+
+  // Legacy Animated kept for confetti only — Math.random() cannot run in Reanimated worklets
   const particles = useParticles();
 
   useEffect(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Entrance sequence
-    Animated.sequence([
-      Animated.delay(100),
-      Animated.parallel([
-        Animated.spring(trophyScale, { toValue: 1, useNativeDriver: true, friction: 5, tension: 80 }),
-        Animated.timing(trophyOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
-      ]),
-      Animated.timing(textOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-      Animated.timing(btnOpacity,  { toValue: 1, duration: 300, useNativeDriver: true }),
-    ]).start();
+    const e = Easing.out(Easing.cubic);
+
+    // Trophy entrance, then a bounce pulse once it lands
+    trophyEntrance.value = withDelay(100, withTiming(1, { duration: 350, easing: e }));
+    trophyScale.value    = withDelay(550, withSequence(
+      withSpring(1.25, { damping: 8, stiffness: 200 }),
+      withSpring(1.0,  { damping: 14, stiffness: 180 }),
+    ));
+
+    textAnim.value = withDelay(420, withTiming(1, { duration: 380, easing: e }));
+    btnAnim.value  = withDelay(620, withTiming(1, { duration: 320, easing: e }));
 
     // Confetti burst
     particles.forEach(p => {
@@ -139,14 +166,14 @@ export function GoalAchievedScreen({ navigation, route }: Props) {
       <View style={[styles.content, { paddingTop: topPad, paddingBottom: btmPad, paddingHorizontal: spacing[6] }]}>
 
         {/* Trophy */}
-        <Animated.View style={{ transform: [{ scale: trophyScale }], opacity: trophyOpacity, alignItems: 'center' }}>
+        <ReAnimated.View style={[{ alignItems: 'center' }, trophyStyle]}>
           <View style={[styles.trophyCircle, { backgroundColor: goalColor + '20', borderRadius: borderRadius.full, width: 120, height: 120, borderWidth: 4, borderColor: goalColor }]}>
             <Text style={{ fontSize: 56, lineHeight: 68 }}>🏆</Text>
           </View>
-        </Animated.View>
+        </ReAnimated.View>
 
         {/* Text block */}
-        <Animated.View style={{ opacity: textOpacity, alignItems: 'center', marginTop: spacing[6] }}>
+        <ReAnimated.View style={[{ alignItems: 'center', marginTop: spacing[6] }, textStyle]}>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: goalColor, letterSpacing: 2, textTransform: 'uppercase' }}>
             Goal Achieved!
           </Text>
@@ -166,10 +193,10 @@ export function GoalAchievedScreen({ navigation, route }: Props) {
               {fmt(goal?.targetAmount ?? 0)}
             </Text>
           </View>
-        </Animated.View>
+        </ReAnimated.View>
 
         {/* Buttons */}
-        <Animated.View style={{ opacity: btnOpacity, width: '100%', gap: spacing[3], marginTop: spacing[8] }}>
+        <ReAnimated.View style={[{ width: '100%', gap: spacing[3], marginTop: spacing[8] }, btnStyle]}>
           <Pressable
             onPress={() => {
               Haptics.selectionAsync();
@@ -201,7 +228,7 @@ export function GoalAchievedScreen({ navigation, route }: Props) {
               Set a New Goal
             </Text>
           </Pressable>
-        </Animated.View>
+        </ReAnimated.View>
       </View>
     </View>
   );

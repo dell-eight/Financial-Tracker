@@ -2,6 +2,7 @@
 import {
   View, Text, Pressable, FlatList, StyleSheet, Platform,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +10,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useAppStore } from '../../store/app.store';
 import { CURRENCIES, getCurrencySymbol } from '../../utils/currency';
+import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import type { HomeStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<HomeStackParamList, 'CurrencyPicker'>;
@@ -24,6 +26,8 @@ export function CurrencyPickerScreen({ navigation }: Props) {
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
 
+  const [headerStyle, listStyle] = useScreenAnimation(2);
+
   function handleSelect(code: string) {
     Haptics.selectionAsync();
     setCurrency(code);
@@ -35,7 +39,7 @@ export function CurrencyPickerScreen({ navigation }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
@@ -43,8 +47,9 @@ export function CurrencyPickerScreen({ navigation }: Props) {
           Currency
         </Text>
         <View style={{ minWidth: 60 }} />
-      </View>
+      </Animated.View>
 
+      <Animated.View style={listStyle}>
       <FlatList
         data={CURRENCIES}
         keyExtractor={item => item.code}
@@ -84,6 +89,7 @@ export function CurrencyPickerScreen({ navigation }: Props) {
           );
         }}
       />
+      </Animated.View>
     </View>
   );
 }

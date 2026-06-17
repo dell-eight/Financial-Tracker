@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -15,6 +16,7 @@ import { useInvestments } from '../../../hooks/queries/useInvestments';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
 import type { InvestmentHolding } from '../../../types/models';
+import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'InvestmentAccountDetail'>;
 
@@ -28,6 +30,8 @@ export function InvestmentAccountDetailScreen({ navigation, route }: Props) {
   const { accountId } = route.params;
 
   const { data: allHoldings } = useInvestments();
+
+  const [headerStyle, holdingsStyle] = useScreenAnimation(2);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -50,7 +54,7 @@ export function InvestmentAccountDetailScreen({ navigation, route }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
+      <Animated.View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }, headerStyle]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
@@ -60,12 +64,12 @@ export function InvestmentAccountDetailScreen({ navigation, route }: Props) {
         <Pressable onPress={() => navigation.push('AddHolding', { accountId })} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.accent.primary }}>+ Add</Text>
         </Pressable>
-      </View>
+      </Animated.View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: btmPad + spacing[8] }}>
 
         {/* ── Account hero ── */}
-        <View style={[shadows.hero, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.cardLg, marginHorizontal: spacing[5], padding: spacing[5], marginBottom: spacing[5] }]}>
+        <Animated.View style={[shadows.hero, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.cardLg, marginHorizontal: spacing[5], padding: spacing[5], marginBottom: spacing[5] }, holdingsStyle]}>
           <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, textTransform: 'uppercase' }}>
             Portfolio Value
           </Text>
@@ -93,7 +97,7 @@ export function InvestmentAccountDetailScreen({ navigation, route }: Props) {
               <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginTop: 2 }}>{holdings.length}</Text>
             </View>
           </View>
-        </View>
+        </Animated.View>
 
         {/* ── Holdings list ── */}
         <View style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}>
