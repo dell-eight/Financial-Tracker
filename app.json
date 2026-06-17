@@ -43,7 +43,6 @@
     },
     "android": {
       "package": "com.financialtracker.app",
-      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#755DEF"
@@ -80,8 +79,15 @@
       "privacyPolicyUrl": "https://financialtracker.app/privacy",
       "supportUrl": "https://financialtracker.app/support",
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "a642a2a2-a884-4108-8286-a018ff817a6c"
       }
+    },
+    "owner": "zzerooo",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a642a2a2-a884-4108-8286-a018ff817a6c"
     }
   }
 }
