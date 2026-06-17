@@ -43,3 +43,5 @@ yarn-error.*
 google-service-account.json
 *.mobileprovision
 *.p12
+
+/docs

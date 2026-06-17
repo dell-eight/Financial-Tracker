@@ -5,6 +5,8 @@
 
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase, handleSupabaseError } from '../lib/supabase';
 import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
@@ -237,17 +239,69 @@ export async function resetPassword(email: string) {
 }
 
 /**
- * Sync display_name to Supabase Auth user_metadata so that any component
- * reading user.user_metadata.display_name (Dashboard, ProfileScreen) updates
- * immediately when the auth store is refreshed with the returned user.
+ * Upload a local image URI to the Supabase Storage `avatars` bucket.
+ * Returns a cache-busted public URL so the UI reflects the new image
+ * immediately even though the storage path is the same on re-upload.
+ *
+ * Requires an `avatars` bucket in Supabase Storage set to **public**.
+ */
+export async function uploadAvatar(
+  userId: string,
+  fileUri: string,
+): Promise<{ url: string | null; error: string | null }> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { url: null, error: 'Not authenticated' };
+
+    // Resize to 400px wide and convert to WebP natively before upload.
+    // Runs on platform image APIs — fast (~100ms) and doesn't block JS.
+    // A 2.5MB JPEG becomes ~20-40KB WebP at this size/quality.
+    const manipulated = await ImageManipulator.manipulateAsync(
+      fileUri,
+      [{ resize: { width: 400 } }],
+      { format: 'webp' as any, compress: 0.8 },
+    );
+
+    const path = `${userId}/avatar.webp`;
+
+    const base64 = await FileSystem.readAsStringAsync(manipulated.uri, {
+      encoding: 'base64' as any,
+    });
+    const binaryStr = globalThis.atob(base64);
+    const buf  = new ArrayBuffer(binaryStr.length);
+    const view = new Uint8Array(buf);
+    for (let i = 0; i < binaryStr.length; i++) view[i] = binaryStr.charCodeAt(i);
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(path, buf, { contentType: 'image/webp', upsert: true });
+
+    if (uploadError) return { url: null, error: uploadError.message };
+
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path);
+    return { url: `${data.publicUrl}?t=${Date.now()}`, error: null };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : JSON.stringify(err);
+    return { url: null, error: msg };
+  }
+}
+
+/**
+ * Sync display_name (and optionally avatar_url) to Supabase Auth user_metadata
+ * so that Dashboard and ProfileScreen update immediately without a re-login.
  */
 export async function syncDisplayNameToAuth(
   displayName: string,
+  avatarUrl?: string | null,
 ): Promise<{ user: SupabaseUser | null; error: string | null }> {
   try {
-    const { data, error } = await supabase.auth.updateUser({
-      data: { display_name: displayName.trim() || null },
-    });
+    const metadata: Record<string, string | null> = {
+      display_name: displayName.trim() || null,
+    };
+    if (avatarUrl !== undefined) {
+      metadata.avatar_url = avatarUrl;
+    }
+    const { data, error } = await supabase.auth.updateUser({ data: metadata });
     if (error) return { user: null, error: error.message };
     return { user: data.user, error: null };
   } catch (err) {

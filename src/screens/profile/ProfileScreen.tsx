@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Switch,
   Alert,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,8 +33,8 @@ type Props = StackScreenProps<HomeStackParamList, 'Profile'>;
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function Avatar({ initials, size, theme }: { initials: string; size: number; theme: ReturnType<typeof useTheme> }) {
-  const { colors, fontFamily, fontSize } = theme;
+function Avatar({ initials, avatarUrl, size, theme }: { initials: string; avatarUrl?: string; size: number; theme: ReturnType<typeof useTheme> }) {
+  const { colors, fontFamily } = theme;
   return (
     <View
       style={{
@@ -45,18 +46,23 @@ function Avatar({ initials, size, theme }: { initials: string; size: number; the
         borderColor:     colors.accent.primary,
         alignItems:      'center',
         justifyContent:  'center',
+        overflow:        'hidden',
       }}
     >
-      <Text
-        style={{
-          fontSize:   size * 0.36,
-          fontFamily: fontFamily.bold,
-          color:      colors.accent.primary,
-          lineHeight: size * 0.44,
-        }}
-      >
-        {initials}
-      </Text>
+      {avatarUrl ? (
+        <Image source={{ uri: avatarUrl }} style={{ width: size, height: size }} />
+      ) : (
+        <Text
+          style={{
+            fontSize:   size * 0.36,
+            fontFamily: fontFamily.bold,
+            color:      colors.accent.primary,
+            lineHeight: size * 0.44,
+          }}
+        >
+          {initials}
+        </Text>
+      )}
     </View>
   );
 }
@@ -302,6 +308,7 @@ export function ProfileScreen({ navigation }: Props) {
     ?? (user?.user_metadata?.name as string | undefined)
     ?? user?.email ?? 'User';
   const initials    = displayName.slice(0, 2).toUpperCase();
+  const avatarUrl   = user?.user_metadata?.avatar_url as string | undefined;
   const memberYear  = user?.created_at ? new Date(user.created_at).getFullYear() : 2024;
 
   // ── Entrance animations ──────────────────────────────────────────────────
@@ -359,7 +366,7 @@ export function ProfileScreen({ navigation }: Props) {
               },
             ]}
           >
-            <Avatar initials={initials} size={80} theme={theme} />
+            <Avatar initials={initials} avatarUrl={avatarUrl} size={80} theme={theme} />
 
             <Text
               style={{

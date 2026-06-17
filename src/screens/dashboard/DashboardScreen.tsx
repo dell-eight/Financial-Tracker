@@ -8,6 +8,7 @@ import {
   Dimensions,
   Platform,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -538,6 +539,7 @@ export function DashboardScreen({ navigation }: Props) {
     ?? '';
   const firstName  = displayName.split(' ')[0] || 'there';
   const avatarInit = displayName ? displayName[0].toUpperCase() : 'W';
+  const avatarUrl  = user?.user_metadata?.avatar_url as string | undefined;
 
   // Shared loading flag for hero zones
   const coreLoading = dashLoading || goalLoading;
@@ -585,12 +587,16 @@ export function DashboardScreen({ navigation }: Props) {
             </Pressable>
             <Pressable
               onPress={() => navigation.push('Profile')}
-              style={[styles.avatar, { backgroundColor: colors.accent.primary, borderRadius: borderRadius.full }]}
+              style={[styles.avatar, { backgroundColor: colors.accent.primary, borderRadius: borderRadius.full, overflow: 'hidden' }]}
               accessibilityLabel="Profile"
             >
-              <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: '#FFFFFF', lineHeight: 20 }}>
-                {avatarInit}
-              </Text>
+              {avatarUrl ? (
+                <Image source={{ uri: avatarUrl }} style={{ width: 40, height: 40 }} />
+              ) : (
+                <Text style={{ fontSize: 16, fontFamily: fontFamily.bold, color: '#FFFFFF', lineHeight: 20 }}>
+                  {avatarInit}
+                </Text>
+              )}
             </Pressable>
           </View>
         </Animated.View>

@@ -11,6 +11,7 @@ import {
   Platform,
   Modal,
   FlatList,
+  Image,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,7 +20,7 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useAuthStore } from '../../store/auth.store';
-import { getUserProfile, updateProfile, syncDisplayNameToAuth } from '../../services/auth.service';
+import { getUserProfile, updateProfile, uploadAvatar, syncDisplayNameToAuth } from '../../services/auth.service';
 import type { HomeStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<HomeStackParamList, 'EditProfile'>;
@@ -160,7 +161,8 @@ export function EditProfileScreen({ navigation }: Props) {
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const email  = authUser?.email ?? '';
 
-  // Initialise from the profiles table (source of truth for profile fields)
+  // Initialise from the profiles table (source of truth for profile fields).
+  // Prefer the DB avatar_url; fall back to user_metadata for freshly set values.
   useEffect(() => {
     if (!authUser) return;
     getUserProfile(authUser.id).then(({ profile }) => {
@@ -168,7 +170,11 @@ export function EditProfileScreen({ navigation }: Props) {
         setDisplayName(profile.display_name ?? '');
         setTimezone(profile.timezone ?? 'Asia/Manila');
         setFiscalYearStart(profile.fiscal_year_start ?? 1);
-        setAvatarUrl(profile.avatar_url ?? undefined);
+        setAvatarUrl(
+          profile.avatar_url
+            ?? (authUser.user_metadata?.avatar_url as string | undefined)
+            ?? undefined,
+        );
       }
       setLoading(false);
     });
@@ -190,12 +196,24 @@ export function EditProfileScreen({ navigation }: Props) {
     if (!authUser) return;
     setSaving(true);
 
-    // 1. Persist to the app's users table
+    // 1. Upload avatar to Supabase Storage if the user picked a new local image
+    let finalAvatarUrl = avatarUrl;
+    if (avatarUrl && !avatarUrl.startsWith('http')) {
+      const { url, error: uploadError } = await uploadAvatar(authUser.id, avatarUrl);
+      if (uploadError) {
+        setSaving(false);
+        Alert.alert('Error', `Could not upload photo: ${uploadError}`);
+        return;
+      }
+      finalAvatarUrl = url ?? avatarUrl;
+    }
+
+    // 2. Persist to the app's users table
     const { error } = await updateProfile(authUser.id, {
       display_name:      displayName.trim() || undefined,
       timezone,
       fiscal_year_start: fiscalYearStart,
-      avatar_url:        avatarUrl,
+      avatar_url:        finalAvatarUrl,
     });
 
     if (error) {
@@ -204,11 +222,11 @@ export function EditProfileScreen({ navigation }: Props) {
       return;
     }
 
-    // 2. Sync display_name to Supabase Auth user_metadata so Dashboard and
-    //    ProfileScreen (which read user.user_metadata.display_name) update
-    //    immediately without needing a re-login or token refresh.
+    // 3. Sync display_name + avatar_url to Supabase Auth user_metadata so
+    //    Dashboard and ProfileScreen update immediately without a re-login.
     const { user: freshAuthUser } = await syncDisplayNameToAuth(
       displayName.trim(),
+      finalAvatarUrl,
     );
     if (freshAuthUser) {
       setSession(freshAuthUser);
@@ -251,13 +269,17 @@ export function EditProfileScreen({ navigation }: Props) {
 
         {/* Avatar */}
         <Pressable onPress={handlePickAvatar} style={{ alignItems: 'center', marginVertical: spacing[6] }}>
-          <View style={[styles.avatar, { backgroundColor: colors.accent.muted, borderColor: colors.accent.primary }]}>
-            <Text style={{ fontSize: 32, fontFamily: fontFamily.bold, color: colors.accent.primary }}>
-              {displayName ? displayName.slice(0, 2).toUpperCase() : email.slice(0, 2).toUpperCase()}
-            </Text>
+          <View style={[styles.avatar, { backgroundColor: colors.accent.muted, borderColor: colors.accent.primary, overflow: 'hidden' }]}>
+            {avatarUrl ? (
+              <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+            ) : (
+              <Text style={{ fontSize: 32, fontFamily: fontFamily.bold, color: colors.accent.primary }}>
+                {displayName ? displayName.slice(0, 2).toUpperCase() : email.slice(0, 2).toUpperCase()}
+              </Text>
+            )}
           </View>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.accent.primary, marginTop: spacing[2] }}>
-            Change Photo
+            {avatarUrl ? 'Change Photo' : 'Add Photo'}
           </Text>
         </Pressable>
 
@@ -383,6 +405,7 @@ const styles = StyleSheet.create({
     width: 88, height: 88, borderRadius: 44,
     borderWidth: 2, alignItems: 'center', justifyContent: 'center',
   },
+  avatarImage: { width: 88, height: 88 },
   input:       { borderWidth: 0 },
   overlay:     { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.4)' },
   sheet:       { borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 12 },
