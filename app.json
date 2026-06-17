@@ -15,7 +15,20 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.financialtracker.app"
+      "bundleIdentifier": "com.financialtracker.app",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSPinnedDomains": {
+            "supabase.co": {
+              "NSIncludesSubdomains": true,
+              "NSPinnedCAIdentities": [
+                { "SPKI-SHA256-BASE64": "kIdp6NNEd8wsugYyyIYFsi1ylMCED3hZbSR8ZFsa/A4=" },
+                { "SPKI-SHA256-BASE64": "mEflZT5enoR1FuXLgYYGqnVEoZvmf9c2bVBpiOjYQ0c=" }
+              ]
+            }
+          }
+        }
+      }
     },
     "android": {
       "package": "com.financialtracker.app",
@@ -41,7 +54,8 @@
           "sounds": []
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "./plugins/withAndroidNetworkSecurity"
     ]
   }
 }

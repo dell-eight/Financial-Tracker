@@ -25,5 +25,13 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Check for non-public env vars in source
+        run: |
+          if grep -rn 'process\.env\.' src/ --include="*.ts" --include="*.tsx" | grep -v 'EXPO_PUBLIC_'; then
+            echo "ERROR: Non-EXPO_PUBLIC_ env var references found in src/ — these will be undefined in the build bundle"
+            exit 1
+          fi
+          echo "All env var references use EXPO_PUBLIC_ prefix — OK"
+
       - name: Test
         run: npm test -- --forceExit --ci
