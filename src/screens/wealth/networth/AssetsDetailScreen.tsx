@@ -296,7 +296,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
                 No assets yet
               </Text>
               <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center' }}>
-                Tap "+ Add" to add your first bank account.
+                {'Tap "+ Add" to add your first bank account.'}
               </Text>
             </View>
           )}

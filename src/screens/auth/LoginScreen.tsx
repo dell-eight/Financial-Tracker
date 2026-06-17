@@ -255,7 +255,7 @@ export function LoginScreen({ navigation }: Props) {
                 color:      colors.text.secondary,
               }}
             >
-              Don't have an account?{' '}
+              {"Don't"} have an account?{' '}
               <Text
                 style={{
                   color:      colors.accent.primary,

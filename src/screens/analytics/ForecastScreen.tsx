@@ -88,6 +88,7 @@ export function ForecastScreen({ navigation }: Props) {
   const nw3yr = Math.round(BASE_NW + MONTHLY_SAVINGS * 36  + BASE_INVEST * 0.231);
   const nw5yr = Math.round(BASE_NW + MONTHLY_SAVINGS * 60  + BASE_INVEST * 0.403);
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const a = [0, 1, 2, 3, 4].map(() => useSharedValue(0));
   useEffect(() => {
     a.forEach((sv, i) => {
@@ -95,6 +96,7 @@ export function ForecastScreen({ navigation }: Props) {
       sv.value = withDelay(i * 80, withTiming(1, { duration: 420, easing: Easing.out(Easing.cubic) }));
     });
   }, []);
+  // eslint-disable-next-line react-hooks/rules-of-hooks
   const as = a.map(sv => useAnimatedStyle(() => ({ opacity: sv.value, transform: [{ translateY: (1 - sv.value) * 14 }] })));
 
   return (

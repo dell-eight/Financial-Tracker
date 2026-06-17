@@ -156,7 +156,7 @@ function AddDebtModal({
                 <Pressable
                   key={t.key}
                   onPress={() => setDebtType(t.key)}
-                  style={[{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: borderRadius.full, borderWidth: 1, borderColor: active ? colors.expense : colors.border.subtle, backgroundColor: active ? colors.expense + '15' : colors.bg.base }]}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: borderRadius.full, borderWidth: 1, borderColor: active ? colors.expense : colors.border.subtle, backgroundColor: active ? colors.expense + '15' : colors.bg.base }}
                 >
                   <Text style={{ fontSize: 13, marginRight: 4 }}>{t.icon}</Text>
                   <Text style={{ fontSize: fontSize.bodySm, fontFamily: active ? fontFamily.semiBold : fontFamily.regular, color: active ? colors.expense : colors.text.secondary }}>{t.label}</Text>
@@ -422,7 +422,7 @@ function PayDebtModal({
           <View style={{ gap: spacing[2], marginBottom: spacing[4] }}>
             <Pressable
               onPress={() => setSelectedAccId(null)}
-              style={[{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: borderRadius.input, borderWidth: 1, borderColor: selectedAccId === null ? colors.income : colors.border.subtle, backgroundColor: selectedAccId === null ? colors.income + '15' : colors.bg.base }]}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: borderRadius.input, borderWidth: 1, borderColor: selectedAccId === null ? colors.income : colors.border.subtle, backgroundColor: selectedAccId === null ? colors.income + '15' : colors.bg.base }}
             >
               <Text style={{ flex: 1, fontSize: fontSize.bodySm, fontFamily: selectedAccId === null ? fontFamily.semiBold : fontFamily.regular, color: selectedAccId === null ? colors.income : colors.text.secondary }}>
                 No account (track only)
@@ -436,7 +436,7 @@ function PayDebtModal({
                 <Pressable
                   key={acc.id}
                   onPress={() => !noFunds && setSelectedAccId(acc.id)}
-                  style={[{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: borderRadius.input, borderWidth: 1, borderColor: active ? colors.income : willOver && active ? colors.expense : colors.border.subtle, backgroundColor: active ? colors.income + '15' : colors.bg.base, opacity: noFunds ? 0.4 : 1 }]}
+                  style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[3], paddingVertical: spacing[2], borderRadius: borderRadius.input, borderWidth: 1, borderColor: active ? colors.income : willOver && active ? colors.expense : colors.border.subtle, backgroundColor: active ? colors.income + '15' : colors.bg.base, opacity: noFunds ? 0.4 : 1 }}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: fontSize.bodySm, fontFamily: active ? fontFamily.semiBold : fontFamily.regular, color: active ? colors.income : colors.text.secondary }}>

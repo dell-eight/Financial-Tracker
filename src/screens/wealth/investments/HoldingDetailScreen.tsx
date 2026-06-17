@@ -64,7 +64,7 @@ function StatRow({ label, value, valueColor, isLast }: { label: string; value: s
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily } = theme;
   return (
-    <View style={[{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing[3], borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }]}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing[3], borderBottomWidth: isLast ? 0 : StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }}>
       <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted }}>{label}</Text>
       <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: valueColor ?? colors.text.primary }}>{value}</Text>
     </View>

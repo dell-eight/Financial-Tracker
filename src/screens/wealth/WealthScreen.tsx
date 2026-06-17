@@ -218,7 +218,7 @@ function SavingsOverview({ navigation }: { navigation: Props['navigation'] }) {
           <ActivityIndicator size="large" color={colors.accent.primary} />
         </View>
       ) : (goals ?? []).length === 0 ? (
-        <View style={[{ backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[6], alignItems: 'center', borderWidth: 1, borderColor: colors.border.subtle }]}>
+        <View style={{ backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[6], alignItems: 'center', borderWidth: 1, borderColor: colors.border.subtle }}>
           <Text style={{ fontSize: 36 }}>🎯</Text>
           <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginTop: spacing[3] }}>
             No goals yet
@@ -228,7 +228,7 @@ function SavingsOverview({ navigation }: { navigation: Props['navigation'] }) {
           </Text>
           <Pressable
             onPress={() => navigation.push('CreateGoal')}
-            style={[{ backgroundColor: colors.accent.primary, borderRadius: borderRadius.button, paddingHorizontal: spacing[5], paddingVertical: spacing[3], marginTop: spacing[4] }]}
+            style={{ backgroundColor: colors.accent.primary, borderRadius: borderRadius.button, paddingHorizontal: spacing[5], paddingVertical: spacing[3], marginTop: spacing[4] }}
           >
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: '#FFFFFF' }}>Create Goal</Text>
           </Pressable>

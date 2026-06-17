@@ -79,7 +79,7 @@ function EditLimitModal({
   const canSave = !isNaN(parsed) && parsed > 0;
 
   return (
-    <View style={[modalStyles.overlay]}>
+    <View style={modalStyles.overlay}>
       <Pressable style={StyleSheet.absoluteFillObject} onPress={onCancel} />
       <View style={[modalStyles.sheet, { backgroundColor: colors.bg.surfaceRaised, borderRadius: borderRadius.cardLg, margin: spacing[5], padding: spacing[6] }]}>
         <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: colors.text.primary, marginBottom: spacing[4] }}>

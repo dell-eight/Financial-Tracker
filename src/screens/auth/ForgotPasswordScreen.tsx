@@ -82,7 +82,7 @@ export function ForgotPasswordScreen({ navigation }: Props) {
             Forgot Password?
           </Text>
           <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.secondary, marginTop: spacing[2], lineHeight: 22 }}>
-            Enter your email and we'll send you a link to reset your password.
+            {"Enter your email and we'll send you a link to reset your password."}
           </Text>
         </View>
 

@@ -711,7 +711,7 @@ function RemainingMetricsCard({
 
       <View style={[remainStyles.projLegend, { marginTop: spacing[2] }]}>
         <View style={remainStyles.legendDot}>
-          <View style={[{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent.primary, marginRight: 4 }]} />
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accent.primary, marginRight: 4 }} />
           <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted }}>Current spending</Text>
         </View>
         <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted }}>
