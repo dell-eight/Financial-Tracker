@@ -166,8 +166,8 @@ export function AccountTransactionsScreen({ navigation, route }: Props) {
       setAccountBalance(bal);
       setEditVisible(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to save. Please try again.');
+    } catch (e: unknown) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to save. Please try again.');
     } finally {
       setSaving(false);
     }

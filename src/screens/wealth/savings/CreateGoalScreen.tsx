@@ -74,8 +74,8 @@ export function CreateGoalScreen({ navigation }: Props) {
       await queryClient.invalidateQueries({ queryKey: SAVINGS_GOALS_KEY });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.replace('GoalDetail', { goalId: newGoal.id });
-    } catch (e: any) {
-      setError(e?.message ?? 'Failed to create goal. Please try again.');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to create goal. Please try again.');
       setSaving(false);
     }
   }

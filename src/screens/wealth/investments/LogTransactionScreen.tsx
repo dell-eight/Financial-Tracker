@@ -85,8 +85,8 @@ export function LogTransactionScreen({ navigation, route }: Props) {
       await queryClient.invalidateQueries({ queryKey: HOLDINGS_KEY });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.goBack();
-    } catch (e: any) {
-      setError(e?.message ?? 'Failed to log trade. Please try again.');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to log trade. Please try again.');
       setSaving(false);
     }
   }

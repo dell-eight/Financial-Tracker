@@ -23,6 +23,8 @@ import type {
   AssetAccount,
   DebtAccount,
   DashboardSummary,
+  CreateExpenseRequest,
+  CreateSavingsGoalRequest,
 } from '../types/supabase';
 
 interface UseAsyncState<T> {
@@ -40,7 +42,7 @@ interface UseAsyncActions<T> {
  * Generic async hook for data fetching
  */
 function useAsync<T>(
-  asyncFunction: () => Promise<{ [key: string]: any; error: string | null }>,
+  asyncFunction: () => Promise<{ [key: string]: unknown; error: string | null }>,
   immediate: boolean = true
 ): UseAsyncState<T> & UseAsyncActions<T> {
   const [state, setState] = useState<UseAsyncState<T>>({
@@ -58,7 +60,7 @@ function useAsync<T>(
       } else {
         // Extract the first non-error key as the data
         const dataKey = Object.keys(result).find((k) => k !== 'error');
-        const data = dataKey ? result[dataKey] : null;
+        const data = (dataKey ? result[dataKey] : null) as T | null;
         setState({ data, loading: false, error: null });
       }
     } catch (error) {
@@ -171,7 +173,7 @@ export function useCreateExpense(userId: string) {
   const [error, setError] = useState<string | null>(null);
 
   const createExpense = useCallback(
-    async (expense: any) => {
+    async (expense: CreateExpenseRequest) => {
       setLoading(true);
       setError(null);
       const result = await expensesService.createExpense(userId, expense);
@@ -235,7 +237,7 @@ export function useCreateSavingsGoal(userId: string) {
   const [error, setError] = useState<string | null>(null);
 
   const createGoal = useCallback(
-    async (goal: any) => {
+    async (goal: CreateSavingsGoalRequest) => {
       setLoading(true);
       setError(null);
       const result = await savingsService.createSavingsGoal(userId, goal);

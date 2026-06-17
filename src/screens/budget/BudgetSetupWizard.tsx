@@ -18,6 +18,7 @@ import { useTheme } from '../../hooks/ui/useTheme';
 import { useBudgets, BUDGETS_KEY } from '../../hooks/queries/useBudgets';
 import { updateBudgetLimit } from '../../services/finance.service';
 import { getCategoryBgColor } from '../../theme';
+import type { CategoryKey } from '../../theme';
 import { EXPENSE_CATEGORIES } from '../../constants/categories';
 import type { BudgetStackParamList } from '../../navigation/types';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
@@ -87,7 +88,7 @@ function CategoryRow({
   const { colors, spacing, borderRadius, fontFamily, fontSize } = theme;
   const { symbol } = useCurrency();
   const catColor = (theme.categoryColors as Record<string, string>)[catKey] ?? colors.accent.primary;
-  const catBg    = getCategoryBgColor(catKey as any);
+  const catBg    = getCategoryBgColor(catKey as CategoryKey);
 
   function handleChange(text: string) {
     const cleaned = text.replace(/[^0-9.]/g, '');
@@ -183,8 +184,8 @@ export function BudgetSetupWizard({ navigation }: Props) {
       await queryClient.invalidateQueries({ queryKey: [...BUDGETS_KEY] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.goBack();
-    } catch (e: any) {
-      setSaveError(e?.message ?? 'Failed to save. Please try again.');
+    } catch (e: unknown) {
+      setSaveError(e instanceof Error ? e.message : 'Failed to save. Please try again.');
       setSaving(false);
     }
   }

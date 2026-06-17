@@ -6,6 +6,27 @@ import type {
 } from '../types/models';
 import type { CategoryKey } from '../theme';
 
+// ── Raw Supabase row types (query result shapes) ───────────────────────────────
+
+type RawDashboardRow   = { total_debts: unknown; monthly_income: unknown; monthly_expenses: unknown; savings_rate_percent: unknown };
+type RawBalanceRow     = { balance: unknown };
+type RawSharesRow      = { shares: unknown; current_price: unknown };
+type RawGoalContribRow = { savings_goal_contributions: Array<{ amount: unknown }> };
+type RawExpenseRow     = { id: string; description: string; amount: unknown; date: string; created_at: string; notes: string | null; account_id: string | null; expense_categories: { name: string; icon: string | null; color: string } | null; asset_accounts: { name: string } | null };
+type RawIncomeRow      = { id: string; description: string | null; amount: unknown; date: string; created_at: string; notes: string | null; account_id: string | null; income_sources: { name: string; type: string; icon: string | null } | null; asset_accounts: { name: string } | null };
+type RawTransferRow    = { id: string; amount: unknown; date: string; created_at: string; notes: string | null; from_account_id: string; to_account_id: string; from: { name: string } | null; to: { name: string } | null };
+type RawCategoryRow    = { id: string; name: string; icon: string | null; color: string | null; budget_limit: unknown };
+type RawGoalRow        = { id: string; name: string; category: string; icon: string | null; target_amount: unknown; color: string | null; priority: number | null; savings_goal_contributions: Array<{ amount: unknown }> };
+type RawContribRow     = { id: string; amount: unknown; date: string; description: string | null };
+type RawAcctBalRow     = { id: string; balance: unknown };
+type RawAssetAcctRow   = { id: string; name: string; asset_type: string; balance: unknown };
+type RawHoldingRow     = { id: string; account_id: string; symbol: string; name: string; asset_class: string; shares: unknown; purchase_price: unknown; current_price: unknown };
+type RawAssetRow       = { id: string; name: string; asset_type: string; balance: unknown };
+type RawCashFlowRow    = { month: string; total_income: unknown; total_expenses: unknown; net_cash_flow: unknown };
+type RawNWRow          = { snapshot_date: string; net_worth: unknown };
+type RawIncomeRecRow   = { amount: unknown; income_sources: { name: string; icon: string | null } | null };
+type RawDebtRow        = { id: string; name: string; debt_type: string; balance: unknown; original_amount: unknown; annual_rate: unknown; monthly_payment: unknown };
+
 // ── Auth helper ────────────────────────────────────────────────────────────────
 
 async function uid(): Promise<string> {
@@ -124,13 +145,13 @@ export async function getDashboard(): Promise<DashboardSummary> {
       .is('deleted_at', null),
   ]);
 
-  const row   = (summaryRes.data as any[])?.[0] ?? {};
+  const row   = (summaryRes.data as RawDashboardRow[])?.[0] ?? {} as RawDashboardRow;
   const snaps = snapshotsRes.data ?? [];
 
-  const bankTotal       = (bankRes.data ?? []).reduce((s: number, a: any) => s + Number(a.balance ?? 0), 0);
-  const investmentValue = (holdingRes.data ?? []).reduce((s: number, h: any) => s + Number(h.shares ?? 0) * Number(h.current_price ?? 0), 0);
-  const savingsTotal    = (goalRes.data ?? []).reduce((s: number, g: any) =>
-    s + (g.savings_goal_contributions ?? []).reduce((gs: number, c: any) => gs + Number(c.amount ?? 0), 0), 0);
+  const bankTotal       = (bankRes.data as RawBalanceRow[] ?? []).reduce((s: number, a: RawBalanceRow) => s + Number(a.balance ?? 0), 0);
+  const investmentValue = (holdingRes.data as RawSharesRow[] ?? []).reduce((s: number, h: RawSharesRow) => s + Number(h.shares ?? 0) * Number(h.current_price ?? 0), 0);
+  const savingsTotal    = (goalRes.data as RawGoalContribRow[] ?? []).reduce((s: number, g: RawGoalContribRow) =>
+    s + (g.savings_goal_contributions ?? []).reduce((gs: number, c: { amount: unknown }) => gs + Number(c.amount ?? 0), 0), 0);
 
   // totalAssets uses the same three sources as getAssets() so both screens always agree
   const totalAssets     = bankTotal + investmentValue + savingsTotal;
@@ -193,16 +214,15 @@ export async function getTransactions(): Promise<Transaction[]> {
       .limit(100),
   ]);
 
-  const expenses: Transaction[] = (expRes.data ?? []).map((e: any) => {
-    const cat  = e.expense_categories ?? {};
-    const name = cat.name ?? 'Other';
+  const expenses: Transaction[] = (expRes.data as unknown as RawExpenseRow[] ?? []).map((e: RawExpenseRow) => {
+    const name = e.expense_categories?.name ?? 'Other';
     const time = e.created_at ? new Date(e.created_at).toTimeString().slice(0, 5) : '00:00';
     return {
       id:            e.id,
       merchant:      e.description,
       category:      categoryKey(name, false),
       categoryLabel: name,
-      categoryIcon:  expenseIcon(name, cat.icon),
+      categoryIcon:  expenseIcon(name, e.expense_categories?.icon),
       amount:        Number(e.amount),
       type:          'expense',
       date:          e.date,
@@ -213,16 +233,15 @@ export async function getTransactions(): Promise<Transaction[]> {
     };
   });
 
-  const income: Transaction[] = (incRes.data ?? []).map((r: any) => {
-    const src  = r.income_sources ?? {};
-    const name = src.name ?? 'Income';
+  const income: Transaction[] = (incRes.data as unknown as RawIncomeRow[] ?? []).map((r: RawIncomeRow) => {
+    const name = r.income_sources?.name ?? 'Income';
     const time = r.created_at ? new Date(r.created_at).toTimeString().slice(0, 5) : '00:00';
     return {
       id:            r.id,
       merchant:      r.description ?? name,
       category:      categoryKey(name, true),
       categoryLabel: name,
-      categoryIcon:  expenseIcon(name, src.icon),
+      categoryIcon:  expenseIcon(name, r.income_sources?.icon),
       amount:        Number(r.amount),
       type:          'income',
       date:          r.date,
@@ -233,7 +252,7 @@ export async function getTransactions(): Promise<Transaction[]> {
     };
   });
 
-  const transfers: Transaction[] = (trRes.data ?? []).map((t: any) => {
+  const transfers: Transaction[] = (trRes.data as unknown as RawTransferRow[] ?? []).map((t: RawTransferRow) => {
     const time = t.created_at ? new Date(t.created_at).toTimeString().slice(0, 5) : '00:00';
     return {
       id:              t.id,
@@ -648,7 +667,7 @@ export async function getBudgets(forYear?: number, forMonth?: number): Promise<B
       (spentByCategory[e.category_id] ?? 0) + Number(e.amount);
   }
 
-  return (catRes.data ?? []).map((c: any) => ({
+  return (catRes.data as RawCategoryRow[] ?? []).map((c: RawCategoryRow) => ({
     id:       c.id,
     category: categoryKey(c.name, false),
     label:    c.name,
@@ -704,9 +723,9 @@ export async function getSavingsGoals(): Promise<SavingsGoal[]> {
     .is('deleted_at', null)
     .order('priority', { ascending: false });
 
-  return (data ?? []).map((g: any) => {
+  return (data as RawGoalRow[] ?? []).map((g: RawGoalRow) => {
     const contributed = (g.savings_goal_contributions ?? [])
-      .reduce((sum: number, c: any) => sum + Number(c.amount), 0);
+      .reduce((sum: number, c: { amount: unknown }) => sum + Number(c.amount), 0);
     return {
       id:           g.id,
       name:         g.name,
@@ -770,7 +789,7 @@ export async function getContributions(goalId: string): Promise<Contribution[]> 
     .eq('user_id', userId)
     .order('date', { ascending: false });
   if (error) throw error;
-  return (data ?? []).map((c: any) => ({
+  return (data as RawContribRow[] ?? []).map((c: RawContribRow) => ({
     id:     c.id,
     date:   new Date(c.date + 'T00:00:00').toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }),
     amount: Number(c.amount),
@@ -846,7 +865,7 @@ export async function deleteSavingsGoal(goalId: string): Promise<void> {
       .in('id', accountIds)
       .eq('user_id', userId);
 
-    const refundOps = (accounts ?? []).map((acc: any) => {
+    const refundOps = (accounts as RawAcctBalRow[] ?? []).map((acc: RawAcctBalRow) => {
       const newBalance = Number(acc.balance ?? 0) + (refundMap[acc.id] ?? 0);
       return supabase
         .from('asset_accounts')
@@ -879,13 +898,13 @@ export async function getAccounts(): Promise<Account[]> {
     .is('deleted_at', null)
     .order('balance', { ascending: false });
 
-  return (data ?? []).map((a: any, i: number) => ({
+  return (data as RawAssetAcctRow[] ?? []).map((a: RawAssetAcctRow, i: number) => ({
     id:              a.id,
     institutionName: a.name,
     maskedNumber:    '•••• ••••',
-    type:            ['checking', 'savings', 'credit'].includes(a.asset_type)
+    type:            (['checking', 'savings', 'credit'].includes(a.asset_type)
                        ? a.asset_type
-                       : 'savings',
+                       : 'savings') as 'checking' | 'savings' | 'credit',
     balance:         Number(a.balance ?? 0),
     gradientIndex:   i % 3,
   }));
@@ -903,7 +922,7 @@ export async function getInvestments(): Promise<InvestmentHolding[]> {
     .is('deleted_at', null)
     .order('current_price', { ascending: false });
 
-  return (data ?? []).map((h: any, i: number) => ({
+  return (data as RawHoldingRow[] ?? []).map((h: RawHoldingRow, i: number) => ({
     id:              h.id,
     accountId:       h.account_id,
     symbol:          h.symbol,
@@ -1145,7 +1164,7 @@ export async function getAssets(): Promise<AssetItem[]> {
       .is('deleted_at', null),
   ]);
 
-  const accountItems: AssetItem[] = (assetRes.data ?? []).map((a: any) => ({
+  const accountItems: AssetItem[] = (assetRes.data as RawAssetRow[] ?? []).map((a: RawAssetRow) => ({
     id:       a.id,
     name:     a.name,
     category: mapAssetType(a.asset_type ?? ''),
@@ -1155,13 +1174,13 @@ export async function getAssets(): Promise<AssetItem[]> {
   }));
 
   const investTotal = (holdingRes.data ?? []).reduce(
-    (sum: number, h: any) => sum + Number(h.shares ?? 0) * Number(h.current_price ?? 0),
+    (sum: number, h: RawSharesRow) => sum + Number(h.shares ?? 0) * Number(h.current_price ?? 0),
     0
   );
 
   const savingsTotal = (goalRes.data ?? []).reduce(
-    (sum: number, g: any) => sum + (g.savings_goal_contributions ?? []).reduce(
-      (s: number, c: any) => s + Number(c.amount ?? 0), 0
+    (sum: number, g: RawGoalContribRow) => sum + (g.savings_goal_contributions ?? []).reduce(
+      (s: number, c: { amount: unknown }) => s + Number(c.amount ?? 0), 0
     ),
     0
   );
@@ -1239,7 +1258,7 @@ export async function getMonthlyHistory(months = 6): Promise<MonthPoint[]> {
     .order('month', { ascending: true })
     .limit(months);
 
-  return (data ?? []).map((r: any) => ({
+  return (data as RawCashFlowRow[] ?? []).map((r: RawCashFlowRow) => ({
     label:   monthLabel(r.month),
     income:  Number(r.total_income   ?? 0),
     expense: Number(r.total_expenses ?? 0),
@@ -1298,7 +1317,7 @@ export async function getNetWorthHistory(months = 12): Promise<NWPoint[]> {
     .order('snapshot_date', { ascending: true })
     .limit(months);
 
-  return (data ?? []).map((r: any) => ({
+  return (data as RawNWRow[] ?? []).map((r: RawNWRow) => ({
     label: monthLabel(r.snapshot_date),
     nw:    Number(r.net_worth ?? 0),
   }));
@@ -1321,10 +1340,9 @@ export async function getIncomeStreams(): Promise<IncomeStream[]> {
     .lt('date', end);
 
   const map = new Map<string, { label: string; icon: string; amount: number }>();
-  for (const r of data ?? []) {
-    const src  = (r as any).income_sources ?? {};
-    const name = src.name ?? 'Other';
-    const curr = map.get(name) ?? { label: name, icon: src.icon ?? '💰', amount: 0 };
+  for (const r of (data as unknown as RawIncomeRecRow[] ?? [])) {
+    const name = r.income_sources?.name ?? 'Other';
+    const curr = map.get(name) ?? { label: name, icon: r.income_sources?.icon ?? '💰', amount: 0 };
     map.set(name, { ...curr, amount: curr.amount + Number(r.amount) });
   }
 
@@ -1482,7 +1500,7 @@ export async function getDebts(): Promise<DebtItem[]> {
     .is('deleted_at', null)
     .order('balance', { ascending: false });
 
-  return (data ?? []).map((d: any) => ({
+  return (data as RawDebtRow[] ?? []).map((d: RawDebtRow) => ({
     id:             d.id,
     name:           d.name,
     category:       mapDebtType(d.debt_type ?? ''),

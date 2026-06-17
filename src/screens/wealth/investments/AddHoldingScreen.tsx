@@ -92,8 +92,8 @@ export function AddHoldingScreen({ navigation, route }: Props) {
       await queryClient.invalidateQueries({ queryKey: HOLDINGS_KEY });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.replace('HoldingDetail', { holdingId: newHolding.id });
-    } catch (e: any) {
-      setError(e?.message ?? 'Failed to add holding. Please try again.');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to add holding. Please try again.');
       setSaving(false);
     }
   }

@@ -114,8 +114,8 @@ function AddDebtModal({
         monthlyPayment: parseFloat(monthlyStr) || 0,
       });
       onClose();
-    } catch (e: any) {
-      setError(e?.message ?? 'Failed to add debt. Please try again.');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to add debt. Please try again.');
       setSaving(false);
     }
   }
@@ -368,8 +368,8 @@ function PayDebtModal({
         selectedAcc?.balance,
       );
       onClose();
-    } catch (e: any) {
-      setError(e?.message ?? 'Payment failed. Please try again.');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Payment failed. Please try again.');
       setSaving(false);
     }
   }

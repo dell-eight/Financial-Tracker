@@ -358,7 +358,7 @@ export async function getDebtSummary(userId: string) {
         }
         return acc;
       },
-      {} as Record<string, any>
+      {} as Record<string, { totalBalance: number; count: number; avgRate: number }>
     );
 
     return { summary, error: null };
