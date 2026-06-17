@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -104,7 +104,7 @@ export function AddContributionScreen({ navigation, route }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={[styles.screen, { backgroundColor: colors.bg.base }]}
     >
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }]}>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -434,7 +434,7 @@ export function WealthScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
       <View style={[styles.header, { paddingTop: topPad + spacing[3], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>

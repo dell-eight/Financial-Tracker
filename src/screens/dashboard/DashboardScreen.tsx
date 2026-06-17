@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -552,7 +552,7 @@ export function DashboardScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -708,7 +708,7 @@ export function DashboardScreen({ navigation }: Props) {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingLeft: spacing[5], paddingRight: spacing[5], gap: spacing[3] }}
+              contentContainerStyle={{ paddingLeft: spacing[5], paddingRight: spacing[5], paddingBottom: spacing[2], gap: spacing[3] }}
             >
               {(goals ?? []).map(g => (
                 <GoalChip

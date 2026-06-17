@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect } from 'react';
+﻿import React, { useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -157,7 +157,7 @@ export function IncomeAnalysisScreen({ navigation }: Props) {
 
   return (
     <View style={[s.screen, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
       <View style={[s.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>

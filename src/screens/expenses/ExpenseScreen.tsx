@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+﻿import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -1062,7 +1062,7 @@ export function ExpenseScreen({ navigation, route }: Props) {
 
   return (
     <View style={[scr.root, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

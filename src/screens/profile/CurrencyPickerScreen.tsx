@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   View, Text, Pressable, FlatList, StyleSheet, Platform,
 } from 'react-native';
@@ -32,7 +32,7 @@ export function CurrencyPickerScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="auto" />
+      <StatusBar style={theme.statusBarStyle} />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>

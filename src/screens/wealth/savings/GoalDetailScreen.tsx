@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -125,7 +125,7 @@ export function GoalDetailScreen({ navigation, route }: Props) {
   if (!goal) {
     return (
       <View style={[s.screen, { backgroundColor: colors.bg.base }]}>
-        <StatusBar style="light" />
+        <StatusBar style={theme.statusBarStyle} />
         <View style={{ paddingTop: topPad + spacing[2], paddingHorizontal: spacing[5] }}>
           <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
             <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
@@ -176,7 +176,7 @@ export function GoalDetailScreen({ navigation, route }: Props) {
 
   return (
     <View style={[s.screen, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ── */}
       <View style={[s.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>

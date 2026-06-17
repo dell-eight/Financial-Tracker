@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -796,7 +797,7 @@ export function BudgetScreen({ navigation }: Props) {
   const now = new Date();
   const [period, setPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() });
 
-  const { data: budgetsData } = useBudgets(period.year, period.month + 1);
+  const { data: budgetsData, isLoading: budgetsLoading } = useBudgets(period.year, period.month + 1);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
@@ -875,7 +876,7 @@ export function BudgetScreen({ navigation }: Props) {
 
   return (
     <View style={[screenStyles.root, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -992,7 +993,12 @@ export function BudgetScreen({ navigation }: Props) {
           </Pressable>
         </Animated.View>
 
-        {budgetItems.length === 0 ? (
+        {budgetsLoading ? (
+          /* ── Loading state ───────────────────────────────────────────────── */
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: spacing[12] }}>
+            <ActivityIndicator size="large" color={colors.accent.primary} />
+          </View>
+        ) : budgetItems.length === 0 ? (
           /* ── Empty state ─────────────────────────────────────────────────── */
           <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[8], alignItems: 'center' }, heroStyle]}>
             <Text style={{ fontSize: 56, marginBottom: spacing[4] }}>📊</Text>

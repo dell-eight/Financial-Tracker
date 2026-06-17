@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+﻿import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -246,7 +246,7 @@ export function AccountTransactionsScreen({ navigation, route }: Props) {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="auto" />
+      <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <Animated.View style={[headerStyle, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[4], borderBottomWidth: 1, borderBottomColor: colors.border.subtle }]}>

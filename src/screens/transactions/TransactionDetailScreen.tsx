@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -217,7 +217,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   if (!tx) {
     return (
       <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
-        <StatusBar style="light" />
+        <StatusBar style={theme.statusBarStyle} />
         <View style={{ paddingTop: topPad + spacing[2], paddingHorizontal: spacing[5] }}>
           <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
             <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>
@@ -250,7 +250,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
         style={[styles.screen, { backgroundColor: colors.bg.base }]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <StatusBar style="light" />
+        <StatusBar style={theme.statusBarStyle} />
         <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
           <Pressable onPress={cancelEdit} hitSlop={12} style={{ minWidth: 60 }}>
             <Text style={{ fontSize: fontSize.bodyLg, color: colors.text.muted, fontFamily: fontFamily.medium }}>Cancel</Text>
@@ -345,7 +345,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
   // ── View mode ─────────────────────────────────────────────────────────────────
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>

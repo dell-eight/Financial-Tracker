@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+﻿import React, { useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -111,7 +111,7 @@ export function GoalAchievedScreen({ navigation, route }: Props) {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Confetti layer ── */}
       <View style={styles.confettiLayer} pointerEvents="none">

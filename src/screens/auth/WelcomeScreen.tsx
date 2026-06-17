@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -293,7 +293,7 @@ export function WelcomeScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
       <BackgroundDecor />
 
       {/* ── Logo + brand ── */}

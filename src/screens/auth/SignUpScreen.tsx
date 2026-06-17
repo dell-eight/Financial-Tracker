@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -116,7 +116,7 @@ export function SignUpScreen({ navigation }: Props) {
       style={[styles.flex, { backgroundColor: colors.bg.base }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       <ScrollView
         contentContainerStyle={[

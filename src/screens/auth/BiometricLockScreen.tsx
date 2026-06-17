@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -58,7 +58,7 @@ export function BiometricLockScreen() {
 
   return (
     <View style={[s.screen, { backgroundColor: colors.bg.base, paddingTop: topPad, paddingBottom: btmPad }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       <View style={s.center}>
         <Text style={{ fontSize: 72, marginBottom: spacing[4] }}>🔒</Text>

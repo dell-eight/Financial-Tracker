@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -401,7 +401,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
       style={[styles.screen, { backgroundColor: colors.bg.base }]}
     >
       <LoadingOverlay visible={saving} message="Saving budget…" />
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: H_PAD, paddingBottom: spacing[3] }]}>

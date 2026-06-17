@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -55,7 +55,7 @@ export function ForgotPasswordScreen({ navigation }: Props) {
       style={[s.flex, { backgroundColor: colors.bg.base }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       <ScrollView
         contentContainerStyle={[s.scroll, { paddingTop: topPad + spacing[2], paddingBottom: btmPad + spacing[4] }]}

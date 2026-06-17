@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+﻿import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -71,14 +71,18 @@ function StatCard({
   label,
   value,
   sub,
+  valueColor,
+  subColor,
   theme,
 }: {
   label: string;
   value: string;
   sub?: string;
+  valueColor?: string;
+  subColor?: string;
   theme: ReturnType<typeof useTheme>;
 }) {
-  const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   return (
     <View
       style={{
@@ -88,13 +92,14 @@ function StatCard({
         padding:         spacing[3],
         alignItems:      'center',
         gap:              2,
+        ...shadows.card,
       }}
     >
       <Text
         style={{
           fontSize:   fontSize.headingMd,
           fontFamily: fontFamily.bold,
-          color:      colors.text.primary,
+          color:      valueColor ?? colors.text.primary,
           lineHeight: 26,
         }}
         numberOfLines={1}
@@ -106,7 +111,7 @@ function StatCard({
         {label}
       </Text>
       {sub ? (
-        <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.regular, color: colors.income }}>
+        <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.regular, color: subColor ?? colors.income }}>
           {sub}
         </Text>
       ) : null}
@@ -299,6 +304,7 @@ export function ProfileScreen({ navigation }: Props) {
 
   const CURRENT_MONTH = new Date().toISOString().substring(0, 7);
   const monthTxCount  = React.useMemo(() => (txns ?? []).filter(t => t.date.startsWith(CURRENT_MONTH)).length, [txns]);
+  const expenseCount  = React.useMemo(() => (txns ?? []).filter(t => t.type === 'expense' && t.date.startsWith(CURRENT_MONTH)).length, [txns]);
   const monthIncome   = React.useMemo(() => (txns ?? []).filter(t => t.type === 'income' && t.date.startsWith(CURRENT_MONTH)).reduce((s, t) => s + t.amount, 0), [txns]);
   const monthExpense  = React.useMemo(() => (txns ?? []).filter(t => t.type === 'expense' && t.date.startsWith(CURRENT_MONTH)).reduce((s, t) => s + t.amount, 0), [txns]);
   const savingsRate   = monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 1000) / 10 : 0;
@@ -347,7 +353,7 @@ export function ProfileScreen({ navigation }: Props) {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -420,7 +426,7 @@ export function ProfileScreen({ navigation }: Props) {
           ]}
         >
           <StatCard label="Net Worth"   value={fmtCompact(netWorth)} sub="+1.3%" theme={theme} />
-          <StatCard label="This Month"  value={`${monthTxCount} txns`}               theme={theme} />
+          <StatCard label="Spent"       value={fmtCompact(monthExpense)} sub={`${expenseCount} expenses`} subColor={colors.expense} theme={theme} />
           <StatCard label="Savings"     value={`${savingsRate}%`} sub="↑ great"      theme={theme} />
         </Animated.View>
 

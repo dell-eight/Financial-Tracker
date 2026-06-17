@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -1118,7 +1118,7 @@ export function AnalyticsScreen({ navigation }: Props) {
 
   return (
     <View style={[sc.root, { backgroundColor: colors.bg.base }]}>
-      <StatusBar style="light" />
+      <StatusBar style={theme.statusBarStyle} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}

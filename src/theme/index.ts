@@ -552,16 +552,18 @@ const sharedTokens = {
 } as const;
 
 export const lightTheme = {
-  dark:    false as const,
-  colors:  lightColors,
-  shadows: lightShadows,
+  dark:            false    as const,
+  statusBarStyle:  'dark'   as const,
+  colors:          lightColors,
+  shadows:         lightShadows,
   ...sharedTokens,
 };
 
 export const darkTheme = {
-  dark:    true  as const,
-  colors:  darkColors,
-  shadows: darkShadows,
+  dark:            true     as const,
+  statusBarStyle:  'light'  as const,
+  colors:          darkColors,
+  shadows:         darkShadows,
   ...sharedTokens,
 };
 
