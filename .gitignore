@@ -39,3 +39,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+# Store submission credentials (never commit)
+google-service-account.json
+*.mobileprovision
+*.p12
