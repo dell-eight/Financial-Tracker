@@ -7,7 +7,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import { makeRedirectUri } from 'expo-auth-session';
 import { supabase, handleSupabaseError } from '../lib/supabase';
-import type { Session } from '@supabase/supabase-js';
+import type { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import type { User } from '../types/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -233,6 +233,26 @@ export async function resetPassword(email: string) {
   } catch (error) {
     const err = handleSupabaseError(error);
     return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Sync display_name to Supabase Auth user_metadata so that any component
+ * reading user.user_metadata.display_name (Dashboard, ProfileScreen) updates
+ * immediately when the auth store is refreshed with the returned user.
+ */
+export async function syncDisplayNameToAuth(
+  displayName: string,
+): Promise<{ user: SupabaseUser | null; error: string | null }> {
+  try {
+    const { data, error } = await supabase.auth.updateUser({
+      data: { display_name: displayName.trim() || null },
+    });
+    if (error) return { user: null, error: error.message };
+    return { user: data.user, error: null };
+  } catch (err) {
+    const e = handleSupabaseError(err);
+    return { user: null, error: e.message };
   }
 }
 

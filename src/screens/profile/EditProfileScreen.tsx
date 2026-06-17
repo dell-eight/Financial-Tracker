@@ -19,7 +19,7 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useAuthStore } from '../../store/auth.store';
-import { getUserProfile, updateProfile } from '../../services/auth.service';
+import { getUserProfile, updateProfile, syncDisplayNameToAuth } from '../../services/auth.service';
 import type { HomeStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<HomeStackParamList, 'EditProfile'>;
@@ -54,6 +54,29 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
+// ── FieldRow ───────────────────────────────────────────────────────────────────
+// Defined OUTSIDE EditProfileScreen so React never sees it as a new component
+// type on re-render — which would unmount/remount the TextInput and dismiss the
+// keyboard on every keystroke.
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  const { colors, spacing, fontSize, fontFamily } = useTheme();
+  return (
+    <View style={{ marginBottom: spacing[1] }}>
+      <Text style={{
+        fontSize:        fontSize.bodySm,
+        fontFamily:      fontFamily.semiBold,
+        color:           colors.text.muted,
+        marginBottom:    spacing[1],
+        paddingHorizontal: spacing[5],
+      }}>
+        {label.toUpperCase()}
+      </Text>
+      {children}
+    </View>
+  );
+}
+
+// ── PickerModal ────────────────────────────────────────────────────────────────
 function PickerModal({
   visible,
   title,
@@ -84,7 +107,9 @@ function PickerModal({
           data={items}
           keyExtractor={i => i}
           style={{ maxHeight: 360 }}
-          ItemSeparatorComponent={() => <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border.subtle, marginHorizontal: spacing[5] }} />}
+          ItemSeparatorComponent={() => (
+            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border.subtle, marginHorizontal: spacing[5] }} />
+          )}
           renderItem={({ item }) => {
             const isSelected = item === selected;
             return (
@@ -114,12 +139,14 @@ function PickerModal({
   );
 }
 
+// ── EditProfileScreen ──────────────────────────────────────────────────────────
 export function EditProfileScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
 
-  const authUser = useAuthStore(s => s.user);
+  const authUser  = useAuthStore(s => s.user);
+  const setSession = useAuthStore(s => s.setSession);
 
   const [displayName,     setDisplayName]     = useState('');
   const [timezone,        setTimezone]        = useState('Asia/Manila');
@@ -133,6 +160,7 @@ export function EditProfileScreen({ navigation }: Props) {
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const email  = authUser?.email ?? '';
 
+  // Initialise from the profiles table (source of truth for profile fields)
   useEffect(() => {
     if (!authUser) return;
     getUserProfile(authUser.id).then(({ profile }) => {
@@ -161,30 +189,34 @@ export function EditProfileScreen({ navigation }: Props) {
   async function handleSave() {
     if (!authUser) return;
     setSaving(true);
+
+    // 1. Persist to the app's users table
     const { error } = await updateProfile(authUser.id, {
       display_name:      displayName.trim() || undefined,
       timezone,
       fiscal_year_start: fiscalYearStart,
       avatar_url:        avatarUrl,
     });
-    setSaving(false);
-    if (error) {
-      Alert.alert('Error', error);
-    } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      navigation.goBack();
-    }
-  }
 
-  function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-      <View style={{ marginBottom: spacing[1] }}>
-        <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.muted, marginBottom: spacing[1], paddingHorizontal: spacing[5] }}>
-          {label.toUpperCase()}
-        </Text>
-        {children}
-      </View>
+    if (error) {
+      setSaving(false);
+      Alert.alert('Error', error);
+      return;
+    }
+
+    // 2. Sync display_name to Supabase Auth user_metadata so Dashboard and
+    //    ProfileScreen (which read user.user_metadata.display_name) update
+    //    immediately without needing a re-login or token refresh.
+    const { user: freshAuthUser } = await syncDisplayNameToAuth(
+      displayName.trim(),
     );
+    if (freshAuthUser) {
+      setSession(freshAuthUser);
+    }
+
+    setSaving(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    navigation.goBack();
   }
 
   if (loading) {
@@ -239,14 +271,14 @@ export function EditProfileScreen({ navigation }: Props) {
             style={[
               styles.input,
               {
-                backgroundColor:  colors.bg.surface,
-                color:            colors.text.primary,
-                fontFamily:       fontFamily.regular,
-                fontSize:         fontSize.bodyMd,
+                backgroundColor:   colors.bg.surface,
+                color:             colors.text.primary,
+                fontFamily:        fontFamily.regular,
+                fontSize:          fontSize.bodyMd,
                 paddingHorizontal: spacing[5],
                 paddingVertical:   spacing[4],
-                marginHorizontal: spacing[4],
-                borderRadius:     borderRadius.card,
+                marginHorizontal:  spacing[4],
+                borderRadius:      borderRadius.card,
               },
             ]}
             autoCapitalize="words"
@@ -258,9 +290,9 @@ export function EditProfileScreen({ navigation }: Props) {
         <FieldRow label="Email">
           <View
             style={{
-              backgroundColor:  colors.bg.surface,
-              marginHorizontal: spacing[4],
-              borderRadius:     borderRadius.card,
+              backgroundColor:   colors.bg.surface,
+              marginHorizontal:  spacing[4],
+              borderRadius:      borderRadius.card,
               paddingHorizontal: spacing[5],
               paddingVertical:   spacing[4],
               opacity: 0.6,
@@ -280,14 +312,14 @@ export function EditProfileScreen({ navigation }: Props) {
           <Pressable
             onPress={() => setTzPickerOpen(true)}
             style={({ pressed }) => ({
-              backgroundColor:  pressed ? colors.bg.surfaceMuted : colors.bg.surface,
-              marginHorizontal: spacing[4],
-              borderRadius:     borderRadius.card,
+              backgroundColor:   pressed ? colors.bg.surfaceMuted : colors.bg.surface,
+              marginHorizontal:  spacing[4],
+              borderRadius:      borderRadius.card,
               paddingHorizontal: spacing[5],
               paddingVertical:   spacing[4],
-              flexDirection:    'row',
-              alignItems:       'center',
-              justifyContent:   'space-between',
+              flexDirection:     'row',
+              alignItems:        'center',
+              justifyContent:    'space-between',
             })}
           >
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.primary }}>
@@ -302,14 +334,14 @@ export function EditProfileScreen({ navigation }: Props) {
           <Pressable
             onPress={() => setFyPickerOpen(true)}
             style={({ pressed }) => ({
-              backgroundColor:  pressed ? colors.bg.surfaceMuted : colors.bg.surface,
-              marginHorizontal: spacing[4],
-              borderRadius:     borderRadius.card,
+              backgroundColor:   pressed ? colors.bg.surfaceMuted : colors.bg.surface,
+              marginHorizontal:  spacing[4],
+              borderRadius:      borderRadius.card,
               paddingHorizontal: spacing[5],
               paddingVertical:   spacing[4],
-              flexDirection:    'row',
-              alignItems:       'center',
-              justifyContent:   'space-between',
+              flexDirection:     'row',
+              alignItems:        'center',
+              justifyContent:    'space-between',
             })}
           >
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.primary }}>
@@ -321,7 +353,6 @@ export function EditProfileScreen({ navigation }: Props) {
 
       </ScrollView>
 
-      {/* Timezone picker */}
       <PickerModal
         visible={tzPickerOpen}
         title="Select Timezone"
@@ -332,7 +363,6 @@ export function EditProfileScreen({ navigation }: Props) {
         theme={theme}
       />
 
-      {/* Fiscal year start picker */}
       <PickerModal
         visible={fyPickerOpen}
         title="Fiscal Year Start"
