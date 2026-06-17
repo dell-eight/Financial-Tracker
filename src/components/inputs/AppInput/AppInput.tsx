@@ -51,13 +51,13 @@ export function AppInput({
 
   const hasError = Boolean(error);
 
-  const handleFocus = (e: any) => {
+  const handleFocus: NonNullable<TextInputProps['onFocus']> = (e) => {
     setIsFocused(true);
     focusProgress.value = withTiming(1, { duration: theme.animation.duration.fast });
     onFocus?.(e);
   };
 
-  const handleBlur = (e: any) => {
+  const handleBlur: NonNullable<TextInputProps['onBlur']> = (e) => {
     setIsFocused(false);
     focusProgress.value = withTiming(0, { duration: theme.animation.duration.fast });
     onBlur?.(e);

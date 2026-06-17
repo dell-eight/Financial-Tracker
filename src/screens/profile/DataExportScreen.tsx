@@ -98,7 +98,7 @@ function buildJson(
   debts:   DebtItem[]  | undefined,
   opts:    { inclTxns: boolean; inclBudgets: boolean; inclNetWorth: boolean },
 ): string {
-  const payload: Record<string, any> = { exportedAt: new Date().toISOString() };
+  const payload: Record<string, unknown> = { exportedAt: new Date().toISOString() };
   if (opts.inclTxns)     payload.transactions = txns;
   if (opts.inclBudgets)  payload.budgets      = budgets  ?? [];
   if (opts.inclNetWorth) { payload.assets = assets ?? []; payload.debts = debts ?? []; }
@@ -149,7 +149,7 @@ export function DataExportScreen({ navigation }: Props) {
   const as = a.map(sv => useAnimatedStyle(() => ({ opacity: sv.value, transform: [{ translateY: (1 - sv.value) * 12 }] })));
 
   const progress = useSharedValue(0);
-  const progressStyle = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` as any }));
+  const progressStyle = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` as `${number}%` }));
 
   async function handleExport() {
     if (format === 'pdf') {

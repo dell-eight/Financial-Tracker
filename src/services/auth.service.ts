@@ -43,7 +43,7 @@ export async function signUp(credentials: AuthCredentials): Promise<AuthResponse
 
     // public.users is populated automatically by the on_auth_user_created trigger
     return {
-      user: data.user as any,
+      user: data.user as unknown as User,
       session: data.session,
       error: null,
     };
@@ -72,7 +72,7 @@ export async function signIn(credentials: AuthCredentials): Promise<AuthResponse
     }
 
     return {
-      user: data.user as any,
+      user: data.user as unknown as User,
       session: data.session,
       error: null,
     };

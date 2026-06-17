@@ -75,8 +75,8 @@ function AccountFormModal({
     try {
       await onSave(name.trim(), parsed);
       onClose();
-    } catch (e: any) {
-      setError(e?.message ?? 'Something went wrong. Please try again.');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
       setSaving(false);
     }
   }

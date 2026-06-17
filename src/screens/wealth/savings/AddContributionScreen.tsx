@@ -93,8 +93,8 @@ export function AddContributionScreen({ navigation, route }: Props) {
       } else {
         navigation.goBack();
       }
-    } catch (e: any) {
-      setError(e?.message ?? 'Failed to save contribution. Please try again.');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to save contribution. Please try again.');
       setSaving(false);
     }
   }

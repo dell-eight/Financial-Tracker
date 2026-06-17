@@ -245,8 +245,8 @@ export function AddTransferScreen({ navigation }: Props) {
       ]);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.navigate('TransactionList', undefined);
-    } catch (e: any) {
-      setSaveError(e?.message ?? 'Failed to save transfer. Please try again.');
+    } catch (e: unknown) {
+      setSaveError(e instanceof Error ? e.message : 'Failed to save transfer. Please try again.');
       setSaving(false);
     }
   }

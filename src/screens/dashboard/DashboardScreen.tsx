@@ -545,7 +545,7 @@ export function DashboardScreen({ navigation }: Props) {
   // Tab navigator for cross-tab navigation
   function goToTab(tab: keyof MainTabParamList) {
     const p = navigation.getParent<NavigationProp<MainTabParamList>>();
-    p?.navigate(tab as any);
+    p?.navigate(tab as never);
   }
 
   return (

@@ -139,8 +139,8 @@ export function AddIncomeScreen({ navigation }: Props) {
       await Promise.all(keys);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.navigate('TransactionList', undefined);
-    } catch (e: any) {
-      setSaveError(e?.message ?? 'Failed to save. Please try again.');
+    } catch (e: unknown) {
+      setSaveError(e instanceof Error ? e.message : 'Failed to save. Please try again.');
       setSaving(false);
     }
   }
