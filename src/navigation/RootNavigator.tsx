@@ -47,13 +47,18 @@ export function RootNavigator() {
 
     // Keep store in sync with Supabase auth events (login, logout, token refresh)
     // getUser() ensures user_metadata (e.g. avatar_url) is always server-authoritative
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         const { data: { user } } = await supabase.auth.getUser();
+        // Clear on explicit SIGNED_IN so a new user never sees a previous user's
+        // cached data. Skip TOKEN_REFRESHED / USER_UPDATED / INITIAL_SESSION to
+        // avoid unnecessary cache wipes for the already-authenticated user.
+        if (event === 'SIGNED_IN') {
+          queryClient.clear();
+        }
         setSession(user ?? session.user ?? null);
       } else {
-        // Clear all cached query data so the next user never sees stale data
-        // from the previous session
+        // Session gone (SIGNED_OUT) — wipe everything immediately
         queryClient.clear();
         setSession(null);
       }
