@@ -9,6 +9,7 @@ import { useAuthStore } from '../store/auth.store';
 import { useAppStore } from '../store/app.store';
 import { BiometricLockScreen } from '../screens/auth/BiometricLockScreen';
 import { supabase } from '../lib/supabase';
+import { queryClient } from '../lib/queryClient';
 import { OfflineBanner } from '../components/common/OfflineBanner';
 import { MilestoneModal } from '../components/wealth/MilestoneModal';
 import {
@@ -51,6 +52,9 @@ export function RootNavigator() {
         const { data: { user } } = await supabase.auth.getUser();
         setSession(user ?? session.user ?? null);
       } else {
+        // Clear all cached query data so the next user never sees stale data
+        // from the previous session
+        queryClient.clear();
         setSession(null);
       }
       // Reset biometric lock whenever the session changes (login / logout)
