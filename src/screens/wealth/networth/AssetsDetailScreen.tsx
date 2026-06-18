@@ -21,11 +21,12 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useAssets, ASSETS_KEY, DEBTS_KEY } from '../../../hooks/queries/useNetWorth';
 import { useSavingsGoals } from '../../../hooks/queries/useSavingsGoals';
+import { useInvestments } from '../../../hooks/queries/useInvestments';
 import { DASHBOARD_KEY } from '../../../hooks/queries/useDashboard';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
 import { createAsset, deleteAsset, hasTransactionsForAccount } from '../../../services/finance.service';
-import type { AssetCategory, AssetItem } from '../../../types/models';
+import type { AssetCategory, AssetItem, AssetType } from '../../../types/models';
 import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'AssetsDetail'>;
@@ -39,6 +40,10 @@ const CATEGORY_LABELS: Record<AssetCategory, string> = {
 };
 
 const CATEGORY_ORDER: AssetCategory[] = ['cash', 'investment', 'real_estate', 'vehicle', 'other'];
+
+const TYPE_LABELS: Record<AssetType, string> = {
+  stock: 'Stock', etf: 'ETF', fund: 'Mutual Fund', bond: 'Bond', crypto: 'Crypto',
+};
 
 // ─── AccountFormModal ─────────────────────────────────────────────────────────
 
@@ -165,6 +170,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
 
   const { data: assets, isLoading } = useAssets();
   const { data: savingsGoals = [] }  = useSavingsGoals();
+  const { data: holdings = [] }      = useInvestments();
 
   const [formVisible, setFormVisible] = useState(false);
   const [mutating,    setMutating]    = useState(false);
@@ -173,9 +179,17 @@ export function AssetsDetailScreen({ navigation }: Props) {
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
 
+  const investmentsMarketValue = useMemo(
+    () => holdings.reduce((s, h) => s + h.shares * h.currentPrice, 0),
+    [holdings],
+  );
+
   const totalAssets = useMemo(
-    () => (assets ?? []).reduce((s, a) => s + a.balance, 0),
-    [assets],
+    () =>
+      (assets ?? [])
+        .filter(a => a.category !== 'investment' && a.id !== 'savings_goals_total')
+        .reduce((s, a) => s + a.balance, 0) + investmentsMarketValue,
+    [assets, investmentsMarketValue],
   );
 
   const savingsGoalsTotal = useMemo(
@@ -190,7 +204,8 @@ export function AssetsDetailScreen({ navigation }: Props) {
       if (!map[a.category]) map[a.category] = [];
       map[a.category]!.push(a);
     }
-    return CATEGORY_ORDER.filter(c => !!map[c]).map(c => ({ category: c, items: map[c]! }));
+    // investment category is rendered separately via holdings — exclude it here
+    return CATEGORY_ORDER.filter(c => !!map[c] && c !== 'investment').map(c => ({ category: c, items: map[c]! }));
   }, [assets]);
 
   async function handleAdd(name: string, balance: number) {
@@ -304,6 +319,59 @@ export function AssetsDetailScreen({ navigation }: Props) {
             </View>
           )}
 
+          {/* ── Investments section (individual holdings) ── */}
+          <View style={{ marginBottom: spacing[5] }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing[5], marginBottom: spacing[2] }}>
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                Investments
+              </Text>
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.secondary }}>
+                {fmtShort(investmentsMarketValue)}
+              </Text>
+            </View>
+            <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], overflow: 'hidden' }]}>
+              {holdings.length === 0 ? (
+                <View style={{ paddingHorizontal: spacing[4], paddingVertical: spacing[4] }}>
+                  <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted }}>
+                    No holdings yet — add them from the Investments tab
+                  </Text>
+                </View>
+              ) : holdings.map((h, idx) => {
+                const marketValue = h.shares * h.currentPrice;
+                return (
+                  <Pressable
+                    key={h.id}
+                    onPress={() => navigation.push('HoldingDetail', { holdingId: h.id })}
+                    style={({ pressed }) => [
+                      s.itemRow,
+                      {
+                        paddingHorizontal: spacing[4],
+                        paddingVertical:   spacing[4],
+                        borderBottomWidth: idx < holdings.length - 1 ? StyleSheet.hairlineWidth : 0,
+                        borderBottomColor: colors.border.subtle,
+                        backgroundColor:   pressed ? colors.bg.surfaceMuted : colors.bg.surface,
+                      },
+                    ]}
+                  >
+                    <View style={{ width: 40, height: 40, borderRadius: borderRadius.full, backgroundColor: h.color + '20', alignItems: 'center', justifyContent: 'center', marginRight: spacing[3] }}>
+                      <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.bold, color: h.color, letterSpacing: 0.5 }}>{h.symbol}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary }} numberOfLines={1}>{h.name}</Text>
+                      <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>{TYPE_LABELS[h.assetType]}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                      <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: h.color }}>
+                        {fmtShort(marketValue)}
+                      </Text>
+                      <Text style={{ fontSize: 14, color: colors.text.muted }}>›</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
           {/* ── Category sections ── */}
           {grouped.map(({ category, items }) => {
             const subtotal = items.reduce((s, a) => s + a.balance, 0);
@@ -415,6 +483,12 @@ export function AssetsDetailScreen({ navigation }: Props) {
                     sub:   items.reduce((sum, a) => sum + a.balance, 0),
                     color: items[0]?.color ?? colors.accent.primary,
                   })),
+                  ...(investmentsMarketValue > 0 ? [{
+                    key:   'investment',
+                    label: 'Investments',
+                    sub:   investmentsMarketValue,
+                    color: colors.accent.primary,
+                  }] : []),
                   ...(savingsGoalsTotal > 0 ? [{
                     key:   'savings_goals',
                     label: 'Saving Goals',
@@ -452,7 +526,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
           )}
 
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', marginTop: spacing[5], paddingHorizontal: spacing[5] }}>
-            Tap any account to view transactions · Long-press to delete
+            Tap a holding to view trade history · Long-press a bank account to delete
           </Text>
         </ScrollView>
       )}
