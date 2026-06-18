@@ -48,21 +48,20 @@ export function RootNavigator() {
     // Keep store in sync with Supabase auth events (login, logout, token refresh)
     // getUser() ensures user_metadata (e.g. avatar_url) is always server-authoritative
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      // Clear cache synchronously — before any await — so no query can
+      // refetch with the wrong user's uid during the getUser() round-trip.
+      // Skips TOKEN_REFRESHED / USER_UPDATED / INITIAL_SESSION so the
+      // current user's live data is never discarded mid-session.
+      if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
+        queryClient.clear();
+      }
+
       if (session) {
         const { data: { user } } = await supabase.auth.getUser();
-        // Clear on explicit SIGNED_IN so a new user never sees a previous user's
-        // cached data. Skip TOKEN_REFRESHED / USER_UPDATED / INITIAL_SESSION to
-        // avoid unnecessary cache wipes for the already-authenticated user.
-        if (event === 'SIGNED_IN') {
-          queryClient.clear();
-        }
         setSession(user ?? session.user ?? null);
       } else {
-        // Session gone (SIGNED_OUT) — wipe everything immediately
-        queryClient.clear();
         setSession(null);
       }
-      // Reset biometric lock whenever the session changes (login / logout)
       setBiometricUnlocked(false);
     });
 
