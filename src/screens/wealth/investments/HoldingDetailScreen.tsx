@@ -195,11 +195,14 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
             setDeleting(true);
             try {
               await deleteHolding(holdingId);
-              await Promise.all([
-                queryClient.invalidateQueries({ queryKey: HOLDINGS_KEY }),
-                queryClient.invalidateQueries({ queryKey: INVESTMENT_TX_KEY }),
-              ]);
+              // Optimistically remove from cache so parent screen reflects deletion immediately
+              queryClient.setQueryData(HOLDINGS_KEY, (old: InvestmentHolding[] | undefined) =>
+                (old ?? []).filter(h => h.id !== holdingId),
+              );
               navigation.goBack();
+              // Invalidate in the background for eventual consistency
+              queryClient.invalidateQueries({ queryKey: HOLDINGS_KEY });
+              queryClient.invalidateQueries({ queryKey: INVESTMENT_TX_KEY });
             } catch (e) {
               setDeleting(false);
               Alert.alert('Error', e instanceof Error ? e.message : 'Failed to remove holding. Please try again.');

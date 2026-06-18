@@ -1066,13 +1066,15 @@ export async function deleteHolding(holdingId: string): Promise<void> {
     .eq('user_id', userId);
   if (txError) throw txError;
 
-  // Soft-delete the holding itself
-  const { error } = await supabase
+  // Soft-delete the holding itself; .select() lets us verify a row was matched
+  const { data: updated, error } = await supabase
     .from('investment_holdings')
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', holdingId)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .select('id');
   if (error) throw error;
+  if (!updated || updated.length === 0) throw new Error('Holding not found or already deleted.');
 }
 
 // ── Assets ─────────────────────────────────────────────────────────────────────
