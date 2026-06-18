@@ -205,7 +205,10 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
               queryClient.invalidateQueries({ queryKey: INVESTMENT_TX_KEY });
             } catch (e) {
               setDeleting(false);
-              Alert.alert('Error', e instanceof Error ? e.message : 'Failed to remove holding. Please try again.');
+              const msg = e instanceof Error
+                ? e.message
+                : (e as any)?.message ?? 'Failed to remove holding. Please try again.';
+              Alert.alert('Error', msg);
             }
           },
         },
