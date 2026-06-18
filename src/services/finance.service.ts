@@ -169,6 +169,9 @@ export async function getDashboard(): Promise<DashboardSummary> {
     ? (balanceDelta / Math.abs(previousNW)) * 100
     : 0;
 
+  // Fire-and-forget: snapshot + milestone check runs in background
+  void syncWealthProgression();
+
   return {
     totalBalance: netWorth,
     netWorth,
@@ -181,6 +184,185 @@ export async function getDashboard(): Promise<DashboardSummary> {
     totalDebts,
     investmentValue,
   };
+}
+
+// ── Wealth Progression ─────────────────────────────────────────────────────────
+
+export interface NewMilestone {
+  id:       string;
+  type:     string;
+  label:    string;
+  emoji:    string;
+  netWorth: number;
+}
+
+const MILESTONE_DEFS = [
+  { type: 'positive_nw', threshold: 0,          label: 'Positive Net Worth', emoji: '🌱' },
+  { type: 'nw_100k',     threshold: 100_000,     label: '₱100K Net Worth',   emoji: '💰' },
+  { type: 'nw_500k',     threshold: 500_000,     label: '₱500K Net Worth',   emoji: '🚀' },
+  { type: 'nw_1m',       threshold: 1_000_000,   label: 'Millionaire',       emoji: '🏆' },
+  { type: 'nw_5m',       threshold: 5_000_000,   label: '₱5M Net Worth',     emoji: '💎' },
+  { type: 'nw_10m',      threshold: 10_000_000,  label: '₱10M Net Worth',    emoji: '👑' },
+  { type: 'debt_free',   threshold: null,         label: 'Debt Free',         emoji: '🔓' },
+] as const;
+
+export async function upsertMonthlySnapshot(): Promise<void> {
+  const userId = await uid();
+
+  const [bankRes, holdingRes, goalRes, debtRes] = await Promise.all([
+    supabase.from('asset_accounts').select('balance, asset_type').eq('user_id', userId).is('deleted_at', null),
+    supabase.from('investment_holdings').select('shares, current_price').eq('user_id', userId).is('deleted_at', null),
+    supabase.from('savings_goals').select('savings_goal_contributions(amount)').eq('user_id', userId).is('deleted_at', null),
+    supabase.from('debt_accounts').select('balance').eq('user_id', userId).is('deleted_at', null),
+  ]);
+
+  type RawAssetTypeRow = { balance: unknown; asset_type: string };
+  const bankRows    = bankRes.data    as RawAssetTypeRow[] ?? [];
+  const holdingRows = holdingRes.data as RawSharesRow[]   ?? [];
+  const goalRows    = goalRes.data    as RawGoalContribRow[] ?? [];
+  const debtRows    = debtRes.data    as RawBalanceRow[]   ?? [];
+
+  const liquidAssets = bankRows
+    .filter(a => ['checking','savings','money_market','cash'].includes(a.asset_type))
+    .reduce((s, a) => s + Number(a.balance ?? 0), 0);
+  const realEstate = bankRows
+    .filter(a => a.asset_type === 'property')
+    .reduce((s, a) => s + Number(a.balance ?? 0), 0);
+  const otherAssets = bankRows
+    .filter(a => !['checking','savings','money_market','cash','property','investment'].includes(a.asset_type))
+    .reduce((s, a) => s + Number(a.balance ?? 0), 0);
+  const investments  = holdingRows.reduce((s, h) => s + Number(h.shares ?? 0) * Number(h.current_price ?? 0), 0);
+  const savingsContribs = goalRows.reduce((s, g) =>
+    s + (g.savings_goal_contributions ?? []).reduce((gs, c) => gs + Number(c.amount ?? 0), 0), 0);
+  const totalAssets = liquidAssets + investments + realEstate + otherAssets + savingsContribs;
+  const totalDebts  = debtRows.reduce((s, d) => s + Number(d.balance ?? 0), 0);
+  const netWorth    = totalAssets - totalDebts;
+
+  const now           = new Date();
+  const snapshotDate  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
+  await supabase.rpc('upsert_net_worth_snapshot', {
+    p_user_id:       userId,
+    p_snapshot_date: snapshotDate,
+    p_total_assets:  totalAssets,
+    p_total_debts:   totalDebts,
+    p_net_worth:     netWorth,
+    p_liquid_assets: liquidAssets + savingsContribs,
+    p_investments:   investments,
+    p_real_estate:   realEstate,
+    p_other_assets:  otherAssets,
+  });
+}
+
+export async function checkAndRecordMilestones(
+  netWorth:   number,
+  totalDebts: number,
+): Promise<NewMilestone[]> {
+  const userId = await uid();
+
+  // Fetch already-recorded milestones so we never double-insert
+  const { data: existing } = await supabase
+    .from('wealth_milestones')
+    .select('milestone_type')
+    .eq('user_id', userId);
+
+  const existingTypes = new Set((existing ?? []).map((r: { milestone_type: string }) => r.milestone_type));
+
+  const toInsert = MILESTONE_DEFS.filter(m => {
+    if (existingTypes.has(m.type)) return false;
+    if (m.type === 'debt_free') return totalDebts === 0 && netWorth > 0;
+    return netWorth >= (m.threshold ?? 0);
+  });
+
+  if (toInsert.length === 0) return [];
+
+  const rows = toInsert.map(m => ({
+    user_id:                  userId,
+    milestone_type:           m.type,
+    net_worth_at_achievement: netWorth,
+    celebrated:               false,
+  }));
+
+  const { data: inserted } = await supabase
+    .from('wealth_milestones')
+    .insert(rows)
+    .select('id, milestone_type');
+
+  if (!inserted) return [];
+
+  return (inserted as { id: string; milestone_type: string }[]).map(row => {
+    const def = MILESTONE_DEFS.find(m => m.type === row.milestone_type)!;
+    return { id: row.id, type: row.milestone_type, label: def.label, emoji: def.emoji, netWorth };
+  });
+}
+
+export async function markMilestoneCelebrated(milestoneId: string): Promise<void> {
+  await supabase
+    .from('wealth_milestones')
+    .update({ celebrated: true })
+    .eq('id', milestoneId);
+}
+
+export async function getAllMilestones(): Promise<{
+  id: string; type: string; label: string; emoji: string;
+  achievedAt: string; netWorthAtAchievement: number; celebrated: boolean;
+}[]> {
+  const userId = await uid();
+  const { data } = await supabase
+    .from('wealth_milestones')
+    .select('id, milestone_type, achieved_at, net_worth_at_achievement, celebrated')
+    .eq('user_id', userId)
+    .order('achieved_at', { ascending: false });
+
+  return (data ?? []).map((r: {
+    id: string; milestone_type: string; achieved_at: string;
+    net_worth_at_achievement: unknown; celebrated: boolean;
+  }) => {
+    const def = MILESTONE_DEFS.find(m => m.type === r.milestone_type);
+    return {
+      id:                   r.id,
+      type:                 r.milestone_type,
+      label:                def?.label ?? r.milestone_type,
+      emoji:                def?.emoji ?? '🏅',
+      achievedAt:           r.achieved_at,
+      netWorthAtAchievement: Number(r.net_worth_at_achievement ?? 0),
+      celebrated:           r.celebrated,
+    };
+  });
+}
+
+export async function syncWealthProgression(): Promise<void> {
+  try {
+    await upsertMonthlySnapshot();
+  } catch {
+    // snapshot errors must never surface to the user
+    return;
+  }
+
+  try {
+    // Re-derive live net worth to check milestones
+    const [bankRes, holdingRes, goalRes, debtRes] = await Promise.all([
+      supabase.from('asset_accounts').select('balance').eq('user_id', await uid()).is('deleted_at', null),
+      supabase.from('investment_holdings').select('shares, current_price').eq('user_id', await uid()).is('deleted_at', null),
+      supabase.from('savings_goals').select('savings_goal_contributions(amount)').eq('user_id', await uid()).is('deleted_at', null),
+      supabase.from('debt_accounts').select('balance').eq('user_id', await uid()).is('deleted_at', null),
+    ]);
+    const bank  = (bankRes.data    as RawBalanceRow[]     ?? []).reduce((s, a) => s + Number(a.balance ?? 0), 0);
+    const inv   = (holdingRes.data as RawSharesRow[]      ?? []).reduce((s, h) => s + Number(h.shares ?? 0) * Number(h.current_price ?? 0), 0);
+    const sav   = (goalRes.data    as RawGoalContribRow[] ?? []).reduce((s, g) =>
+      s + (g.savings_goal_contributions ?? []).reduce((gs, c) => gs + Number(c.amount ?? 0), 0), 0);
+    const debts = (debtRes.data    as RawBalanceRow[]     ?? []).reduce((s, d) => s + Number(d.balance ?? 0), 0);
+    const nw    = bank + inv + sav - debts;
+
+    const newMilestones = await checkAndRecordMilestones(nw, debts);
+    if (newMilestones.length > 0) {
+      // Import lazily to avoid circular dep with store
+      const { useAppStore } = await import('../store/app.store');
+      useAppStore.getState().addPendingMilestones(newMilestones);
+    }
+  } catch {
+    // milestone errors must never surface to the user
+  }
 }
 
 // ── Transactions ───────────────────────────────────────────────────────────────
@@ -1223,8 +1405,9 @@ export interface MonthPoint {
 }
 
 export interface NWPoint {
-  label: string;
-  nw:    number;
+  label:  string;
+  nw:     number;
+  isLive?: boolean;
 }
 
 export interface IncomeStream {
@@ -1310,18 +1493,34 @@ export async function getNetWorthHistory(months = 12): Promise<NWPoint[]> {
   cutoff.setUTCMonth(cutoff.getUTCMonth() - (months - 1));
   const cutoffStr = cutoff.toISOString().slice(0, 10);
 
-  const { data } = await supabase
-    .from('net_worth_snapshots')
-    .select('snapshot_date, net_worth')
-    .eq('user_id', userId)
-    .gte('snapshot_date', cutoffStr)
-    .order('snapshot_date', { ascending: true })
-    .limit(months);
+  const [snapRes, bankRes, holdingRes, goalRes, debtRes] = await Promise.all([
+    supabase
+      .from('net_worth_snapshots')
+      .select('snapshot_date, net_worth')
+      .eq('user_id', userId)
+      .gte('snapshot_date', cutoffStr)
+      .order('snapshot_date', { ascending: true })
+      .limit(months),
+    supabase.from('asset_accounts').select('balance').eq('user_id', userId).is('deleted_at', null),
+    supabase.from('investment_holdings').select('shares, current_price').eq('user_id', userId).is('deleted_at', null),
+    supabase.from('savings_goals').select('savings_goal_contributions(amount)').eq('user_id', userId).is('deleted_at', null),
+    supabase.from('debt_accounts').select('balance').eq('user_id', userId).is('deleted_at', null),
+  ]);
 
-  return (data as RawNWRow[] ?? []).map((r: RawNWRow) => ({
+  const snapshots = (snapRes.data as RawNWRow[] ?? []).map((r: RawNWRow) => ({
     label: monthLabel(r.snapshot_date),
     nw:    Number(r.net_worth ?? 0),
   }));
+
+  // Compute live net worth to append as the "Now" point
+  const bankTotal      = (bankRes.data    as RawBalanceRow[]     ?? []).reduce((s, a) => s + Number(a.balance ?? 0), 0);
+  const investTotal    = (holdingRes.data as RawSharesRow[]      ?? []).reduce((s, h) => s + Number(h.shares ?? 0) * Number(h.current_price ?? 0), 0);
+  const savingsTotal   = (goalRes.data    as RawGoalContribRow[] ?? []).reduce((s, g) =>
+    s + (g.savings_goal_contributions ?? []).reduce((gs, c) => gs + Number(c.amount ?? 0), 0), 0);
+  const totalDebtsLive = (debtRes.data    as RawBalanceRow[]     ?? []).reduce((s, d) => s + Number(d.balance ?? 0), 0);
+  const liveNW         = bankTotal + investTotal + savingsTotal - totalDebtsLive;
+
+  return [...snapshots, { label: 'Now', nw: liveNW, isLive: true }];
 }
 
 export async function getIncomeStreams(): Promise<IncomeStream[]> {

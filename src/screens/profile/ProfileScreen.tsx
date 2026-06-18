@@ -23,6 +23,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useAuthStore } from '../../store/auth.store';
 import { useAppStore } from '../../store/app.store';
+import { signOut } from '../../services/auth.service';
 import { useCurrency } from '../../utils/currency';
 import type { ThemePreference } from '../../store/app.store';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
@@ -343,7 +344,10 @@ export function ProfileScreen({ navigation }: Props) {
         {
           text:    'Sign Out',
           style:   'destructive',
-          onPress: clearAuth,
+          onPress: async () => {
+            await signOut();
+            clearAuth();
+          },
         },
       ],
     );

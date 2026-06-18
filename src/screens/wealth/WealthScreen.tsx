@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
@@ -20,6 +21,7 @@ import { useNetWorthHistory } from '../../hooks/queries/useAnalytics';
 import type { WealthStackParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
 import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
+import { NetWorthChart } from '../../components/wealth/NetWorthChart';
 
 type Props = StackScreenProps<WealthStackParamList, 'WealthMain'>;
 
@@ -31,22 +33,49 @@ const SUB_TABS: { key: SubTab; label: string; icon: string; phase: string }[] = 
   { key: 'investments',  label: 'Investments', icon: '📈', phase: 'Phase 6' },
 ];
 
+interface MilestoneDef {
+  type:       string;
+  threshold:  number;
+  label:      string;
+  emoji:      string;
+  isDebtFree?: boolean;
+}
+
+// Milestone definitions (mirrors finance.service.ts — used for "Next Milestone" card only)
+const MILESTONE_DEFS: MilestoneDef[] = [
+  { type: 'positive_nw', threshold: 0,          label: 'Positive Net Worth', emoji: '🌱' },
+  { type: 'nw_100k',     threshold: 100_000,     label: '₱100K Net Worth',   emoji: '💰' },
+  { type: 'nw_500k',     threshold: 500_000,     label: '₱500K Net Worth',   emoji: '🚀' },
+  { type: 'nw_1m',       threshold: 1_000_000,   label: 'Millionaire',       emoji: '🏆' },
+  { type: 'nw_5m',       threshold: 5_000_000,   label: '₱5M Net Worth',     emoji: '💎' },
+  { type: 'nw_10m',      threshold: 10_000_000,  label: '₱10M Net Worth',    emoji: '👑' },
+];
+
+const CHART_SIDE_PAD = 20;
+
 // ── Net Worth overview ────────────────────────────────────────────────────────
 
 function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
 
-  const { data: assets  } = useAssets();
-  const { data: debts   } = useDebts();
-  const { data: nwHist  } = useNetWorthHistory(2);
+  const [period, setPeriod] = useState<6 | 12 | 24>(12);
+  const { data: assets } = useAssets();
+  const { data: debts  } = useDebts();
+  const { data: nwHist } = useNetWorthHistory(period);
 
   const totalAssets = useMemo(() => (assets ?? []).reduce((s, a) => s + a.balance, 0), [assets]);
   const totalDebts  = useMemo(() => (debts  ?? []).reduce((s, d) => s + d.balance,  0), [debts]);
   const netWorth    = totalAssets - totalDebts;
 
+  const { fmt, fmtCompact: fmtShort } = useCurrency();
+
+  const screenW  = Dimensions.get('window').width;
+  const chartW   = screenW - CHART_SIDE_PAD * 2;
+
+  // Month-over-month delta (last two non-live points)
   const { deltaAmt, deltaPct } = useMemo(() => {
-    const snaps = nwHist ?? [];
+    const snaps = (nwHist ?? []).filter(p => !p.isLive);
     if (snaps.length < 2) return { deltaAmt: 0, deltaPct: 0 };
     const curr = snaps[snaps.length - 1].nw;
     const prev = snaps[snaps.length - 2].nw;
@@ -55,19 +84,45 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
     return { deltaAmt: amt, deltaPct: pct };
   }, [nwHist]);
 
-  const { fmt, fmtCompact: fmtShort } = useCurrency();
+  // Monthly progress — 3-month rolling average
+  const monthlyProgress = useMemo(() => {
+    const snaps = (nwHist ?? []).filter(p => !p.isLive);
+    if (snaps.length < 4) return 0;
+    const recent = snaps[snaps.length - 1].nw;
+    const base   = snaps[snaps.length - 4].nw;
+    return (recent - base) / 3;
+  }, [nwHist]);
 
-  // Asset category breakdown for mini bars
-  const assetGroups = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const a of assets ?? []) {
-      map[a.category] = (map[a.category] ?? 0) + a.balance;
+  // Next milestone
+  const nextMilestone = useMemo<MilestoneDef | null>(() => {
+    if (totalDebts > 0) {
+      return { type: 'debt_free', threshold: 0, label: 'Debt Free', emoji: '🔓', isDebtFree: true };
     }
-    return Object.entries(map).map(([cat, val]) => ({ cat, val })).sort((a, b) => b.val - a.val);
-  }, [assets]);
+    return MILESTONE_DEFS.find(m => netWorth < m.threshold) ?? null;
+  }, [netWorth, totalDebts]);
 
-  const CAT_LABELS: Record<string, string> = { cash: 'Cash', investment: 'Investments', vehicle: 'Vehicles', real_estate: 'Property', other: 'Other' };
-  const CAT_COLORS: Record<string, string> = { cash: '#755DEF', investment: '#F97316', vehicle: '#EC4899', real_estate: '#22C55E', other: '#6B7280' };
+  const milestoneProgress = useMemo(() => {
+    if (!nextMilestone || nextMilestone.isDebtFree) return 0;
+    const prev = MILESTONE_DEFS[MILESTONE_DEFS.indexOf(nextMilestone) - 1];
+    const base = prev?.threshold ?? 0;
+    const span = nextMilestone.threshold - base;
+    return span > 0 ? Math.min((netWorth - base) / span, 1) : 0;
+  }, [nextMilestone, netWorth]);
+
+  const debtFreeProgress = totalDebts > 0 && nextMilestone?.isDebtFree
+    ? Math.min((1 - totalDebts / (totalDebts + totalAssets * 0.5)), 1)
+    : 0;
+
+  const progressPct = nextMilestone?.isDebtFree ? debtFreeProgress : milestoneProgress;
+
+  const monthsAway = useMemo(() => {
+    if (!nextMilestone || monthlyProgress <= 0) return null;
+    if (nextMilestone.isDebtFree) return Math.ceil(totalDebts / monthlyProgress);
+    const remaining = nextMilestone.threshold - netWorth;
+    return remaining > 0 ? Math.ceil(remaining / monthlyProgress) : 0;
+  }, [nextMilestone, monthlyProgress, netWorth, totalDebts]);
+
+  const hasTimeline = (nwHist ?? []).filter(p => !p.isLive).length >= 1;
 
   return (
     <ScrollView
@@ -84,7 +139,7 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
         </Text>
         {deltaAmt !== 0 && (
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: deltaAmt >= 0 ? colors.income : colors.expense, marginTop: spacing[1] }}>
-            {deltaAmt >= 0 ? '↑' : '↓'} {fmtShort(Math.abs(deltaAmt))} ({deltaAmt >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%) this month
+            {deltaAmt >= 0 ? '↑' : '↓'} {fmtShort(Math.abs(deltaAmt))} ({deltaAmt >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%) vs last month
           </Text>
         )}
 
@@ -130,33 +185,121 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
         </Pressable>
       </View>
 
-      {/* ── Asset breakdown mini bars ── */}
-      {assetGroups.length > 0 && (
-        <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4] }]}>
-          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: spacing[3] }}>
-            Asset Breakdown
+      {/* ── Net Worth Timeline ── */}
+      <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, paddingTop: spacing[4], paddingBottom: spacing[3], overflow: 'hidden' }]}>
+        {/* Period selector */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing[4], marginBottom: spacing[3] }}>
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.secondary }}>
+            Net Worth Timeline
           </Text>
-          {assetGroups.map(({ cat, val }) => {
-            const pct   = totalAssets > 0 ? (val / totalAssets) * 100 : 0;
-            const color = CAT_COLORS[cat] ?? colors.accent.primary;
-            return (
-              <View key={cat} style={{ marginBottom: spacing[3] }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary }}>
-                    {CAT_LABELS[cat] ?? cat}
-                  </Text>
-                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
-                    {fmtShort(val)} · {pct.toFixed(1)}%
-                  </Text>
-                </View>
-                <View style={{ height: 5, backgroundColor: colors.bg.surfaceMuted, borderRadius: 99 }}>
-                  <View style={{ height: '100%', width: `${pct}%`, backgroundColor: color, borderRadius: 99 }} />
-                </View>
-              </View>
-            );
-          })}
+          <View style={{ flexDirection: 'row', gap: spacing[1], backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full, padding: 3 }}>
+            {([6, 12, 24] as const).map(p => (
+              <Pressable
+                key={p}
+                onPress={() => setPeriod(p)}
+                style={[{
+                  paddingHorizontal: spacing[3],
+                  paddingVertical:   4,
+                  borderRadius:      borderRadius.full,
+                  backgroundColor:   period === p ? colors.bg.surfaceRaised : 'transparent',
+                }]}
+              >
+                <Text style={{
+                  fontSize:   fontSize.micro,
+                  fontFamily: period === p ? fontFamily.semiBold : fontFamily.regular,
+                  color:      period === p ? colors.text.primary : colors.text.muted,
+                }}>
+                  {p === 6 ? '6M' : p === 12 ? '1Y' : 'All'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {hasTimeline ? (
+          <View style={{ paddingHorizontal: CHART_SIDE_PAD }}>
+            <NetWorthChart data={nwHist ?? []} width={chartW} />
+          </View>
+        ) : (
+          <View style={{ paddingVertical: spacing[6], alignItems: 'center', paddingHorizontal: spacing[5] }}>
+            <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary, textAlign: 'center' }}>
+              Your timeline builds here
+            </Text>
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', marginTop: spacing[2] }}>
+              Keep tracking — your net worth history appears month by month.
+            </Text>
+          </View>
+        )}
+
+        {/* Monthly Progress */}
+        {monthlyProgress !== 0 && (
+          <View style={{
+            flexDirection:   'row',
+            alignItems:      'center',
+            paddingHorizontal: spacing[4],
+            paddingTop:      spacing[3],
+            borderTopWidth:  1,
+            borderTopColor:  colors.border.subtle,
+            marginTop:       spacing[2],
+          }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                Monthly Progress
+              </Text>
+              <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
+                3-month average
+              </Text>
+            </View>
+            <Text style={{
+              fontSize:   fontSize.headingSm,
+              fontFamily: fontFamily.bold,
+              color:      monthlyProgress >= 0 ? colors.income : colors.expense,
+              letterSpacing: -0.3,
+            }}>
+              {monthlyProgress >= 0 ? '+' : ''}{fmtShort(monthlyProgress)}/mo
+            </Text>
+          </View>
+        )}
+      </View>
+
+      {/* ── Next Milestone ── */}
+      {nextMilestone && (
+        <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4] }]}>
+          <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: spacing[3] }}>
+            Next Milestone
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing[3] }}>
+            <Text style={{ fontSize: 32, marginRight: spacing[3] }}>{nextMilestone.emoji}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: colors.text.primary, letterSpacing: -0.3 }}>
+                {nextMilestone.label}
+              </Text>
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
+                {nextMilestone.isDebtFree
+                  ? `${fmtShort(totalDebts)} remaining`
+                  : `${fmtShort(nextMilestone.threshold - netWorth)} to go`
+                }
+                {monthsAway != null && monthsAway > 0 && monthsAway < 120
+                  ? ` · ~${monthsAway} mo away`
+                  : ''}
+              </Text>
+            </View>
+            <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: colors.accent.primary }}>
+              {Math.round(progressPct * 100)}%
+            </Text>
+          </View>
+          {/* Progress bar */}
+          <View style={{ height: 8, backgroundColor: colors.bg.surfaceMuted, borderRadius: 99, overflow: 'hidden' }}>
+            <View style={{
+              height:          '100%',
+              width:           `${Math.min(progressPct * 100, 100)}%`,
+              backgroundColor: colors.accent.primary,
+              borderRadius:    99,
+            }} />
+          </View>
         </View>
       )}
+
     </ScrollView>
   );
 }

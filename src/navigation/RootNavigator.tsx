@@ -10,6 +10,7 @@ import { useAppStore } from '../store/app.store';
 import { BiometricLockScreen } from '../screens/auth/BiometricLockScreen';
 import { supabase } from '../lib/supabase';
 import { OfflineBanner } from '../components/common/OfflineBanner';
+import { MilestoneModal } from '../components/wealth/MilestoneModal';
 import {
   requestPermissionsAndGetToken,
   savePushToken,
@@ -33,14 +34,25 @@ export function RootNavigator() {
   const weeklySummaryEnabled = useAppStore(s => s.weeklySummaryEnabled);
 
   useEffect(() => {
-    // Restore session on cold start
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session?.user ?? null);
+    // Restore session on cold start — use getUser() for server-fresh user_metadata
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session) {
+        const { data: { user } } = await supabase.auth.getUser();
+        setSession(user ?? session.user ?? null);
+      } else {
+        setSession(null);
+      }
     });
 
     // Keep store in sync with Supabase auth events (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session?.user ?? null);
+    // getUser() ensures user_metadata (e.g. avatar_url) is always server-authoritative
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session) {
+        const { data: { user } } = await supabase.auth.getUser();
+        setSession(user ?? session.user ?? null);
+      } else {
+        setSession(null);
+      }
       // Reset biometric lock whenever the session changes (login / logout)
       setBiometricUnlocked(false);
     });
@@ -91,6 +103,7 @@ export function RootNavigator() {
         />
       </Root.Navigator>
       <OfflineBanner />
+      {isAuthenticated && <MilestoneModal />}
     </View>
   );
 }

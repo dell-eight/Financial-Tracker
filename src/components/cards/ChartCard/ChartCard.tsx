@@ -92,6 +92,7 @@ export function ChartCard({
 const styles = StyleSheet.create({
   card: {
     width: '100%',
+    overflow: 'hidden',
   },
   header: {
     flexDirection:  'row',
