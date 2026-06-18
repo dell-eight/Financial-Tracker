@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments, HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
+import { INVESTMENT_TX_KEY } from '../../../hooks/queries/useInvestmentTransactions';
 import { logTrade } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
@@ -87,6 +88,7 @@ export function LogTransactionScreen({ navigation, route }: Props) {
         currentAvgCost: holding.avgCostPerShare,
       });
       await queryClient.invalidateQueries({ queryKey: HOLDINGS_KEY });
+      await queryClient.invalidateQueries({ queryKey: INVESTMENT_TX_KEY });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       navigation.goBack();
     } catch (e: unknown) {

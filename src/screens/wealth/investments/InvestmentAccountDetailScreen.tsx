@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
@@ -13,12 +14,44 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments } from '../../../hooks/queries/useInvestments';
+import { useInvestmentTransactions } from '../../../hooks/queries/useInvestmentTransactions';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
 import type { InvestmentHolding } from '../../../types/models';
+import type { InvestmentTransaction } from '../../../types/supabase';
 import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'InvestmentAccountDetail'>;
+
+// ─── TradeRow ─────────────────────────────────────────────────────────────────
+
+function TradeRow({ tx, theme, fmt }: { tx: InvestmentTransaction; theme: ReturnType<typeof useTheme>; fmt: (n: number) => string }) {
+  const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const isBuy      = tx.transaction_type === 'buy';
+  const typeColor  = isBuy ? colors.income : colors.expense;
+  const typeLabel  = tx.transaction_type.toUpperCase().slice(0, 1);
+  const dateStr    = new Date(tx.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: '2-digit' });
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[4], paddingVertical: spacing[3] }}>
+      {/* Symbol badge */}
+      <View style={{ backgroundColor: typeColor + '20', borderRadius: borderRadius.md, paddingHorizontal: spacing[2], paddingVertical: 4, minWidth: 48, alignItems: 'center', marginRight: spacing[3] }}>
+        <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.bold, color: typeColor, letterSpacing: 0.5 }}>{tx.symbol ?? '—'}</Text>
+        <Text style={{ fontSize: 9, fontFamily: fontFamily.semiBold, color: typeColor, marginTop: 1 }}>{typeLabel}</Text>
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary }}>
+          {tx.shares != null ? `${tx.shares} shares` : '—'}
+          {tx.price_per_share != null ? ` @ ${fmt(tx.price_per_share)}` : ''}
+        </Text>
+        <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>{dateStr}</Text>
+      </View>
+      <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: isBuy ? colors.expense : colors.income }}>
+        {isBuy ? '-' : '+'}{fmt(tx.total_amount)}
+      </Text>
+    </View>
+  );
+}
 
 // ─── InvestmentAccountDetailScreen ───────────────────────────────────────────
 
@@ -30,8 +63,9 @@ export function InvestmentAccountDetailScreen({ navigation, route }: Props) {
   const { accountId } = route.params;
 
   const { data: allHoldings } = useInvestments();
+  const { data: recentActivity, isLoading: activityLoading } = useInvestmentTransactions({ accountId, limit: 20 });
 
-  const [headerStyle, holdingsStyle] = useScreenAnimation(2);
+  const [headerStyle, holdingsStyle, activityStyle] = useScreenAnimation(3);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -163,6 +197,42 @@ export function InvestmentAccountDetailScreen({ navigation, route }: Props) {
             })}
           </View>
         )}
+
+        {/* ── Recent Activity ── */}
+        <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[6] }, activityStyle]}>
+          <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
+            Recent Activity
+          </Text>
+          {activityLoading ? (
+            <ActivityIndicator size="small" color={colors.accent.primary} style={{ paddingVertical: spacing[4] }} />
+          ) : !recentActivity || recentActivity.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: spacing[5] }}>
+              <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted }}>
+                No trades recorded yet
+              </Text>
+              <Pressable
+                onPress={() => holdings.length > 0
+                  ? navigation.push('LogTransaction', { holdingId: holdings[0].id })
+                  : navigation.push('AddHolding', { accountId })
+                }
+                style={({ pressed }) => [{ marginTop: spacing[3], opacity: pressed ? 0.7 : 1 }]}
+              >
+                <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.accent.primary }}>
+                  {holdings.length > 0 ? 'Log First Trade' : 'Add a Holding First'}
+                </Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, overflow: 'hidden' }]}>
+              {recentActivity.map((tx, i) => (
+                <View key={tx.id}>
+                  {i > 0 && <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border.subtle, marginLeft: spacing[4] }} />}
+                  <TradeRow tx={tx} theme={theme} fmt={fmt} />
+                </View>
+              ))}
+            </View>
+          )}
+        </Animated.View>
 
         {/* ── Quick actions ── */}
         <View style={{ flexDirection: 'row', paddingHorizontal: spacing[5], gap: spacing[3], marginTop: spacing[5] }}>

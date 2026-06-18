@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
@@ -16,11 +17,13 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments, HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
+import { useInvestmentTransactions } from '../../../hooks/queries/useInvestmentTransactions';
 import { deleteHolding } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { InvestmentHolding } from '../../../types/models';
+import type { InvestmentTransaction } from '../../../types/supabase';
 import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'HoldingDetail'>;
@@ -73,6 +76,47 @@ function StatRow({ label, value, valueColor, isLast }: { label: string; value: s
   );
 }
 
+// ─── TradeRow ─────────────────────────────────────────────────────────────────
+
+function TradeRow({ tx }: { tx: InvestmentTransaction }) {
+  const theme = useTheme();
+  const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
+  const { fmt } = useCurrency();
+
+  const isBuy    = tx.transaction_type === 'buy';
+  const typeColor = isBuy ? colors.income : colors.expense;
+  const label     = tx.transaction_type.charAt(0).toUpperCase();
+
+  const dateStr = tx.date
+    ? new Date(tx.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '—';
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing[3], borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border.subtle }}>
+      {/* Type badge */}
+      <View style={{ width: 36, height: 36, borderRadius: borderRadius.full, backgroundColor: typeColor + '18', alignItems: 'center', justifyContent: 'center', marginRight: spacing[3] }}>
+        <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.bold, color: typeColor }}>{label}</Text>
+      </View>
+
+      {/* Details */}
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary }}>
+          {tx.shares != null ? `${tx.shares.toLocaleString('en-PH')} shares` : tx.transaction_type}
+          {tx.price_per_share != null ? ` @ ${fmt(tx.price_per_share)}` : ''}
+        </Text>
+        <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
+          {dateStr}
+        </Text>
+      </View>
+
+      {/* Amount */}
+      <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: typeColor }}>
+        {isBuy ? '-' : '+'}{fmt(tx.total_amount)}
+      </Text>
+    </View>
+  );
+}
+
 // ─── HoldingDetailScreen ──────────────────────────────────────────────────────
 
 export function HoldingDetailScreen({ navigation, route }: Props) {
@@ -90,6 +134,8 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
     () => holdings?.find(h => h.id === holdingId),
     [holdings, holdingId],
   );
+
+  const { data: trades, isLoading: tradesLoading } = useInvestmentTransactions({ holdingId });
 
   // Must be declared before any early return to respect hooks order
   const priceBars = useMemo(
@@ -214,6 +260,37 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
           <StatRow label="Market value"     value={fmt(marketValue)} valueColor={holding.color} />
           <StatRow label="Unrealised P&L"   value={`${isPositive ? '+' : ''}${fmt(pnl)}`} valueColor={pnlColor} />
           <StatRow label="Return"           value={`${isPositive ? '+' : ''}${pnlPct.toFixed(2)}%`} valueColor={pnlColor} isLast />
+        </View>
+
+        {/* ── Trade History ── */}
+        <View style={{ paddingHorizontal: spacing[5], marginBottom: spacing[5] }}>
+          <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
+            Trade History
+          </Text>
+
+          {tradesLoading ? (
+            <ActivityIndicator color={colors.accent.primary} style={{ paddingVertical: spacing[4] }} />
+          ) : !trades || trades.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: spacing[5] }}>
+              <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted, marginBottom: spacing[3] }}>
+                No trades recorded yet
+              </Text>
+              <Pressable
+                onPress={() => navigation.push('LogTransaction', { holdingId })}
+                style={({ pressed }) => [{ backgroundColor: colors.accent.primary, borderRadius: borderRadius.button, paddingHorizontal: spacing[5], paddingVertical: spacing[2], opacity: pressed ? 0.8 : 1 }]}
+              >
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: '#FFFFFF' }}>Log First Trade</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, paddingHorizontal: spacing[4] }]}>
+              {trades.map((tx, i) => (
+                <View key={tx.id} style={i === trades.length - 1 ? { borderBottomWidth: 0 } : undefined}>
+                  <TradeRow tx={tx} />
+                </View>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* ── CTAs ── */}

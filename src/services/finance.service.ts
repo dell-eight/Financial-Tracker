@@ -4,6 +4,7 @@ import type {
   Account, AssetItem, DebtItem, InvestmentHolding,
   AssetCategory, DebtCategory, AssetType,
 } from '../types/models';
+import type { InvestmentTransaction } from '../types/supabase';
 import type { CategoryKey } from '../theme';
 
 // ── Raw Supabase row types (query result shapes) ───────────────────────────────
@@ -1511,4 +1512,29 @@ export async function getDebts(): Promise<DebtItem[]> {
     icon:           DEBT_ICON[d.debt_type ?? ''] ?? '💰',
     color:          '#EF4444',
   }));
+}
+
+// ── Investment trade history ───────────────────────────────────────────────────
+
+export async function getTradeHistory(filters: {
+  holdingId?: string;
+  accountId?: string;
+  limit?: number;
+}): Promise<InvestmentTransaction[]> {
+  const userId = await uid();
+
+  let query = supabase
+    .from('investment_transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .order('date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (filters.holdingId) query = query.eq('holding_id', filters.holdingId);
+  if (filters.accountId) query = query.eq('account_id', filters.accountId);
+  if (filters.limit)     query = query.limit(filters.limit);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as InvestmentTransaction[];
 }
