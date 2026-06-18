@@ -176,9 +176,11 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
     if (!holding) return;
     const sym        = holding.symbol;
     const tradeCount = trades?.length ?? 0;
-    const tradeNote  = tradeCount > 0
-      ? `\n\nThis will also permanently delete ${tradeCount} trade record${tradeCount !== 1 ? 's' : ''} for this holding.`
-      : '';
+    const tradeNote  = tradesLoading
+      ? '\n\nThis will also permanently delete all trade records for this holding.'
+      : tradeCount > 0
+        ? `\n\nThis will also permanently delete ${tradeCount} trade record${tradeCount !== 1 ? 's' : ''} for this holding.`
+        : '';
 
     Alert.alert(
       'Remove Holding',
