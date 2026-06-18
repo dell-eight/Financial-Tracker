@@ -1057,6 +1057,16 @@ export async function logTrade(params: {
 
 export async function deleteHolding(holdingId: string): Promise<void> {
   const userId = await uid();
+
+  // Hard-delete all trade records for this holding first
+  const { error: txError } = await supabase
+    .from('investment_transactions')
+    .delete()
+    .eq('holding_id', holdingId)
+    .eq('user_id', userId);
+  if (txError) throw txError;
+
+  // Soft-delete the holding itself
   const { error } = await supabase
     .from('investment_holdings')
     .update({ deleted_at: new Date().toISOString() })

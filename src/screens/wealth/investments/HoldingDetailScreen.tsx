@@ -17,7 +17,7 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../../hooks/ui/useTheme';
 import { useInvestments, HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
-import { useInvestmentTransactions } from '../../../hooks/queries/useInvestmentTransactions';
+import { useInvestmentTransactions, INVESTMENT_TX_KEY } from '../../../hooks/queries/useInvestmentTransactions';
 import { deleteHolding } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
@@ -174,27 +174,38 @@ export function HoldingDetailScreen({ navigation, route }: Props) {
 
   function handleDelete() {
     if (!holding) return;
-    const sym = holding.symbol;
-    Alert.alert('Remove Holding', `Remove ${sym} from your portfolio?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          setDeleting(true);
-          try {
-            await deleteHolding(holdingId);
-            await queryClient.invalidateQueries({ queryKey: HOLDINGS_KEY });
-          } catch {
-            // still navigate back even if delete fails
-          } finally {
-            setDeleting(false);
-          }
-          navigation.goBack();
+    const sym        = holding.symbol;
+    const tradeCount = trades?.length ?? 0;
+    const tradeNote  = tradeCount > 0
+      ? `\n\nThis will also permanently delete ${tradeCount} trade record${tradeCount !== 1 ? 's' : ''} for this holding.`
+      : '';
+
+    Alert.alert(
+      'Remove Holding',
+      `Remove ${sym} from your portfolio?${tradeNote}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            setDeleting(true);
+            try {
+              await deleteHolding(holdingId);
+              await Promise.all([
+                queryClient.invalidateQueries({ queryKey: HOLDINGS_KEY }),
+                queryClient.invalidateQueries({ queryKey: INVESTMENT_TX_KEY }),
+              ]);
+              navigation.goBack();
+            } catch (e) {
+              setDeleting(false);
+              Alert.alert('Error', e instanceof Error ? e.message : 'Failed to remove holding. Please try again.');
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   }
 
   return (
