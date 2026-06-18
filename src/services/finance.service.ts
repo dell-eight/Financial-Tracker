@@ -1056,22 +1056,12 @@ export async function logTrade(params: {
 }
 
 export async function deleteHolding(holdingId: string): Promise<void> {
-  const userId = await uid();
-
-  // Hard-delete all trade records for this holding first
-  const { error: txError } = await supabase
-    .from('investment_transactions')
-    .delete()
-    .eq('holding_id', holdingId)
-    .eq('user_id', userId);
-  if (txError) throw txError;
-
-  // Soft-delete the holding itself
-  const { error } = await supabase
-    .from('investment_holdings')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', holdingId)
-    .eq('user_id', userId);
+  // Uses a SECURITY DEFINER function to bypass the RLS catch-22 where
+  // setting deleted_at makes the row fail the SELECT policy WITH CHECK.
+  // Ownership is still verified inside the function via auth.uid().
+  const { error } = await supabase.rpc('delete_investment_holding', {
+    p_holding_id: holdingId,
+  });
   if (error) throw error;
 }
 
