@@ -8,6 +8,7 @@ import { QuickAddSheet } from '../screens/home/QuickAddSheet';
 import { useAuthStore } from '../store/auth.store';
 import { useAppStore } from '../store/app.store';
 import { BiometricLockScreen } from '../screens/auth/BiometricLockScreen';
+import { AppLoadingScreen } from '../screens/auth/AppLoadingScreen';
 import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 import { OfflineBanner } from '../components/common/OfflineBanner';
@@ -28,7 +29,9 @@ const styles = StyleSheet.create({
 
 export function RootNavigator() {
   const isAuthenticated      = useAuthStore(s => s.isAuthenticated);
+  const isLoading            = useAuthStore(s => s.isLoading);
   const setSession           = useAuthStore(s => s.setSession);
+  const setLoading           = useAuthStore(s => s.setLoading);
   const biometricEnabled     = useAppStore(s => s.biometricEnabled);
   const isBiometricUnlocked  = useAppStore(s => s.isBiometricUnlocked);
   const setBiometricUnlocked = useAppStore(s => s.setBiometricUnlocked);
@@ -44,6 +47,7 @@ export function RootNavigator() {
       } else {
         setSession(null);
       }
+      setLoading(false);
     });
 
     // Keep store in sync with Supabase auth events (login, logout, token refresh)
@@ -89,6 +93,8 @@ export function RootNavigator() {
 
   // Show biometric lock screen when authenticated but not yet unlocked
   const showBiometricLock = isAuthenticated && biometricEnabled && !isBiometricUnlocked;
+
+  if (isLoading) return <AppLoadingScreen />;
 
   return (
     <View style={styles.root}>
