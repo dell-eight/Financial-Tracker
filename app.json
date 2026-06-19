@@ -73,8 +73,7 @@
         }
       ],
       "@react-native-community/datetimepicker",
-      "./plugins/withAndroidNetworkSecurity",
-      "expo-screen-capture"
+      "./plugins/withAndroidNetworkSecurity"
     ],
     "extra": {
       "privacyPolicyUrl": "https://financialtracker.app/privacy",
