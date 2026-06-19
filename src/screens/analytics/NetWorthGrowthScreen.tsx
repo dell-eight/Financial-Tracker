@@ -38,11 +38,11 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 
 // ─── NWChart ─────────────────────────────────────────────────────────────────
 
-function NWChart({ data }: { data: { label: string; nw: number }[] }) {
+function NWChart({ data, width }: { data: { label: string; nw: number }[]; width?: number }) {
   const theme = useTheme();
   const { colors, fontFamily } = theme;
   const { fmtCompact: fmtShort } = useCurrency();
-  const W = SCREEN_W - 40;
+  const W = width ?? (SCREEN_W - 40);
   const Y_W = 48, X_H = 24, Y_PAD = 12, CHART_H = 200;
   const plotW = W - Y_W;
   const plotH = CHART_H - X_H - Y_PAD;
@@ -221,7 +221,12 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
               12-Month Net Worth
             </Text>
-            <NWChart data={hist.length > 0 ? hist : [{ label: '—', nw: 0 }]} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <NWChart
+                data={hist.length > 0 ? hist : [{ label: '—', nw: 0 }]}
+                width={Math.max(SCREEN_W - 40, hist.length * 28)}
+              />
+            </ScrollView>
           </View>
         </Animated.View>
 

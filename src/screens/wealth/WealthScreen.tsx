@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,8 +8,14 @@ import {
   Platform,
   ActivityIndicator,
   Dimensions,
+  Modal,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -52,6 +58,19 @@ const MILESTONE_DEFS: MilestoneDef[] = [
 ];
 
 const CHART_SIDE_PAD = 20;
+const { width: SW, height: SH } = Dimensions.get('window');
+
+function ExpandIcon({ color }: { color: string }) {
+  const arm = 5, t = 1.5, s = 14;
+  return (
+    <View style={{ width: s, height: s }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, width: arm, height: arm, borderTopWidth: t, borderLeftWidth: t, borderColor: color }} />
+      <View style={{ position: 'absolute', top: 0, right: 0, width: arm, height: arm, borderTopWidth: t, borderRightWidth: t, borderColor: color }} />
+      <View style={{ position: 'absolute', bottom: 0, left: 0, width: arm, height: arm, borderBottomWidth: t, borderLeftWidth: t, borderColor: color }} />
+      <View style={{ position: 'absolute', bottom: 0, right: 0, width: arm, height: arm, borderBottomWidth: t, borderRightWidth: t, borderColor: color }} />
+    </View>
+  );
+}
 
 // ── Net Worth overview ────────────────────────────────────────────────────────
 
@@ -124,7 +143,25 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
 
   const hasTimeline = (nwHist ?? []).filter(p => !p.isLive).length >= 1;
 
+  // ── Maximize modal for Net Worth Timeline ──
+  const [nwExpanded, setNwExpanded] = useState(false);
+  const nwCardScale = useSharedValue(0.88);
+  const nwCardOp    = useSharedValue(0);
+  useEffect(() => {
+    if (nwExpanded) {
+      nwCardScale.value = 0.88;
+      nwCardOp.value    = 0;
+      nwCardScale.value = withSpring(1, { damping: 16, stiffness: 160 });
+      nwCardOp.value    = withTiming(1, { duration: 180 });
+    }
+  }, [nwExpanded]);
+  const nwModalCardStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: nwCardScale.value }],
+    opacity:   nwCardOp.value,
+  }));
+
   return (
+    <>
     <ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ padding: spacing[5], gap: spacing[4] }}
@@ -186,40 +223,45 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
       </View>
 
       {/* ── Net Worth Timeline ── */}
-      <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, paddingTop: spacing[4], paddingBottom: spacing[3], overflow: 'hidden' }]}>
-        {/* Period selector */}
+      <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, paddingTop: spacing[4], paddingBottom: spacing[3] }]}>
+        {/* Period selector + expand button */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing[4], marginBottom: spacing[3] }}>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.secondary }}>
             Net Worth Timeline
           </Text>
-          <View style={{ flexDirection: 'row', gap: spacing[1], backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full, padding: 3 }}>
-            {([6, 12, 24] as const).map(p => (
-              <Pressable
-                key={p}
-                onPress={() => setPeriod(p)}
-                style={[{
-                  paddingHorizontal: spacing[3],
-                  paddingVertical:   4,
-                  borderRadius:      borderRadius.full,
-                  backgroundColor:   period === p ? colors.bg.surfaceRaised : 'transparent',
-                }]}
-              >
-                <Text style={{
-                  fontSize:   fontSize.micro,
-                  fontFamily: period === p ? fontFamily.semiBold : fontFamily.regular,
-                  color:      period === p ? colors.text.primary : colors.text.muted,
-                }}>
-                  {p === 6 ? '6M' : p === 12 ? '1Y' : 'All'}
-                </Text>
-              </Pressable>
-            ))}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+            <View style={{ flexDirection: 'row', gap: spacing[1], backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full, padding: 3 }}>
+              {([6, 12, 24] as const).map(p => (
+                <Pressable
+                  key={p}
+                  onPress={() => setPeriod(p)}
+                  style={[{
+                    paddingHorizontal: spacing[3],
+                    paddingVertical:   4,
+                    borderRadius:      borderRadius.full,
+                    backgroundColor:   period === p ? colors.bg.surfaceRaised : 'transparent',
+                  }]}
+                >
+                  <Text style={{
+                    fontSize:   fontSize.micro,
+                    fontFamily: period === p ? fontFamily.semiBold : fontFamily.regular,
+                    color:      period === p ? colors.text.primary : colors.text.muted,
+                  }}>
+                    {p === 6 ? '6M' : p === 12 ? '1Y' : 'All'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Pressable onPress={() => setNwExpanded(true)} hitSlop={12}>
+              <ExpandIcon color={colors.text.muted} />
+            </Pressable>
           </View>
         </View>
 
         {hasTimeline ? (
-          <View style={{ paddingHorizontal: CHART_SIDE_PAD }}>
-            <NetWorthChart data={nwHist ?? []} width={chartW} />
-          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: CHART_SIDE_PAD }}>
+            <NetWorthChart data={nwHist ?? []} width={Math.max(chartW, (nwHist ?? []).length * 28)} />
+          </ScrollView>
         ) : (
           <View style={{ paddingVertical: spacing[6], alignItems: 'center', paddingHorizontal: spacing[5] }}>
             <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary, textAlign: 'center' }}>
@@ -301,6 +343,54 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
       )}
 
     </ScrollView>
+
+    {/* ── Net Worth Timeline maximize modal ── */}
+    <Modal
+      visible={nwExpanded}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={() => setNwExpanded(false)}
+    >
+      <Pressable
+        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' }}
+        onPress={() => setNwExpanded(false)}
+      >
+        <Animated.View
+          style={[
+            nwModalCardStyle,
+            {
+              backgroundColor: colors.bg.surface,
+              borderRadius:    borderRadius.cardLg,
+              width:           SW - 32,
+              padding:         spacing[5],
+            },
+          ]}
+          onStartShouldSetResponder={() => true}
+        >
+          {/* Modal header */}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, lineHeight: 24 }}>
+              Net Worth Timeline
+            </Text>
+            <Pressable onPress={() => setNwExpanded(false)} hitSlop={12} style={{ marginLeft: spacing[3] }}>
+              <Text style={{ fontSize: 20, color: colors.text.secondary, lineHeight: 24 }}>✕</Text>
+            </Pressable>
+          </View>
+          {/* Divider */}
+          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginVertical: spacing[4], opacity: 0.6 }} />
+          {/* Chart — scrollable if data is wide */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <NetWorthChart
+              data={nwHist ?? []}
+              width={Math.max(SW - 72, (nwHist ?? []).length * 28)}
+              height={Math.round(SH * 0.45)}
+            />
+          </ScrollView>
+        </Animated.View>
+      </Pressable>
+    </Modal>
+    </>
   );
 }
 

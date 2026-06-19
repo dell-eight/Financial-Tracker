@@ -55,6 +55,10 @@ const LINE_H     = 200;  // line chart height
 const BAR_H      = 200;  // bar chart height (includes x-axis)
 const BAR_PLOT_H = BAR_H - X_LABEL_H;
 
+// Minimum px per data point — drives horizontal scroll width when there are many points
+const MIN_BAR_PT_W  = 52;
+const MIN_LINE_PT_W = 38;
+
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
 interface BarPoint  { label: string; income: number; expense: number }
@@ -1070,8 +1074,7 @@ export function AnalyticsScreen({ navigation }: Props) {
     };
   }, [period, txns, monthlyHistory, weeklyHistory]);
 
-  const PAD     = spacing[5];
-  const CHART_W = SCREEN_W - PAD * 4;
+  const PAD = spacing[5];
 
   const barData = useMemo<BarPoint[]>(() => {
     if (period === 'weekly')  return weeklyHistory  ?? [];
@@ -1325,8 +1328,13 @@ export function AnalyticsScreen({ navigation }: Props) {
               : 'Last 6 months'
             }
             minHeight={BAR_H + 80}
+            scrollable
+            chartHeight={BAR_H}
           >
-            <GroupedBarChart data={barData} chartW={CHART_W} animDelay={120} />
+            {(w) => {
+              const effectiveW = Math.max(w, barData.length * MIN_BAR_PT_W);
+              return <GroupedBarChart data={barData} chartW={effectiveW} animDelay={120} />;
+            }}
           </ChartCard>
         </Animated.View>
 
@@ -1340,8 +1348,13 @@ export function AnalyticsScreen({ navigation }: Props) {
               : 'Monthly expense trend'
             }
             minHeight={LINE_H + 80}
+            scrollable
+            chartHeight={LINE_H}
           >
-            <SpendingLineChart data={lineData} chartW={CHART_W} animDelay={200} />
+            {(w) => {
+              const effectiveW = Math.max(w, lineData.length * MIN_LINE_PT_W);
+              return <SpendingLineChart data={lineData} chartW={effectiveW} animDelay={200} />;
+            }}
           </ChartCard>
         </Animated.View>
 

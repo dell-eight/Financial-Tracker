@@ -38,11 +38,11 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 
 // ─── IncomeLineChart ──────────────────────────────────────────────────────────
 
-function IncomeLineChart({ data, color }: { data: { label: string; value: number }[]; color: string }) {
+function IncomeLineChart({ data, color, width }: { data: { label: string; value: number }[]; color: string; width?: number }) {
   const theme = useTheme();
   const { colors, fontFamily } = theme;
   const { fmtCompact: fmtK } = useCurrency();
-  const W = SCREEN_W - 40;
+  const W = width ?? (SCREEN_W - 40);
   const Y_W = 40, X_H = 24, Y_PAD = 12, CHART_H = 168;
   const plotW = W - Y_W;
   const plotH = CHART_H - X_H - Y_PAD;
@@ -204,7 +204,13 @@ export function IncomeAnalysisScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
               6-Month Income Trend
             </Text>
-            <IncomeLineChart data={incomeHistory.length > 0 ? incomeHistory : [{ label: '—', value: 0 }]} color={colors.income} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <IncomeLineChart
+                data={incomeHistory.length > 0 ? incomeHistory : [{ label: '—', value: 0 }]}
+                color={colors.income}
+                width={Math.max(SCREEN_W - 40, incomeHistory.length * 40)}
+              />
+            </ScrollView>
           </View>
         </Animated.View>
 

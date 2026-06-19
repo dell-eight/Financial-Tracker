@@ -45,11 +45,11 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 
 // ─── SpendingChart ────────────────────────────────────────────────────────────
 
-function SpendingChart({ data, color }: { data: { label: string; value: number }[]; color: string }) {
+function SpendingChart({ data, color, width }: { data: { label: string; value: number }[]; color: string; width: number }) {
   const theme = useTheme();
   const { colors, fontFamily } = theme;
   const { fmtCompact: fmtK } = useCurrency();
-  const W = SCREEN_W - 40;
+  const W = width;
   const plotW = W - Y_W;
   const plotH = CHART_H - X_H - Y_PAD;
 
@@ -269,7 +269,13 @@ export function SpendingTrendsScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
               {period === 'weekly' ? 'Daily Expenses' : period === 'yearly' ? 'Quarterly Expenses' : '6-Month Trend'}
             </Text>
-            <SpendingChart data={chartData} color={colors.expense} />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <SpendingChart
+                data={chartData}
+                color={colors.expense}
+                width={Math.max(SCREEN_W - 40, chartData.length * 40)}
+              />
+            </ScrollView>
           </View>
         </Animated.View>
 
