@@ -19,7 +19,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { StackScreenProps } from '@react-navigation/stack';
 
-import { useTheme }          from '../../hooks/ui/useTheme';
+import { useChartModalStore } from '../../store/chartModal.store';
+import { useTheme }           from '../../hooks/ui/useTheme';
 import { useTransactions }   from '../../hooks/queries/useTransactions';
 import { useBudgets }        from '../../hooks/queries/useBudgets';
 import { useMonthlyHistory, useWeeklyHistory } from '../../hooks/queries/useAnalytics';
@@ -474,6 +475,7 @@ function BudgetPerformanceCard({ data }: { data: BudgetPerfItem[] }) {
 // ─── AnalyticsScreen ────────────────────────────────────────────────────────────
 
 export function AnalyticsScreen({ navigation }: Props) {
+  const openModal = useChartModalStore(s => s.open);
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows, categoryColors } = theme;
@@ -827,7 +829,6 @@ export function AnalyticsScreen({ navigation }: Props) {
             minHeight={BAR_H + 80}
             scrollable
             chartHeight={BAR_H}
-            onExpand={() => navigation.push('ChartFullscreen', { chartKey: 'bar', period })}
           >
             {(w) => {
               const effectiveW = Math.max(w, barData.length * MIN_BAR_PT_W);
@@ -848,7 +849,6 @@ export function AnalyticsScreen({ navigation }: Props) {
             minHeight={LINE_H + 80}
             scrollable
             chartHeight={LINE_H}
-            onExpand={() => navigation.push('ChartFullscreen', { chartKey: 'line', period })}
           >
             {(w) => {
               const effectiveW = Math.max(w, lineData.length * MIN_LINE_PT_W);
@@ -863,7 +863,6 @@ export function AnalyticsScreen({ navigation }: Props) {
             title="Category Breakdown"
             subtitle="Tap a segment to inspect"
             minHeight={164 + 80}
-            onExpand={() => navigation.push('ChartFullscreen', { chartKey: 'donut', period })}
           >
             <CategoryDonut data={monthCats} animDelay={260} />
           </ChartCard>

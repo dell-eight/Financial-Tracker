@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
+import { useChartModalStore } from '../../store/chartModal.store';
 import { useSavingsGoals } from '../../hooks/queries/useSavingsGoals';
 import { useInvestments } from '../../hooks/queries/useInvestments';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
@@ -68,7 +69,8 @@ function ExpandIcon({ color }: { color: string }) {
 // ── Net Worth overview ────────────────────────────────────────────────────────
 
 function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
-  const theme = useTheme();
+  const theme     = useTheme();
+  const openModal = useChartModalStore(s => s.open);
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
 
   const [period, setPeriod] = useState<6 | 12 | 24>(12);
@@ -227,9 +229,6 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
                 </Pressable>
               ))}
             </View>
-            <Pressable onPress={() => navigation.push('ChartFullscreen', { chartKey: 'networth', period })} hitSlop={12}>
-              <ExpandIcon color={colors.text.muted} />
-            </Pressable>
           </View>
         </View>
 

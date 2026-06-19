@@ -157,13 +157,6 @@ function FABButton() {
 // ── BottomTabBar ───────────────────────────────────────────────────────────────
 
 export function BottomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-  // Hide entirely (tab bar + FAB) when a fullscreen chart is active in the focused stack
-  const activeTabRoute   = state.routes[state.index];
-  const activeNestedName = activeTabRoute?.state?.routes?.[
-    activeTabRoute.state?.index ?? 0
-  ]?.name;
-  if (activeNestedName === 'ChartFullscreen') return null;
-
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, tabBarConfig, shadows } = theme;

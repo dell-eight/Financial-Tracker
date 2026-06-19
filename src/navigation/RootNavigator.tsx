@@ -12,6 +12,7 @@ import { supabase } from '../lib/supabase';
 import { queryClient } from '../lib/queryClient';
 import { OfflineBanner } from '../components/common/OfflineBanner';
 import { MilestoneModal } from '../components/wealth/MilestoneModal';
+import { ChartOverlayHost } from '../components/charts/ChartOverlayHost';
 import {
   requestPermissionsAndGetToken,
   savePushToken,
@@ -112,6 +113,7 @@ export function RootNavigator() {
       </Root.Navigator>
       <OfflineBanner />
       {isAuthenticated && <MilestoneModal />}
+      <ChartOverlayHost />
     </View>
   );
 }

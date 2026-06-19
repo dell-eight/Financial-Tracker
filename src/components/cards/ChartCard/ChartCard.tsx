@@ -103,7 +103,7 @@ export function ChartCard({
 
         <View style={styles.headerRight}>
           {action && <View style={styles.action}>{action}</View>}
-          {onExpand && (
+          {false && onExpand && (
             <Pressable
               onPress={onExpand}
               hitSlop={12}
