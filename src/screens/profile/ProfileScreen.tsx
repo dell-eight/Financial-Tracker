@@ -294,8 +294,6 @@ export function ProfileScreen({ navigation }: Props) {
   const { data: userProfile } = useUserProfile();
   const notifEnabled = useAppStore(s => s.notificationsEnabled);
   const setNotif     = useAppStore(s => s.setNotificationsEnabled);
-  const biometric    = useAppStore(s => s.biometricEnabled);
-  const setBiometric = useAppStore(s => s.setBiometricEnabled);
 
   const { data: assets } = useAssets();
   const { data: debts  } = useDebts();
@@ -452,11 +450,6 @@ export function ProfileScreen({ navigation }: Props) {
               onPress={() => navigation.push('CurrencyPicker')}
               theme={theme}
             />
-            <MenuItem
-              icon="📤" label="Export Data" chevron
-              onPress={() => navigation.push('DataExport')}
-              theme={theme}
-            />
           </MenuGroup>
 
           {/* Security */}
@@ -465,19 +458,6 @@ export function ProfileScreen({ navigation }: Props) {
             <MenuItem
               icon="🔐" label="Security Settings" chevron
               onPress={() => navigation.push('SecuritySettings')}
-              theme={theme}
-            />
-            <MenuItem
-              icon="🔒"
-              label="Biometric Auth"
-              right={
-                <Switch
-                  value={biometric}
-                  onValueChange={setBiometric}
-                  trackColor={{ false: colors.bg.surfaceMuted, true: colors.accent.muted }}
-                  thumbColor={biometric ? colors.accent.primary : colors.text.muted}
-                />
-              }
               theme={theme}
             />
           </MenuGroup>
@@ -511,17 +491,17 @@ export function ProfileScreen({ navigation }: Props) {
           <MenuGroup theme={theme}>
             <MenuItem
               icon="❓" label="Help & Support" chevron
-              onPress={() => Alert.alert('Help', 'Coming soon')}
+              onPress={() => navigation.push('HelpSupport')}
               theme={theme}
             />
             <MenuItem
               icon="📄" label="Privacy Policy" chevron
-              onPress={() => Alert.alert('Privacy Policy', 'Coming soon')}
+              onPress={() => navigation.push('PrivacyPolicy')}
               theme={theme}
             />
             <MenuItem
               icon="📜" label="Terms of Service" chevron
-              onPress={() => Alert.alert('Terms', 'Coming soon')}
+              onPress={() => navigation.push('TermsOfService')}
               theme={theme}
             />
           </MenuGroup>
