@@ -95,7 +95,7 @@ export function BiometricLockScreen() {
     if (key === '') return;
     const next = digits + key;
     setDigits(next);
-    if (next.length === 4) {
+    if (next.length === 6) {
       setPinVerifying(true);
       const ok = await verifyPIN(next);
       setPinVerifying(false);
@@ -128,7 +128,7 @@ export function BiometricLockScreen() {
 
           {/* Dot indicators */}
           <Animated.View style={[{ flexDirection: 'row', gap: 16, marginTop: spacing[6], marginBottom: spacing[2] }, dotAnim]}>
-            {[0,1,2,3].map(i => (
+            {[0,1,2,3,4,5].map(i => (
               <View
                 key={i}
                 style={{

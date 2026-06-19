@@ -62,7 +62,7 @@ export function ChangePINScreen({ navigation }: Props) {
     if (key === '') return;
     const next = digits + key;
     setDigits(next);
-    if (next.length < 4) return;
+    if (next.length < 6) return;
 
     if (step === 'current') {
       const ok = await verifyPIN(next);
@@ -97,7 +97,7 @@ export function ChangePINScreen({ navigation }: Props) {
 
   const LABELS: Record<Step, { title: string; sub: string }> = {
     current: { title: 'Enter current PIN', sub: 'Verify your identity to continue'           },
-    new:     { title: 'Enter new PIN',     sub: 'Choose a new 4-digit PIN'                   },
+    new:     { title: 'Enter new PIN',     sub: 'Choose a new 6-digit PIN'                   },
     confirm: { title: 'Confirm new PIN',   sub: 'Enter the same PIN again to confirm'        },
   };
   const { title, sub } = LABELS[step];
@@ -124,7 +124,7 @@ export function ChangePINScreen({ navigation }: Props) {
         </Text>
 
         <Animated.View style={[{ flexDirection: 'row', gap: 16, marginTop: spacing[6], marginBottom: spacing[2] }, dotAnim]}>
-          {[0,1,2,3].map(i => (
+          {[0,1,2,3,4,5].map(i => (
             <View
               key={i}
               style={{

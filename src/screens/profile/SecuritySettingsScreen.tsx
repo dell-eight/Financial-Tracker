@@ -253,7 +253,7 @@ export function SecuritySettingsScreen({ navigation }: Props) {
             <RowItem
               icon="🔢"
               label="PIN Code"
-              desc={pinEnabled ? '4-digit PIN enabled' : 'No PIN set'}
+              desc={pinEnabled ? '6-digit PIN enabled' : 'No PIN set'}
               right={
                 <Switch
                   value={pinEnabled}
@@ -398,12 +398,6 @@ export function SecuritySettingsScreen({ navigation }: Props) {
               </Text>
             ))}
 
-            <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: colors.border.subtle, marginVertical: spacing[3] }} />
-
-            {/* Last sync */}
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>
-              Last sync: {formatLastSync(user?.last_sign_in_at)}
-            </Text>
           </View>
         </Animated.View>
 

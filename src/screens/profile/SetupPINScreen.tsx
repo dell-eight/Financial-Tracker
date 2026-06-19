@@ -63,7 +63,7 @@ export function SetupPINScreen({ navigation }: Props) {
     if (key === '') return;
     const next = digits + key;
     setDigits(next);
-    if (next.length < 4) return;
+    if (next.length < 6) return;
 
     if (step === 'enter') {
       setFirstPin(next);
@@ -87,7 +87,7 @@ export function SetupPINScreen({ navigation }: Props) {
   }
 
   const title = step === 'enter' ? 'Set your PIN' : 'Confirm your PIN';
-  const sub   = step === 'enter' ? 'Choose a 4-digit PIN to lock the app' : 'Enter the same PIN again to confirm';
+  const sub   = step === 'enter' ? 'Choose a 6-digit PIN to lock the app' : 'Enter the same PIN again to confirm';
 
   return (
     <View style={[s.screen, { backgroundColor: colors.bg.base, paddingTop: topPad, paddingBottom: btmPad }]}>
@@ -111,7 +111,7 @@ export function SetupPINScreen({ navigation }: Props) {
         </Text>
 
         <Animated.View style={[{ flexDirection: 'row', gap: 16, marginTop: spacing[6], marginBottom: spacing[2] }, dotAnim]}>
-          {[0,1,2,3].map(i => (
+          {[0,1,2,3,4,5].map(i => (
             <View
               key={i}
               style={{
