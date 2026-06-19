@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, Pressable, ScrollView, useWindowDimensions, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ScreenOrientation from 'expo-screen-orientation';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useMonthlyHistory, useWeeklyHistory, useNetWorthHistory } from '../../hooks/queries/useAnalytics';
 import { useTransactions } from '../../hooks/queries/useTransactions';
@@ -14,6 +13,7 @@ import type { CategoryKey } from '../../theme';
 
 const MIN_BAR_PT_W  = 52;
 const MIN_LINE_PT_W = 38;
+const PAD           = 20;
 
 // Used by both AnalyticsStack and WealthStack — route params typed at call sites
 export function ChartFullscreenScreen({ navigation, route }: any) {
@@ -22,18 +22,10 @@ export function ChartFullscreenScreen({ navigation, route }: any) {
     period:   string | number;
   };
 
-  const { width: W, height: H } = useWindowDimensions();
-  const insets = useSafeAreaInsets();
-  const theme  = useTheme();
+  const { width: W } = useWindowDimensions();
+  const insets        = useSafeAreaInsets();
+  const theme         = useTheme();
   const { colors, spacing, fontFamily, fontSize, borderRadius } = theme;
-
-  // Force landscape on mount, restore portrait on unmount
-  useEffect(() => {
-    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
-    return () => {
-      ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP);
-    };
-  }, []);
 
   // Local period state seeded from route param
   const [analyticsPeriod, setAnalyticsPeriod] = useState<'weekly' | 'monthly' | 'yearly'>(
@@ -44,6 +36,9 @@ export function ChartFullscreenScreen({ navigation, route }: any) {
   const [nwPeriod, setNwPeriod] = useState<6 | 12 | 24>(
     [6, 12, 24].includes(Number(initPeriod)) ? (Number(initPeriod) as 6 | 12 | 24) : 12,
   );
+
+  // Chart height driven by onLayout — stable 300 default prevents one-frame blank
+  const [chartH, setChartH] = useState(300);
 
   // Data hooks — React Query cache hits from parent screens, no extra network
   const { data: monthlyHistory } = useMonthlyHistory(6);
@@ -90,134 +85,169 @@ export function ChartFullscreenScreen({ navigation, route }: any) {
       .sort((a, b) => b.amount - a.amount);
   }, [txns, theme.categoryColors]);
 
-  // Chart fills the full safe-area-adjusted canvas
-  const PAD    = 24;
-  const chartW = W - insets.left - insets.right - PAD * 2;
-  const chartH = H - insets.top  - insets.bottom - PAD * 2;
+  // Chart width — explicit per chartKey; minDataW guards empty-dataset collapse
+  const containerMinW = W;
+  const minDataW      = Math.max(W - PAD * 2, 200);
 
-  // Overlay safe-area offsets for floating controls
-  const overlayTop   = insets.top   + 10;
-  const overlayLeft  = insets.left  + 12;
-  const overlayRight = insets.right + 12;
+  function getChartW(): number {
+    switch (chartKey) {
+      case 'bar':      return Math.max(minDataW, barData.length  * MIN_BAR_PT_W);
+      case 'line':     return Math.max(minDataW, lineData.length * MIN_LINE_PT_W);
+      case 'donut':    return minDataW;
+      case 'networth': return Math.max(minDataW, (nwHist ?? []).length * 32);
+    }
+  }
+  const chartW       = getChartW();
+  const shouldScroll = chartW > W;
+
+  const chartTitle = {
+    bar:      'Income vs Expenses',
+    line:     'Spending Trend',
+    donut:    'Category Breakdown',
+    networth: 'Net Worth',
+  }[chartKey];
 
   return (
-    <View style={[sc.root, { backgroundColor: colors.bg.base }]}>
+    <View style={[sc.root, {
+      paddingTop:      insets.top + 6,
+      paddingBottom:   insets.bottom,
+      backgroundColor: colors.bg.base,
+    }]}>
       <StatusBar style={theme.statusBarStyle} hidden />
 
-      {/* Chart — fills entire screen */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={sc.chart}
-        contentContainerStyle={{
-          paddingHorizontal: insets.left + PAD,
-          paddingVertical:   insets.top + PAD / 2,
-          alignItems:        'center',
-        }}
-      >
-        {chartKey === 'bar' && (
-          <GroupedBarChart
-            data={barData}
-            chartW={Math.max(chartW, barData.length * MIN_BAR_PT_W)}
-            chartH={chartH}
-          />
-        )}
-        {chartKey === 'line' && (
-          <SpendingLineChart
-            data={lineData}
-            chartW={Math.max(chartW, lineData.length * MIN_LINE_PT_W)}
-            chartH={chartH}
-          />
-        )}
-        {chartKey === 'donut' && (
-          <CategoryDonut data={monthCats} />
-        )}
-        {chartKey === 'networth' && (
-          <NetWorthChart
-            data={nwHist ?? []}
-            width={Math.max(chartW, (nwHist ?? []).length * 32)}
-            height={chartH}
-          />
-        )}
-      </ScrollView>
-
-      {/* Floating period selector — top-left */}
-      {(chartKey === 'bar' || chartKey === 'line') && (
-        <View style={[sc.pillOverlay, { top: overlayTop, left: overlayLeft }]}>
-          <View style={{
-            flexDirection: 'row', gap: spacing[1],
-            backgroundColor: colors.bg.surface + 'E8',
-            borderRadius: borderRadius.full, padding: 3,
+      {/* Header — title + period pills on the left, ✕ on the right */}
+      <View style={[sc.header, { paddingHorizontal: PAD }]}>
+        <View style={sc.titleBlock}>
+          <Text style={{
+            fontFamily: fontFamily.semiBold,
+            fontSize:   fontSize.headingMd,
+            color:      colors.text.primary,
+            lineHeight: 24,
           }}>
-            {(['weekly', 'monthly', 'yearly'] as const).map(p => (
-              <Pressable
-                key={p}
-                onPress={() => setAnalyticsPeriod(p)}
-                style={{
-                  paddingHorizontal: spacing[3], paddingVertical: 5,
-                  borderRadius: borderRadius.full,
-                  backgroundColor: analyticsPeriod === p ? colors.accent.primary : 'transparent',
-                }}
-              >
-                <Text style={{
-                  fontSize:   fontSize.micro,
-                  fontFamily: analyticsPeriod === p ? fontFamily.semiBold : fontFamily.regular,
-                  color:      analyticsPeriod === p ? '#FFFFFF' : colors.text.secondary,
-                }}>
-                  {p === 'weekly' ? 'Week' : p === 'monthly' ? 'Month' : 'Year'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
+            {chartTitle}
+          </Text>
 
-      {chartKey === 'networth' && (
-        <View style={[sc.pillOverlay, { top: overlayTop, left: overlayLeft }]}>
-          <View style={{
-            flexDirection: 'row', gap: spacing[1],
-            backgroundColor: colors.bg.surface + 'E8',
-            borderRadius: borderRadius.full, padding: 3,
-          }}>
-            {([6, 12, 24] as const).map(p => (
-              <Pressable
-                key={p}
-                onPress={() => setNwPeriod(p)}
-                style={{
-                  paddingHorizontal: spacing[3], paddingVertical: 5,
-                  borderRadius: borderRadius.full,
-                  backgroundColor: nwPeriod === p ? colors.accent.primary : 'transparent',
-                }}
-              >
-                <Text style={{
-                  fontSize:   fontSize.micro,
-                  fontFamily: nwPeriod === p ? fontFamily.semiBold : fontFamily.regular,
-                  color:      nwPeriod === p ? '#FFFFFF' : colors.text.secondary,
-                }}>
-                  {p === 6 ? '6M' : p === 12 ? '1Y' : 'All'}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
-        </View>
-      )}
+          {/* Period pills — bar / line */}
+          {(chartKey === 'bar' || chartKey === 'line') && (
+            <View style={{
+              flexDirection:   'row',
+              backgroundColor: colors.bg.surface,
+              borderRadius:    borderRadius.full,
+              padding:         3,
+              alignSelf:       'flex-start',
+            }}>
+              {(['weekly', 'monthly', 'yearly'] as const).map(p => (
+                <Pressable
+                  key={p}
+                  onPress={() => setAnalyticsPeriod(p)}
+                  style={{
+                    paddingHorizontal: spacing[3],
+                    paddingVertical:   5,
+                    borderRadius:      borderRadius.full,
+                    backgroundColor:   analyticsPeriod === p ? colors.accent.primary : 'transparent',
+                  }}
+                >
+                  <Text style={{
+                    fontSize:   fontSize.micro,
+                    fontFamily: analyticsPeriod === p ? fontFamily.semiBold : fontFamily.regular,
+                    color:      analyticsPeriod === p ? '#FFFFFF' : colors.text.secondary,
+                  }}>
+                    {p === 'weekly' ? 'Week' : p === 'monthly' ? 'Month' : 'Year'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
 
-      {/* X close button — top-right */}
-      <Pressable
-        onPress={() => navigation.goBack()}
-        hitSlop={12}
-        style={[
-          sc.closeBtn,
-          {
-            top:             overlayTop,
-            right:           overlayRight,
-            backgroundColor: colors.bg.surface + 'E8',
+          {/* Period pills — networth */}
+          {chartKey === 'networth' && (
+            <View style={{
+              flexDirection:   'row',
+              backgroundColor: colors.bg.surface,
+              borderRadius:    borderRadius.full,
+              padding:         3,
+              alignSelf:       'flex-start',
+            }}>
+              {([6, 12, 24] as const).map(p => (
+                <Pressable
+                  key={p}
+                  onPress={() => setNwPeriod(p)}
+                  style={{
+                    paddingHorizontal: spacing[3],
+                    paddingVertical:   5,
+                    borderRadius:      borderRadius.full,
+                    backgroundColor:   nwPeriod === p ? colors.accent.primary : 'transparent',
+                  }}
+                >
+                  <Text style={{
+                    fontSize:   fontSize.micro,
+                    fontFamily: nwPeriod === p ? fontFamily.semiBold : fontFamily.regular,
+                    color:      nwPeriod === p ? '#FFFFFF' : colors.text.secondary,
+                  }}>
+                    {p === 6 ? '6M' : p === 12 ? '1Y' : 'All'}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <Pressable
+          onPress={() => navigation.goBack()}
+          hitSlop={12}
+          style={[sc.closeBtn, {
+            backgroundColor: colors.bg.surface,
             borderRadius:    borderRadius.full,
-          },
-        ]}
+          }]}
+          accessibilityRole="button"
+          accessibilityLabel="Close chart"
+        >
+          <Text style={{ fontSize: 16, color: colors.text.secondary, lineHeight: 20 }}>✕</Text>
+        </Pressable>
+      </View>
+
+      {/* Chart area — flex fills all remaining space; onLayout measures real height */}
+      <View
+        style={sc.chartArea}
+        onLayout={e => setChartH(e.nativeEvent.layout.height)}
       >
-        <Text style={{ fontSize: 16, color: colors.text.secondary, lineHeight: 20 }}>✕</Text>
-      </Pressable>
+        <ScrollView
+          horizontal={shouldScroll}
+          scrollEnabled={shouldScroll}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{
+            minWidth:          containerMinW,
+            paddingHorizontal: PAD,
+            paddingVertical:   PAD,
+            alignItems:        'center',
+          }}
+        >
+          {chartKey === 'bar' && (
+            <GroupedBarChart
+              data={barData}
+              chartW={chartW}
+              chartH={chartH}
+            />
+          )}
+          {chartKey === 'line' && (
+            <SpendingLineChart
+              data={lineData}
+              chartW={chartW}
+              chartH={chartH}
+            />
+          )}
+          {chartKey === 'donut' && (
+            <CategoryDonut data={monthCats} />
+          )}
+          {chartKey === 'networth' && (
+            <NetWorthChart
+              data={nwHist ?? []}
+              width={chartW}
+              height={chartH}
+            />
+          )}
+        </ScrollView>
+      </View>
     </View>
   );
 }
@@ -226,17 +256,23 @@ const sc = StyleSheet.create({
   root: {
     flex: 1,
   },
-  chart: {
+  header: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    paddingVertical: 12,
+  },
+  titleBlock: {
+    flex: 1,
+    gap:  6,
+  },
+  chartArea: {
     flex: 1,
   },
-  pillOverlay: {
-    position: 'absolute',
-  },
   closeBtn: {
-    position: 'absolute',
-    width:    36,
-    height:   36,
+    width:          36,
+    height:         36,
     alignItems:     'center',
     justifyContent: 'center',
+    marginLeft:     12,
   },
 });
