@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { View, Text, Pressable, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, Pressable, ScrollView, useWindowDimensions, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -14,8 +14,6 @@ import type { CategoryKey } from '../../theme';
 
 const MIN_BAR_PT_W  = 52;
 const MIN_LINE_PT_W = 38;
-const HEADER_H      = 52;
-const CTRL_H        = 44;
 
 // Used by both AnalyticsStack and WealthStack — route params typed at call sites
 export function ChartFullscreenScreen({ navigation, route }: any) {
@@ -92,67 +90,78 @@ export function ChartFullscreenScreen({ navigation, route }: any) {
       .sort((a, b) => b.amount - a.amount);
   }, [txns, theme.categoryColors]);
 
-  // Chart area — W & H reflect landscape dims after rotation
-  const hasCtrl  = chartKey === 'bar' || chartKey === 'line' || chartKey === 'networth';
-  const ctrlH    = hasCtrl ? CTRL_H : 0;
-  const chartW   = W - insets.left - insets.right - 32;
-  const chartH   = H - insets.top - insets.bottom - HEADER_H - ctrlH - 16;
+  // Chart fills the full safe area
+  const chartW = W - insets.left - insets.right;
+  const chartH = H - insets.top - insets.bottom;
 
-  const chartTitle =
-    chartKey === 'bar'      ? 'Income vs Expenses'
-    : chartKey === 'line'   ? 'Spending Trends'
-    : chartKey === 'donut'  ? 'Category Breakdown'
-    : 'Net Worth Timeline';
+  // Overlay safe-area offsets for floating controls
+  const overlayTop   = insets.top   + 10;
+  const overlayLeft  = insets.left  + 12;
+  const overlayRight = insets.right + 12;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg.base }}>
+    <View style={[sc.root, { backgroundColor: colors.bg.base }]}>
       <StatusBar style={theme.statusBarStyle} hidden />
 
-      {/* Header */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems:    'center',
-        paddingLeft:   insets.left + 16,
-        paddingRight:  insets.right + 16,
-        height:        HEADER_H + insets.top,
-        paddingTop:    insets.top,
-      }}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 64 }}>
-          <Text style={{ color: colors.accent.primary, fontFamily: fontFamily.medium, fontSize: fontSize.bodyMd }}>
-            ← Back
-          </Text>
-        </Pressable>
-        <Text
-          style={{ flex: 1, textAlign: 'center', fontFamily: fontFamily.semiBold, color: colors.text.primary, fontSize: fontSize.headingMd }}
-          numberOfLines={1}
-        >
-          {chartTitle}
-        </Text>
-        <View style={{ minWidth: 64 }} />
-      </View>
+      {/* Chart — fills entire screen */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={sc.chart}
+        contentContainerStyle={{
+          paddingHorizontal: insets.left + 16,
+          paddingVertical:   insets.top + 16,
+          alignItems:        'center',
+        }}
+      >
+        {chartKey === 'bar' && (
+          <GroupedBarChart
+            data={barData}
+            chartW={Math.max(chartW - 32, barData.length * MIN_BAR_PT_W)}
+            chartH={chartH - 32}
+          />
+        )}
+        {chartKey === 'line' && (
+          <SpendingLineChart
+            data={lineData}
+            chartW={Math.max(chartW - 32, lineData.length * MIN_LINE_PT_W)}
+            chartH={chartH - 32}
+          />
+        )}
+        {chartKey === 'donut' && (
+          <CategoryDonut data={monthCats} />
+        )}
+        {chartKey === 'networth' && (
+          <NetWorthChart
+            data={nwHist ?? []}
+            width={Math.max(chartW - 32, (nwHist ?? []).length * 32)}
+            height={chartH - 32}
+          />
+        )}
+      </ScrollView>
 
-      {/* Period selector — analytics bar / line */}
+      {/* Floating period selector — top-left */}
       {(chartKey === 'bar' || chartKey === 'line') && (
-        <View style={{ paddingLeft: insets.left + 16, height: CTRL_H, justifyContent: 'center' }}>
+        <View style={[sc.pillOverlay, { top: overlayTop, left: overlayLeft }]}>
           <View style={{
             flexDirection: 'row', gap: spacing[1],
-            backgroundColor: colors.bg.surfaceMuted,
-            borderRadius: borderRadius.full, padding: 3, alignSelf: 'flex-start',
+            backgroundColor: colors.bg.surface + 'E8',
+            borderRadius: borderRadius.full, padding: 3,
           }}>
             {(['weekly', 'monthly', 'yearly'] as const).map(p => (
               <Pressable
                 key={p}
                 onPress={() => setAnalyticsPeriod(p)}
                 style={{
-                  paddingHorizontal: spacing[3], paddingVertical: 4,
+                  paddingHorizontal: spacing[3], paddingVertical: 5,
                   borderRadius: borderRadius.full,
-                  backgroundColor: analyticsPeriod === p ? colors.bg.surfaceRaised : 'transparent',
+                  backgroundColor: analyticsPeriod === p ? colors.accent.primary : 'transparent',
                 }}
               >
                 <Text style={{
                   fontSize:   fontSize.micro,
                   fontFamily: analyticsPeriod === p ? fontFamily.semiBold : fontFamily.regular,
-                  color:      analyticsPeriod === p ? colors.text.primary : colors.text.muted,
+                  color:      analyticsPeriod === p ? '#FFFFFF' : colors.text.secondary,
                 }}>
                   {p === 'weekly' ? 'Week' : p === 'monthly' ? 'Month' : 'Year'}
                 </Text>
@@ -162,28 +171,27 @@ export function ChartFullscreenScreen({ navigation, route }: any) {
         </View>
       )}
 
-      {/* Period selector — net worth */}
       {chartKey === 'networth' && (
-        <View style={{ paddingLeft: insets.left + 16, height: CTRL_H, justifyContent: 'center' }}>
+        <View style={[sc.pillOverlay, { top: overlayTop, left: overlayLeft }]}>
           <View style={{
             flexDirection: 'row', gap: spacing[1],
-            backgroundColor: colors.bg.surfaceMuted,
-            borderRadius: borderRadius.full, padding: 3, alignSelf: 'flex-start',
+            backgroundColor: colors.bg.surface + 'E8',
+            borderRadius: borderRadius.full, padding: 3,
           }}>
             {([6, 12, 24] as const).map(p => (
               <Pressable
                 key={p}
                 onPress={() => setNwPeriod(p)}
                 style={{
-                  paddingHorizontal: spacing[3], paddingVertical: 4,
+                  paddingHorizontal: spacing[3], paddingVertical: 5,
                   borderRadius: borderRadius.full,
-                  backgroundColor: nwPeriod === p ? colors.bg.surfaceRaised : 'transparent',
+                  backgroundColor: nwPeriod === p ? colors.accent.primary : 'transparent',
                 }}
               >
                 <Text style={{
                   fontSize:   fontSize.micro,
                   fontFamily: nwPeriod === p ? fontFamily.semiBold : fontFamily.regular,
-                  color:      nwPeriod === p ? colors.text.primary : colors.text.muted,
+                  color:      nwPeriod === p ? '#FFFFFF' : colors.text.secondary,
                 }}>
                   {p === 6 ? '6M' : p === 12 ? '1Y' : 'All'}
                 </Text>
@@ -193,42 +201,41 @@ export function ChartFullscreenScreen({ navigation, route }: any) {
         </View>
       )}
 
-      {/* Chart */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingHorizontal: insets.left + 16,
-          paddingBottom:     insets.bottom + 8,
-          alignItems:        'center',
-        }}
+      {/* X close button — top-right */}
+      <Pressable
+        onPress={() => navigation.goBack()}
+        hitSlop={12}
+        style={[
+          sc.closeBtn,
+          {
+            top:             overlayTop,
+            right:           overlayRight,
+            backgroundColor: colors.bg.surface + 'E8',
+            borderRadius:    borderRadius.full,
+          },
+        ]}
       >
-        {chartKey === 'bar' && (
-          <GroupedBarChart
-            data={barData}
-            chartW={Math.max(chartW, barData.length * MIN_BAR_PT_W)}
-            chartH={chartH}
-          />
-        )}
-        {chartKey === 'line' && (
-          <SpendingLineChart
-            data={lineData}
-            chartW={Math.max(chartW, lineData.length * MIN_LINE_PT_W)}
-            chartH={chartH}
-          />
-        )}
-        {chartKey === 'donut' && (
-          <CategoryDonut data={monthCats} />
-        )}
-        {chartKey === 'networth' && (
-          <NetWorthChart
-            data={nwHist ?? []}
-            width={Math.max(chartW, (nwHist ?? []).length * 32)}
-            height={chartH}
-          />
-        )}
-      </ScrollView>
+        <Text style={{ fontSize: 16, color: colors.text.secondary, lineHeight: 20 }}>✕</Text>
+      </Pressable>
     </View>
   );
 }
+
+const sc = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  chart: {
+    flex: 1,
+  },
+  pillOverlay: {
+    position: 'absolute',
+  },
+  closeBtn: {
+    position: 'absolute',
+    width:    36,
+    height:   36,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+});
