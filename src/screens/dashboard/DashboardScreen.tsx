@@ -34,6 +34,7 @@ import { useDashboard }               from '../../hooks/queries/useDashboard';
 import { useTransactions }            from '../../hooks/queries/useTransactions';
 import { useBudgets }                 from '../../hooks/queries/useBudgets';
 import { useSavingsGoals }            from '../../hooks/queries/useSavingsGoals';
+import { useUserProfile }             from '../../hooks/queries/useAuth';
 import { useAuthStore }               from '../../store/auth.store';
 import { ProgressBar, SectionHeader, ExpenseItem } from '../../components';
 import type { HomeStackParamList, MainTabParamList } from '../../navigation/types';
@@ -421,6 +422,7 @@ export function DashboardScreen({ navigation }: Props) {
   const { fmt: fmtPh } = useCurrency();
 
   const user    = useAuthStore(s => s.user);
+  const { data: userProfile } = useUserProfile();
 
   const { data: dashboard, isLoading: dashLoading, refetch: refetchDash }  = useDashboard();
   const { data: txns,      isLoading: txLoading,   refetch: refetchTxns }  = useTransactions();
@@ -539,7 +541,7 @@ export function DashboardScreen({ navigation }: Props) {
     ?? '';
   const firstName  = displayName.split(' ')[0] || 'there';
   const avatarInit = displayName ? displayName[0].toUpperCase() : 'W';
-  const avatarUrl  = user?.user_metadata?.avatar_url as string | undefined;
+  const avatarUrl  = userProfile?.avatar_url ?? (user?.user_metadata?.avatar_url as string | undefined);
 
   // Shared loading flag for hero zones
   const coreLoading = dashLoading || goalLoading;

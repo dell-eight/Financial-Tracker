@@ -28,6 +28,7 @@ import { useCurrency } from '../../utils/currency';
 import type { ThemePreference } from '../../store/app.store';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useTransactions } from '../../hooks/queries/useTransactions';
+import { useUserProfile } from '../../hooks/queries/useAuth';
 import type { HomeStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<HomeStackParamList, 'Profile'>;
@@ -290,6 +291,7 @@ export function ProfileScreen({ navigation }: Props) {
   const { fmtCompact } = useCurrency();
   const user         = useAuthStore(s => s.user);
   const clearAuth    = useAuthStore(s => s.clearAuth);
+  const { data: userProfile } = useUserProfile();
   const notifEnabled = useAppStore(s => s.notificationsEnabled);
   const setNotif     = useAppStore(s => s.setNotificationsEnabled);
   const biometric    = useAppStore(s => s.biometricEnabled);
@@ -315,7 +317,7 @@ export function ProfileScreen({ navigation }: Props) {
     ?? (user?.user_metadata?.name as string | undefined)
     ?? user?.email ?? 'User';
   const initials    = displayName.slice(0, 2).toUpperCase();
-  const avatarUrl   = user?.user_metadata?.avatar_url as string | undefined;
+  const avatarUrl   = userProfile?.avatar_url ?? (user?.user_metadata?.avatar_url as string | undefined);
   const memberYear  = user?.created_at ? new Date(user.created_at).getFullYear() : 2024;
 
   // ── Entrance animations ──────────────────────────────────────────────────
