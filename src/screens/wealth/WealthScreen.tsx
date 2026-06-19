@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState, useEffect } from 'react';
+﻿import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,8 @@ import {
   Platform,
   ActivityIndicator,
   Dimensions,
-  Modal,
 } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -58,7 +52,6 @@ const MILESTONE_DEFS: MilestoneDef[] = [
 ];
 
 const CHART_SIDE_PAD = 20;
-const { width: SW, height: SH } = Dimensions.get('window');
 
 function ExpandIcon({ color }: { color: string }) {
   const arm = 5, t = 1.5, s = 14;
@@ -143,25 +136,7 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
 
   const hasTimeline = (nwHist ?? []).filter(p => !p.isLive).length >= 1;
 
-  // ── Maximize modal for Net Worth Timeline ──
-  const [nwExpanded, setNwExpanded] = useState(false);
-  const nwCardScale = useSharedValue(0.88);
-  const nwCardOp    = useSharedValue(0);
-  useEffect(() => {
-    if (nwExpanded) {
-      nwCardScale.value = 0.88;
-      nwCardOp.value    = 0;
-      nwCardScale.value = withSpring(1, { damping: 16, stiffness: 160 });
-      nwCardOp.value    = withTiming(1, { duration: 180 });
-    }
-  }, [nwExpanded]);
-  const nwModalCardStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: nwCardScale.value }],
-    opacity:   nwCardOp.value,
-  }));
-
   return (
-    <>
     <ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ padding: spacing[5], gap: spacing[4] }}
@@ -252,7 +227,7 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
                 </Pressable>
               ))}
             </View>
-            <Pressable onPress={() => setNwExpanded(true)} hitSlop={12}>
+            <Pressable onPress={() => navigation.push('ChartFullscreen', { chartKey: 'networth', period })} hitSlop={12}>
               <ExpandIcon color={colors.text.muted} />
             </Pressable>
           </View>
@@ -343,54 +318,6 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
       )}
 
     </ScrollView>
-
-    {/* ── Net Worth Timeline maximize modal ── */}
-    <Modal
-      visible={nwExpanded}
-      transparent
-      animationType="fade"
-      statusBarTranslucent
-      onRequestClose={() => setNwExpanded(false)}
-    >
-      <Pressable
-        style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' }}
-        onPress={() => setNwExpanded(false)}
-      >
-        <Animated.View
-          style={[
-            nwModalCardStyle,
-            {
-              backgroundColor: colors.bg.surface,
-              borderRadius:    borderRadius.cardLg,
-              width:           SW - 32,
-              padding:         spacing[5],
-            },
-          ]}
-          onStartShouldSetResponder={() => true}
-        >
-          {/* Modal header */}
-          <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, lineHeight: 24 }}>
-              Net Worth Timeline
-            </Text>
-            <Pressable onPress={() => setNwExpanded(false)} hitSlop={12} style={{ marginLeft: spacing[3] }}>
-              <Text style={{ fontSize: 20, color: colors.text.secondary, lineHeight: 24 }}>✕</Text>
-            </Pressable>
-          </View>
-          {/* Divider */}
-          <View style={{ height: 1, backgroundColor: colors.border.subtle, marginVertical: spacing[4], opacity: 0.6 }} />
-          {/* Chart — scrollable if data is wide */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <NetWorthChart
-              data={nwHist ?? []}
-              width={Math.max(SW - 72, (nwHist ?? []).length * 28)}
-              height={Math.round(SH * 0.45)}
-            />
-          </ScrollView>
-        </Animated.View>
-      </Pressable>
-    </Modal>
-    </>
   );
 }
 

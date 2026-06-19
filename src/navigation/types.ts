@@ -75,15 +75,17 @@ export type WealthStackParamList = {
     accountCategory: string;
   };
   TransactionDetail: { id: string; type: 'expense' | 'income' | 'transfer' };
+  ChartFullscreen:   { chartKey: 'networth'; period: 6 | 12 | 24 };
 };
 
 // ── Analytics stack ────────────────────────────────────────────────────────────
 export type AnalyticsStackParamList = {
-  AnalyticsHome:  undefined;
-  SpendingTrends: undefined;
-  IncomeAnalysis: undefined;
-  NetWorthGrowth: undefined;
-  Forecast:       undefined;
+  AnalyticsHome:   undefined;
+  SpendingTrends:  undefined;
+  IncomeAnalysis:  undefined;
+  NetWorthGrowth:  undefined;
+  Forecast:        undefined;
+  ChartFullscreen: { chartKey: 'bar' | 'line' | 'donut'; period: 'weekly' | 'monthly' | 'yearly' };
 };
 
 // ── Main tab bar ───────────────────────────────────────────────────────────────

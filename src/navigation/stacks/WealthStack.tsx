@@ -2,6 +2,7 @@ import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import type { WealthStackParamList } from '../types';
 import { WealthScreen }                   from '../../screens/wealth/WealthScreen';
+import { ChartFullscreenScreen }          from '../../screens/charts/ChartFullscreenScreen';
 import { GoalDetailScreen }               from '../../screens/wealth/savings/GoalDetailScreen';
 import { CreateGoalScreen }               from '../../screens/wealth/savings/CreateGoalScreen';
 import { AddContributionScreen }          from '../../screens/wealth/savings/AddContributionScreen';
@@ -35,6 +36,7 @@ export function WealthStack() {
       <Stack.Screen name="DebtsDetail"             component={DebtsDetailScreen} />
       <Stack.Screen name="AccountTransactions"     component={AccountTransactionsScreen} />
       <Stack.Screen name="TransactionDetail"       component={TransactionDetailScreen} />
+      <Stack.Screen name="ChartFullscreen"         component={ChartFullscreenScreen} />
     </Stack.Navigator>
   );
 }
