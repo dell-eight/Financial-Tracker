@@ -1,5 +1,6 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, StyleSheet, AppState } from 'react-native';
+import * as ScreenCapture from 'expo-screen-capture';
 import { createStackNavigator } from '@react-navigation/stack';
 import type { RootStackParamList } from './types';
 import { AuthNavigator } from './AuthNavigator';
@@ -32,11 +33,14 @@ export function RootNavigator() {
   const isLoading            = useAuthStore(s => s.isLoading);
   const setSession           = useAuthStore(s => s.setSession);
   const setLoading           = useAuthStore(s => s.setLoading);
-  const biometricEnabled     = useAppStore(s => s.biometricEnabled);
-  const isBiometricUnlocked  = useAppStore(s => s.isBiometricUnlocked);
-  const setBiometricUnlocked = useAppStore(s => s.setBiometricUnlocked);
-  const notificationsEnabled = useAppStore(s => s.notificationsEnabled);
-  const weeklySummaryEnabled = useAppStore(s => s.weeklySummaryEnabled);
+  const biometricEnabled         = useAppStore(s => s.biometricEnabled);
+  const isBiometricUnlocked      = useAppStore(s => s.isBiometricUnlocked);
+  const setBiometricUnlocked     = useAppStore(s => s.setBiometricUnlocked);
+  const notificationsEnabled     = useAppStore(s => s.notificationsEnabled);
+  const weeklySummaryEnabled     = useAppStore(s => s.weeklySummaryEnabled);
+  const pinEnabled               = useAppStore(s => s.pinEnabled);
+  const autoLockDuration         = useAppStore(s => s.autoLockDuration);
+  const screenshotPrivacyEnabled = useAppStore(s => s.screenshotPrivacyEnabled);
 
   useEffect(() => {
     // Restore session on cold start — use getUser() for server-fresh user_metadata
@@ -72,6 +76,39 @@ export function RootNavigator() {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Auto-lock: track time spent in background; lock on resume if threshold exceeded
+  const bgTimeRef = useRef(0);
+  useEffect(() => {
+    const THRESHOLDS: Record<string, number> = {
+      '1min':  60_000,
+      '5min':  300_000,
+      '15min': 900_000,
+      'never': Infinity,
+    };
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'background' || state === 'inactive') {
+        bgTimeRef.current = Date.now();
+      } else if (state === 'active' && bgTimeRef.current > 0) {
+        const elapsed   = Date.now() - bgTimeRef.current;
+        const threshold = THRESHOLDS[autoLockDuration] ?? Infinity;
+        if (elapsed >= threshold && (biometricEnabled || pinEnabled)) {
+          setBiometricUnlocked(false);
+        }
+        bgTimeRef.current = 0;
+      }
+    });
+    return () => sub.remove();
+  }, [autoLockDuration, biometricEnabled, pinEnabled]);
+
+  // Screenshot privacy: enable/disable FLAG_SECURE (Android) and iOS snapshot prevention
+  useEffect(() => {
+    if (screenshotPrivacyEnabled) {
+      ScreenCapture.preventScreenCaptureAsync();
+    } else {
+      ScreenCapture.allowScreenCaptureAsync();
+    }
+  }, [screenshotPrivacyEnabled]);
 
   // Request notification permissions and register push token once authenticated
   useEffect(() => {

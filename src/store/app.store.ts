@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type ThemePreference = 'dark' | 'light' | 'system';
+export type AutoLockDuration = '1min' | '5min' | '15min' | 'never';
 
 export interface PendingMilestone {
   id:        string;
@@ -28,18 +29,25 @@ interface AppState {
   // Auth rate limiting — persisted so lockout survives app restart
   loginAttempts:        number;
   loginLockoutUntil:    number | null; // epoch ms, null = not locked out
+  // Security settings — persisted
+  pinEnabled:               boolean;
+  autoLockDuration:         AutoLockDuration;
+  screenshotPrivacyEnabled: boolean;
   // Milestone celebrations — session-only (not persisted)
   pendingMilestones:    PendingMilestone[];
 
-  setThemePreference:      (pref: ThemePreference) => void;
+  setThemePreference:          (pref: ThemePreference) => void;
   setCurrency:             (currency: string) => void;
   setNotificationsEnabled: (enabled: boolean) => void;
   setBiometricEnabled:     (enabled: boolean) => void;
   setBiometricUnlocked:    (unlocked: boolean) => void;
   setAlert80Enabled:       (enabled: boolean) => void;
   setAlert100Enabled:      (enabled: boolean) => void;
-  setWeeklySummaryEnabled: (enabled: boolean) => void;
-  recordLoginFailure:      () => void;
+  setWeeklySummaryEnabled:     (enabled: boolean) => void;
+  setPinEnabled:               (enabled: boolean) => void;
+  setAutoLockDuration:         (duration: AutoLockDuration) => void;
+  setScreenshotPrivacyEnabled: (enabled: boolean) => void;
+  recordLoginFailure:          () => void;
   clearLoginAttempts:      () => void;
   addPendingMilestones:    (milestones: PendingMilestone[]) => void;
   shiftPendingMilestone:   () => void;
@@ -58,16 +66,22 @@ export const useAppStore = create<AppState>()(
       weeklySummaryEnabled: false,
       loginAttempts:        0,
       loginLockoutUntil:    null,
+      pinEnabled:               false,
+      autoLockDuration:         'never',
+      screenshotPrivacyEnabled: false,
       pendingMilestones:    [],
 
-      setThemePreference:      (themePreference)      => set({ themePreference }),
-      setCurrency:             (currency)             => set({ currency }),
-      setNotificationsEnabled: (notificationsEnabled) => set({ notificationsEnabled }),
-      setBiometricEnabled:     (biometricEnabled)     => set({ biometricEnabled }),
-      setBiometricUnlocked:    (isBiometricUnlocked)  => set({ isBiometricUnlocked }),
-      setAlert80Enabled:       (alert80Enabled)       => set({ alert80Enabled }),
-      setAlert100Enabled:      (alert100Enabled)      => set({ alert100Enabled }),
-      setWeeklySummaryEnabled: (weeklySummaryEnabled) => set({ weeklySummaryEnabled }),
+      setThemePreference:          (themePreference)          => set({ themePreference }),
+      setCurrency:                 (currency)                 => set({ currency }),
+      setNotificationsEnabled:     (notificationsEnabled)     => set({ notificationsEnabled }),
+      setBiometricEnabled:         (biometricEnabled)         => set({ biometricEnabled }),
+      setBiometricUnlocked:        (isBiometricUnlocked)      => set({ isBiometricUnlocked }),
+      setAlert80Enabled:           (alert80Enabled)           => set({ alert80Enabled }),
+      setAlert100Enabled:          (alert100Enabled)          => set({ alert100Enabled }),
+      setWeeklySummaryEnabled:     (weeklySummaryEnabled)     => set({ weeklySummaryEnabled }),
+      setPinEnabled:               (pinEnabled)               => set({ pinEnabled }),
+      setAutoLockDuration:         (autoLockDuration)         => set({ autoLockDuration }),
+      setScreenshotPrivacyEnabled: (screenshotPrivacyEnabled) => set({ screenshotPrivacyEnabled }),
 
       recordLoginFailure: () => set((s) => {
         const next = s.loginAttempts + 1;
@@ -100,8 +114,11 @@ export const useAppStore = create<AppState>()(
         alert80Enabled:       state.alert80Enabled,
         alert100Enabled:      state.alert100Enabled,
         weeklySummaryEnabled: state.weeklySummaryEnabled,
-        loginAttempts:        state.loginAttempts,
-        loginLockoutUntil:    state.loginLockoutUntil,
+        loginAttempts:            state.loginAttempts,
+        loginLockoutUntil:        state.loginLockoutUntil,
+        pinEnabled:               state.pinEnabled,
+        autoLockDuration:         state.autoLockDuration,
+        screenshotPrivacyEnabled: state.screenshotPrivacyEnabled,
       }),
     },
   ),
