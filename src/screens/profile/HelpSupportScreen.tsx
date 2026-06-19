@@ -332,7 +332,7 @@ const FAQ_ITEMS = [
   },
   {
     question: 'Can I export my data?',
-    answer:   'Yes. Go to Profile > Export Data to download your transactions, budget data, and net worth history in CSV, JSON, or PDF format.',
+    answer:   'Yes. Go to Profile > Security Settings > Export Data to download your transactions, budget data, and net worth history in CSV, JSON, or PDF format.',
   },
 ];
 
