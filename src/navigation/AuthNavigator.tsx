@@ -8,10 +8,10 @@ import { ForgotPasswordScreen }  from '../screens/auth/ForgotPasswordScreen';
 
 const Stack = createStackNavigator<AuthStackParamList>();
 
-export function AuthNavigator() {
+export function AuthNavigator({ initialRoute = 'Welcome' }: { initialRoute?: keyof AuthStackParamList }) {
   return (
     <Stack.Navigator
-      initialRouteName="Welcome"
+      initialRouteName={initialRoute}
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="Welcome"        component={WelcomeScreen} />

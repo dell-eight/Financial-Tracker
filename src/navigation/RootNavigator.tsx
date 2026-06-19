@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { View, StyleSheet } from 'react-native';
 import * as ScreenCapture from 'expo-screen-capture';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -131,6 +131,18 @@ export function RootNavigator() {
     return () => sub.remove();
   }, [isAuthenticated, notificationsEnabled]);
 
+  // Track whether the user has ever been authenticated this session so that
+  // signing out lands on Login instead of the Welcome/onboarding screen.
+  const wasAuthenticatedRef = useRef(false);
+  useEffect(() => {
+    if (isAuthenticated) wasAuthenticatedRef.current = true;
+  }, [isAuthenticated]);
+
+  const AuthScreen = useCallback(
+    () => <AuthNavigator initialRoute={wasAuthenticatedRef.current ? 'Login' : 'Welcome'} />,
+    [],
+  );
+
   // Show lock screen when authenticated but not yet unlocked and at least one auth method is enabled
   const showBiometricLock = isAuthenticated && (biometricEnabled || pinEnabled) && !isBiometricUnlocked;
 
@@ -144,7 +156,7 @@ export function RootNavigator() {
         ) : isAuthenticated ? (
           <Root.Screen name="Main" component={MainNavigator} />
         ) : (
-          <Root.Screen name="Auth" component={AuthNavigator} />
+          <Root.Screen name="Auth" component={AuthScreen} />
         )}
         <Root.Screen
           name="QuickAddSheet"
