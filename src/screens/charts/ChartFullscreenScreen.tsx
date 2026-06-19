@@ -90,9 +90,10 @@ export function ChartFullscreenScreen({ navigation, route }: any) {
       .sort((a, b) => b.amount - a.amount);
   }, [txns, theme.categoryColors]);
 
-  // Chart fills the full safe area
-  const chartW = W - insets.left - insets.right;
-  const chartH = H - insets.top - insets.bottom;
+  // Chart fills the full safe-area-adjusted canvas
+  const PAD    = 24;
+  const chartW = W - insets.left - insets.right - PAD * 2;
+  const chartH = H - insets.top  - insets.bottom - PAD * 2;
 
   // Overlay safe-area offsets for floating controls
   const overlayTop   = insets.top   + 10;
@@ -109,23 +110,23 @@ export function ChartFullscreenScreen({ navigation, route }: any) {
         showsHorizontalScrollIndicator={false}
         style={sc.chart}
         contentContainerStyle={{
-          paddingHorizontal: insets.left + 16,
-          paddingVertical:   insets.top + 16,
+          paddingHorizontal: insets.left + PAD,
+          paddingVertical:   insets.top + PAD / 2,
           alignItems:        'center',
         }}
       >
         {chartKey === 'bar' && (
           <GroupedBarChart
             data={barData}
-            chartW={Math.max(chartW - 32, barData.length * MIN_BAR_PT_W)}
-            chartH={chartH - 32}
+            chartW={Math.max(chartW, barData.length * MIN_BAR_PT_W)}
+            chartH={chartH}
           />
         )}
         {chartKey === 'line' && (
           <SpendingLineChart
             data={lineData}
-            chartW={Math.max(chartW - 32, lineData.length * MIN_LINE_PT_W)}
-            chartH={chartH - 32}
+            chartW={Math.max(chartW, lineData.length * MIN_LINE_PT_W)}
+            chartH={chartH}
           />
         )}
         {chartKey === 'donut' && (
@@ -134,8 +135,8 @@ export function ChartFullscreenScreen({ navigation, route }: any) {
         {chartKey === 'networth' && (
           <NetWorthChart
             data={nwHist ?? []}
-            width={Math.max(chartW - 32, (nwHist ?? []).length * 32)}
-            height={chartH - 32}
+            width={Math.max(chartW, (nwHist ?? []).length * 32)}
+            height={chartH}
           />
         )}
       </ScrollView>
