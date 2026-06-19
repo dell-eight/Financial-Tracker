@@ -204,16 +204,19 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
               queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
               queryClient.invalidateQueries({ queryKey: ASSETS_KEY }),
             ]);
-          } catch {
-            // navigate back regardless; list will re-fetch and show correct state
+            navigation.goBack();
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : JSON.stringify(err);
+            Alert.alert('Delete Failed', msg);
           } finally {
             setDeleting(false);
           }
-          navigation.goBack();
         },
       },
     ]);
   }
+
+  const [headerStyle, detailStyle, actionStyle] = useScreenAnimation(3);
 
   // ── Not found ────────────────────────────────────────────────────────────────
   if (!tx) {
@@ -239,8 +242,6 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
       </View>
     );
   }
-
-  const [headerStyle, detailStyle, actionStyle] = useScreenAnimation(3);
 
   const prefix      = isTransfer ? '↔ ' : isExpense ? '-' : '+';
   const displayDate = formatDisplayDate(tx.date);
