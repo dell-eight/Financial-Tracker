@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -133,8 +133,18 @@ export function SecuritySettingsScreen({ navigation }: Props) {
   const clearAuth                = useAuthStore(s => s.clearAuth);
   const user                     = useAuthStore(s => s.user);
 
+  const [biometricAvailable, setBiometricAvailable] = useState(true);
+
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
+
+  // Check biometric hardware/enrollment on mount; auto-disable if gone
+  useEffect(() => {
+    isBiometricAvailable().then(available => {
+      setBiometricAvailable(available);
+      if (!available && biometricEnabled) setBiometricEnabled(false);
+    });
+  }, []);
 
   // ── Entrance animations ──────────────────────────────────────────────────
   const a0 = useSharedValue(0);
@@ -239,11 +249,16 @@ export function SecuritySettingsScreen({ navigation }: Props) {
             <RowItem
               icon="🔒"
               label="Biometric Auth"
-              desc={biometricEnabled ? 'Face ID / fingerprint active' : 'Use biometrics to unlock'}
+              desc={
+                !biometricAvailable
+                  ? 'No biometrics enrolled on this device'
+                  : biometricEnabled ? 'Face ID / fingerprint active' : 'Use biometrics to unlock'
+              }
               right={
                 <Switch
                   value={biometricEnabled}
                   onValueChange={handleBiometricToggle}
+                  disabled={!biometricAvailable}
                   trackColor={switchTrack}
                   thumbColor={biometricEnabled ? colors.accent.primary : colors.text.muted}
                 />

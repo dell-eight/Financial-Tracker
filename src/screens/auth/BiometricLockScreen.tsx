@@ -37,7 +37,7 @@ export function BiometricLockScreen() {
 
   const [error,        setError]        = useState<string | null>(null);
   const [checking,     setChecking]     = useState(false);
-  const [showPin,      setShowPin]      = useState(false);
+  const [showPin,      setShowPin]      = useState(!biometricEnabled);
   const [digits,       setDigits]       = useState('');
   const [pinVerifying, setPinVerifying] = useState(false);
 

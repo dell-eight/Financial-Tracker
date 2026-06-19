@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, AppState } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import * as ScreenCapture from 'expo-screen-capture';
 import { createStackNavigator } from '@react-navigation/stack';
 import type { RootStackParamList } from './types';
@@ -23,6 +23,14 @@ import {
 } from '../services/notifications.service';
 
 const Root = createStackNavigator<RootStackParamList>();
+
+const THRESHOLDS: Record<string, number> = {
+  '1min':  60_000,
+  '5min':  300_000,
+  '15min': 900_000,
+  'never': Infinity,
+};
+
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
@@ -77,28 +85,23 @@ export function RootNavigator() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Auto-lock: track time spent in background; lock on resume if threshold exceeded
-  const bgTimeRef = useRef(0);
+  // Auto-lock: JS timers pause when the app is backgrounded. On resume, the interval fires
+  // with a gap equal to time spent in background — no AppState events required.
+  const lastTickRef = useRef(Date.now());
   useEffect(() => {
-    const THRESHOLDS: Record<string, number> = {
-      '1min':  60_000,
-      '5min':  300_000,
-      '15min': 900_000,
-      'never': Infinity,
-    };
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'background' || state === 'inactive') {
-        bgTimeRef.current = Date.now();
-      } else if (state === 'active' && bgTimeRef.current > 0) {
-        const elapsed   = Date.now() - bgTimeRef.current;
-        const threshold = THRESHOLDS[autoLockDuration] ?? Infinity;
-        if (elapsed >= threshold && (biometricEnabled || pinEnabled)) {
-          setBiometricUnlocked(false);
-        }
-        bgTimeRef.current = 0;
+    const threshold = THRESHOLDS[autoLockDuration] ?? Infinity;
+    lastTickRef.current = Date.now();
+    if (threshold === Infinity) return;
+
+    const id = setInterval(() => {
+      const now = Date.now();
+      const gap = now - lastTickRef.current;
+      lastTickRef.current = now;
+      if (gap >= threshold && (biometricEnabled || pinEnabled)) {
+        setBiometricUnlocked(false);
       }
-    });
-    return () => sub.remove();
+    }, 1000);
+    return () => clearInterval(id);
   }, [autoLockDuration, biometricEnabled, pinEnabled]);
 
   // Screenshot privacy: enable/disable FLAG_SECURE (Android) and iOS snapshot prevention
@@ -128,8 +131,8 @@ export function RootNavigator() {
     return () => sub.remove();
   }, [isAuthenticated, notificationsEnabled]);
 
-  // Show biometric lock screen when authenticated but not yet unlocked
-  const showBiometricLock = isAuthenticated && biometricEnabled && !isBiometricUnlocked;
+  // Show lock screen when authenticated but not yet unlocked and at least one auth method is enabled
+  const showBiometricLock = isAuthenticated && (biometricEnabled || pinEnabled) && !isBiometricUnlocked;
 
   if (isLoading) return <AppLoadingScreen />;
 
