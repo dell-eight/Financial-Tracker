@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,7 +24,7 @@ import { AppButton, AppInput } from '../../components';
 import { SocialAuthRow } from '../../components/auth/SocialAuthRow';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useLogin } from '../../hooks/queries/useAuth';
-import { signInWithGoogle } from '../../services/auth.service';
+import { signInWithGoogle as googleSignIn } from '../../services/auth.service';
 import { useAppStore } from '../../store/app.store';
 import type { AuthStackParamList } from '../../navigation/types';
 
@@ -70,9 +71,10 @@ export function LoginScreen({ navigation }: Props) {
   const remainingMs  = isLockedOut ? loginLockoutUntil - now : 0;
 
   // Form state
-  const [email,    setEmail]    = useState('');
-  const [password, setPassword] = useState('');
-  const [showPass, setShowPass] = useState(false);
+  const [email,         setEmail]         = useState('');
+  const [password,      setPassword]      = useState('');
+  const [showPass,      setShowPass]      = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const [errors, setErrors] = useState<{
     email?: string;
@@ -131,6 +133,24 @@ export function LoginScreen({ navigation }: Props) {
         }
       },
     });
+  }
+
+  async function handleGoogleSignIn() {
+    setGoogleLoading(true);
+    try {
+      const { error } = await googleSignIn();
+      if (error) {
+        Alert.alert('Sign in failed', error);
+        setGoogleLoading(false);
+      } else {
+        // No error — either success (SIGNED_IN fires and covers the rest)
+        // or user dismissed the browser without completing OAuth.
+        // Wait briefly for onAuthStateChange to fire; if it doesn't, reset.
+        setTimeout(() => setGoogleLoading(false), 500);
+      }
+    } catch {
+      setGoogleLoading(false);
+    }
   }
 
   // ── Layout constants ────────────────────────────────────────────────────────
@@ -309,7 +329,8 @@ export function LoginScreen({ navigation }: Props) {
 
           {/* Social auth */}
           <SocialAuthRow
-            onGooglePress={signInWithGoogle}
+            onGooglePress={handleGoogleSignIn}
+            googleLoading={googleLoading}
             style={{ marginTop: spacing[5] }}
           />
 

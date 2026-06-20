@@ -918,7 +918,7 @@ export function BudgetScreen({ navigation }: Props) {
               accessibilityRole="button"
               accessibilityLabel="Alert settings"
             >
-              <Text style={{ fontSize: 16, lineHeight: 20 }}>🔔</Text>
+              <Text style={{ fontSize: 16, lineHeight: 20 }}>⚙️</Text>
             </Pressable>
             <Pressable
               onPress={() => navigation.push('BudgetSetupWizard')}

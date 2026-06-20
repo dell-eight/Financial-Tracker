@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useBudgets, BUDGETS_KEY } from '../../hooks/queries/useBudgets';
+import { useDashboard } from '../../hooks/queries/useDashboard';
 import { updateBudgetLimit } from '../../services/finance.service';
 import { getCategoryBgColor } from '../../theme';
 import type { CategoryKey } from '../../theme';
@@ -140,13 +141,21 @@ export function BudgetSetupWizard({ navigation }: Props) {
 
   // Existing budgets — used only to pre-fill limits
   const { data: existingBudgets } = useBudgets();
+  const { data: dashboard }       = useDashboard();
 
   const [step,     setStep]     = useState(1);
-  const [income,   setIncome]   = useState('43171.80');
+  const [income,   setIncome]   = useState('');
   // allocMap key = category key (e.g. 'food', 'transport')
   const [allocMap, setAllocMap] = useState<Record<string, string>>({});
   const [saving,   setSaving]   = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Pre-fill income from dashboard monthly income (runs once when data arrives)
+  useEffect(() => {
+    if (dashboard?.monthlyIncome && dashboard.monthlyIncome > 0 && income === '') {
+      setIncome(String(dashboard.monthlyIncome));
+    }
+  }, [dashboard]);
 
   // Pre-fill from existing Supabase budgets (match by label)
   useEffect(() => {

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { ScoreMode } from '../utils/healthScore';
+import type { CategoryKey } from '../theme';
 
 export type ThemePreference = 'dark' | 'light' | 'system';
 export type AutoLockDuration = '1min' | '5min' | '15min' | 'never';
@@ -34,10 +36,11 @@ interface AppState {
   // ── Account-level preferences (persisted, reset on sign-out) ──────────
   themePreference:      ThemePreference;
   currency:             string;
-  notificationsEnabled: boolean;
-  alert80Enabled:       boolean;
-  alert100Enabled:      boolean;
-  weeklySummaryEnabled: boolean;
+  notificationsEnabled:    boolean;
+  alert80Enabled:          boolean;
+  alert100Enabled:         boolean;
+  weeklySummaryEnabled:    boolean;
+  categoryAlertOverrides:  Partial<Record<CategoryKey, boolean>>;
 
   // ── Device-level brute-force guard (persisted, never reset) ───────────
   loginAttempts:     number;
@@ -49,6 +52,9 @@ interface AppState {
   autoLockDuration:         AutoLockDuration;
   screenshotPrivacyEnabled: boolean;
 
+  // ── Health score mode (NOT persisted — loaded from Supabase on sign-in) ─
+  healthScoreMode: ScoreMode;
+
   // ── Session-only (never persisted) ────────────────────────────────────
   isBiometricUnlocked: boolean;
   pendingMilestones:   PendingMilestone[];
@@ -57,6 +63,7 @@ interface AppState {
   setThemePreference:          (pref: ThemePreference) => void;
   setCurrency:                 (currency: string) => void;
   setNotificationsEnabled:     (enabled: boolean) => void;
+  setCategoryAlertOverrides:   (overrides: Partial<Record<CategoryKey, boolean>>) => void;
   setBiometricEnabled:         (enabled: boolean) => void;
   setBiometricUnlocked:        (unlocked: boolean) => void;
   setAlert80Enabled:           (enabled: boolean) => void;
@@ -69,6 +76,8 @@ interface AppState {
   clearLoginAttempts:          () => void;
   addPendingMilestones:        (milestones: PendingMilestone[]) => void;
   shiftPendingMilestone:       () => void;
+  setHealthScoreMode:          (mode: ScoreMode) => void;
+  clearHealthScoreMode:        () => void;
 
   // ── Auth-event actions ─────────────────────────────────────────────────
   // Hydrates the active security fields from a Supabase-fetched settings object.
@@ -85,13 +94,15 @@ export const useAppStore = create<AppState>()(
       // ── Initial values ───────────────────────────────────────────────
       themePreference:      'system',
       currency:             'PHP',
-      notificationsEnabled: true,
-      alert80Enabled:       true,
-      alert100Enabled:      true,
-      weeklySummaryEnabled: false,
-      loginAttempts:        0,
+      notificationsEnabled:   true,
+      alert80Enabled:         true,
+      alert100Enabled:        true,
+      weeklySummaryEnabled:   false,
+      categoryAlertOverrides: {},
+      loginAttempts:          0,
       loginLockoutUntil:    null,
       ...DEFAULT_SECURITY,
+      healthScoreMode:      'balanced' as ScoreMode,
       isBiometricUnlocked:  false,
       pendingMilestones:    [],
 
@@ -99,6 +110,7 @@ export const useAppStore = create<AppState>()(
       setThemePreference:          (themePreference)          => set({ themePreference }),
       setCurrency:                 (currency)                 => set({ currency }),
       setNotificationsEnabled:     (notificationsEnabled)     => set({ notificationsEnabled }),
+      setCategoryAlertOverrides:   (categoryAlertOverrides)   => set({ categoryAlertOverrides }),
       setAlert80Enabled:           (alert80Enabled)           => set({ alert80Enabled }),
       setAlert100Enabled:          (alert100Enabled)          => set({ alert100Enabled }),
       setWeeklySummaryEnabled:     (weeklySummaryEnabled)     => set({ weeklySummaryEnabled }),
@@ -130,6 +142,9 @@ export const useAppStore = create<AppState>()(
         pendingMilestones: s.pendingMilestones.slice(1),
       })),
 
+      setHealthScoreMode:  (healthScoreMode) => set({ healthScoreMode }),
+      clearHealthScoreMode: () => set({ healthScoreMode: 'balanced' }),
+
       // ── Auth-event actions ───────────────────────────────────────────
 
       // Called after sign-in with the row fetched from Supabase.
@@ -147,12 +162,13 @@ export const useAppStore = create<AppState>()(
 
       // Called on sign-out — resets account-level preferences only.
       resetAccountSettings: () => set({
-        currency:             'PHP',
-        notificationsEnabled: true,
-        alert80Enabled:       true,
-        alert100Enabled:      true,
-        weeklySummaryEnabled: false,
-        pendingMilestones:    [],
+        currency:               'PHP',
+        notificationsEnabled:   true,
+        alert80Enabled:         true,
+        alert100Enabled:        true,
+        weeklySummaryEnabled:   false,
+        categoryAlertOverrides: {},
+        pendingMilestones:      [],
       }),
     }),
     {
@@ -164,10 +180,11 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         themePreference:      state.themePreference,
         currency:             state.currency,
-        notificationsEnabled: state.notificationsEnabled,
-        alert80Enabled:       state.alert80Enabled,
-        alert100Enabled:      state.alert100Enabled,
-        weeklySummaryEnabled: state.weeklySummaryEnabled,
+        notificationsEnabled:   state.notificationsEnabled,
+        alert80Enabled:         state.alert80Enabled,
+        alert100Enabled:        state.alert100Enabled,
+        weeklySummaryEnabled:   state.weeklySummaryEnabled,
+        categoryAlertOverrides: state.categoryAlertOverrides,
         loginAttempts:        state.loginAttempts,
         loginLockoutUntil:    state.loginLockoutUntil,
       }),

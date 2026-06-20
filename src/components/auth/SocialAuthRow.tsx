@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, type ViewStyle } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator, type ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -42,10 +42,11 @@ interface ProviderButtonProps {
   label: string;
   icon: React.ReactNode;
   onPress: () => void;
+  loading?: boolean;
   style?: ViewStyle;
 }
 
-function ProviderButton({ label, icon, onPress, style }: ProviderButtonProps) {
+function ProviderButton({ label, icon, onPress, loading, style }: ProviderButtonProps) {
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontFamily, fontSize, animation } = theme;
 
@@ -60,7 +61,9 @@ function ProviderButton({ label, icon, onPress, style }: ProviderButtonProps) {
   return (
     <AnimatedPressable
       onPress={onPress}
+      disabled={loading}
       onPressIn={() => {
+        if (loading) return;
         scale.value   = withSpring(0.96, animation.spring.snappy);
         opacity.value = withTiming(0.8, { duration: animation.duration.fast });
       }}
@@ -84,16 +87,18 @@ function ProviderButton({ label, icon, onPress, style }: ProviderButtonProps) {
           },
         ]}
       >
-        {icon}
+        {loading
+          ? <ActivityIndicator size="small" color={colors.accent.primary} />
+          : icon}
         <Text
           style={{
             fontSize:   fontSize.bodyMd,
             fontFamily: fontFamily.medium,
-            color:      colors.text.primary,
+            color:      loading ? colors.text.muted : colors.text.primary,
             marginLeft: spacing[2],
           }}
         >
-          {label}
+          {loading ? 'Signing in…' : label}
         </Text>
       </View>
     </AnimatedPressable>
@@ -104,10 +109,11 @@ function ProviderButton({ label, icon, onPress, style }: ProviderButtonProps) {
 
 export interface SocialAuthRowProps {
   onGooglePress: () => void;
+  googleLoading?: boolean;
   style?: ViewStyle;
 }
 
-export function SocialAuthRow({ onGooglePress, style }: SocialAuthRowProps) {
+export function SocialAuthRow({ onGooglePress, googleLoading, style }: SocialAuthRowProps) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily } = theme;
 
@@ -134,6 +140,7 @@ export function SocialAuthRow({ onGooglePress, style }: SocialAuthRowProps) {
         label="Continue with Google"
         icon={<GoogleIcon />}
         onPress={onGooglePress}
+        loading={googleLoading}
         style={styles.providerFull}
       />
     </View>

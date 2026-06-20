@@ -2,6 +2,9 @@
 // Pins TLS connections to supabase.co to the WE1 intermediate CA and the
 // GTS Root R4 backup, then wires the manifest attribute.
 //
+// Development builds (EAS_BUILD_PROFILE=development) allow cleartext HTTP so
+// the expo-dev-client can reach the Metro bundler on the local network.
+//
 // Expiration: update pins annually or when cert chain changes.
 // Re-derive pins with: node scripts/get-cert-pins.js
 
@@ -9,12 +12,18 @@ const { withAndroidManifest, withDangerousMod } = require('@expo/config-plugins'
 const path = require('path');
 const fs   = require('fs');
 
-const NETWORK_SECURITY_XML = `<?xml version="1.0" encoding="utf-8"?>
+const isDev = process.env.EAS_BUILD_PROFILE === 'development';
+
+function buildNetworkSecurityXml(allowCleartext) {
+  return `<?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-  <!-- Block cleartext (HTTP) for all domains -->
-  <base-config cleartextTrafficPermitted="false">
+  <!-- ${allowCleartext
+    ? 'Development: cleartext permitted so Metro bundler (LAN HTTP) can connect'
+    : 'Block cleartext (HTTP) for all domains'} -->
+  <base-config cleartextTrafficPermitted="${allowCleartext ? 'true' : 'false'}">
     <trust-anchors>
       <certificates src="system"/>
+      ${allowCleartext ? '<!-- Trust user-installed CAs in dev builds for Charles/Proxyman -->\n      <certificates src="user"/>' : ''}
     </trust-anchors>
   </base-config>
 
@@ -32,6 +41,7 @@ const NETWORK_SECURITY_XML = `<?xml version="1.0" encoding="utf-8"?>
   </domain-config>
 </network-security-config>
 `;
+}
 
 /** @param {import('@expo/config-plugins').ExpoConfig} config */
 function withAndroidNetworkSecurity(config) {
@@ -53,7 +63,10 @@ function withAndroidNetworkSecurity(config) {
         'app', 'src', 'main', 'res', 'xml'
       );
       fs.mkdirSync(xmlDir, { recursive: true });
-      fs.writeFileSync(path.join(xmlDir, 'network_security_config.xml'), NETWORK_SECURITY_XML);
+      fs.writeFileSync(
+        path.join(xmlDir, 'network_security_config.xml'),
+        buildNetworkSecurityXml(isDev),
+      );
       return cfg;
     },
   ]);

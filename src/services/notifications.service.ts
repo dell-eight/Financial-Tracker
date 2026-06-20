@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import type { Budget } from '../types/models';
+import type { CategoryKey } from '../theme';
 
 // expo-notifications auto-registers for push tokens at import time via TokenAutoRegistration.fxs.js,
 // triggering a console error in Expo Go since SDK 53 removed remote push support.
@@ -96,12 +97,14 @@ export async function checkBudgetThresholds(
   budgets: Budget[],
   alert80Enabled:  boolean,
   alert100Enabled: boolean,
+  categoryAlertOverrides: Partial<Record<CategoryKey, boolean>> = {},
 ): Promise<void> {
   const N = getNotifs();
   if (!N) return;
 
   for (const budget of budgets) {
     if (budget.limit <= 0) continue;
+    if (categoryAlertOverrides[budget.category] === false) continue;
     const ratio = budget.spent / budget.limit;
     const monthKey = `${budget.year}_${budget.month}`;
 
@@ -136,6 +139,71 @@ export async function checkBudgetThresholds(
         await markFired(key);
       }
     }
+  }
+}
+
+// ── Debug test notifications ───────────────────────────────────────────────────
+
+export type TestNotificationType = 'push' | 'weekly_summary' | 'budget_warning' | 'budget_over';
+
+export type TestNotificationResult =
+  | { ok: true }
+  | { ok: false; reason: 'expo_go' | 'permission_denied' | 'error'; message: string };
+
+export async function fireTestNotification(type: TestNotificationType): Promise<TestNotificationResult> {
+  if (IS_EXPO_GO) {
+    return {
+      ok:      false,
+      reason:  'expo_go',
+      message: 'Notifications are not supported in Expo Go (SDK 53+). Run a dev build via EAS to test notifications.',
+    };
+  }
+
+  const N = getNotifs()!;
+
+  const { status } = await N.getPermissionsAsync();
+  if (status !== 'granted') {
+    const { status: requested } = await N.requestPermissionsAsync();
+    if (requested !== 'granted') {
+      return {
+        ok:      false,
+        reason:  'permission_denied',
+        message: 'Notification permission was denied. Enable it in your device Settings → Notifications.',
+      };
+    }
+  }
+
+  const contentMap: Record<TestNotificationType, { title: string; body: string }> = {
+    push: {
+      title: '🔔 Test Notification',
+      body:  'Push notifications are working correctly!',
+    },
+    weekly_summary: {
+      title: '📊 Weekly Budget Summary',
+      body:  "Here's how your spending tracked this week — tap to review.",
+    },
+    budget_warning: {
+      title: '⚠️ Budget Warning: Food',
+      body:  "You've used 85% of your Food budget this month.",
+    },
+    budget_over: {
+      title: '🚨 Over Budget: Entertainment',
+      body:  "You've exceeded your Entertainment budget limit.",
+    },
+  };
+
+  try {
+    await N.scheduleNotificationAsync({
+      content: { ...contentMap[type], data: { type, _test: true } },
+      trigger: null,
+    });
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok:      false,
+      reason:  'error',
+      message: e instanceof Error ? e.message : 'Unknown error scheduling notification.',
+    };
   }
 }
 

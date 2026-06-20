@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React from 'react';
 import Animated from 'react-native-reanimated';
 import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import {
@@ -9,6 +9,7 @@ import {
   Switch,
   StyleSheet,
   Platform,
+  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,7 +21,9 @@ import { getCategoryBgColor } from '../../theme';
 import type { BudgetStackParamList } from '../../navigation/types';
 import { useAppStore } from '../../store/app.store';
 import { useCurrency } from '../../utils/currency';
-import { syncWeeklySummary } from '../../services/notifications.service';
+import type { CategoryKey } from '../../theme';
+import { syncWeeklySummary, fireTestNotification } from '../../services/notifications.service';
+import type { TestNotificationType } from '../../services/notifications.service';
 
 type Props = StackScreenProps<BudgetStackParamList, 'AlertSettings'>;
 
@@ -112,31 +115,33 @@ export function AlertSettingsScreen({ navigation }: Props) {
 
   const { data: budgets } = useBudgets();
 
-  const notificationsEnabled   = useAppStore(s => s.notificationsEnabled);
-  const alert80Enabled         = useAppStore(s => s.alert80Enabled);
-  const alert100Enabled        = useAppStore(s => s.alert100Enabled);
-  const weeklySummaryEnabled   = useAppStore(s => s.weeklySummaryEnabled);
+  const notificationsEnabled      = useAppStore(s => s.notificationsEnabled);
+  const alert80Enabled            = useAppStore(s => s.alert80Enabled);
+  const alert100Enabled           = useAppStore(s => s.alert100Enabled);
+  const weeklySummaryEnabled      = useAppStore(s => s.weeklySummaryEnabled);
+  const categoryAlertOverrides    = useAppStore(s => s.categoryAlertOverrides);
   const setNotificationsEnabled   = useAppStore(s => s.setNotificationsEnabled);
   const setAlert80Enabled         = useAppStore(s => s.setAlert80Enabled);
   const setAlert100Enabled        = useAppStore(s => s.setAlert100Enabled);
   const setWeeklySummaryEnabled   = useAppStore(s => s.setWeeklySummaryEnabled);
+  const setCategoryAlertOverrides = useAppStore(s => s.setCategoryAlertOverrides);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
 
-  // Per-category alert toggles (all on by default)
-  const [catAlerts, setCatAlerts] = useState<Record<string, boolean>>(() => {
-    const init: Record<string, boolean> = {};
-    (budgets ?? []).forEach(b => { init[b.id] = true; });
-    return init;
-  });
-
-  function toggleCat(id: string) {
+  function toggleCat(category: CategoryKey) {
     Haptics.selectionAsync();
-    setCatAlerts(prev => ({ ...prev, [id]: !prev[id] }));
+    const currentlyEnabled = categoryAlertOverrides[category] ?? true;
+    const next = { ...categoryAlertOverrides };
+    if (currentlyEnabled) {
+      next[category] = false;
+    } else {
+      delete next[category];
+    }
+    setCategoryAlertOverrides(next);
   }
 
-  const activeCount = Object.values(catAlerts).filter(Boolean).length;
+  const activeCount = (budgets ?? []).filter(b => categoryAlertOverrides[b.category] ?? true).length;
 
   const [headerStyle, contentStyle] = useScreenAnimation(2);
 
@@ -213,7 +218,7 @@ export function AlertSettingsScreen({ navigation }: Props) {
             const catColor = theme.categoryColors[b.category] ?? colors.accent.primary;
             const catBg    = getCategoryBgColor(b.category);
             const ratio    = b.limit > 0 ? b.spent / b.limit : 0;
-            const isActive = catAlerts[b.id] ?? true;
+            const isActive = categoryAlertOverrides[b.category] ?? true;
 
             return (
               <View
@@ -246,7 +251,7 @@ export function AlertSettingsScreen({ navigation }: Props) {
                 {/* Toggle */}
                 <Switch
                   value={isActive}
-                  onValueChange={() => toggleCat(b.id)}
+                  onValueChange={() => toggleCat(b.category)}
                   trackColor={{ false: colors.bg.surfaceMuted, true: `${catColor}40` }}
                   thumbColor={isActive ? catColor : colors.text.muted}
                   ios_backgroundColor={colors.bg.surfaceMuted}
@@ -261,9 +266,7 @@ export function AlertSettingsScreen({ navigation }: Props) {
           <Pressable
             onPress={() => {
               Haptics.selectionAsync();
-              const next: Record<string, boolean> = {};
-              (budgets ?? []).forEach(b => { next[b.id] = true; });
-              setCatAlerts(next);
+              setCategoryAlertOverrides({});
             }}
             style={[styles.bulkBtn, { backgroundColor: colors.accent.muted, borderRadius: borderRadius.button, flex: 1, height: 40 }]}
           >
@@ -272,15 +275,67 @@ export function AlertSettingsScreen({ navigation }: Props) {
           <Pressable
             onPress={() => {
               Haptics.selectionAsync();
-              const next: Record<string, boolean> = {};
-              (budgets ?? []).forEach(b => { next[b.id] = false; });
-              setCatAlerts(next);
+              const next: Partial<Record<CategoryKey, boolean>> = {};
+              (budgets ?? []).forEach(b => { next[b.category] = false; });
+              setCategoryAlertOverrides(next);
             }}
             style={[styles.bulkBtn, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.button, flex: 1, height: 40, borderWidth: 1, borderColor: colors.border.subtle }]}
           >
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.text.secondary }}>Disable All</Text>
           </Pressable>
         </View>
+        {/* ── Debug: test notifications (DEV only) ──────────────────────────── */}
+        {__DEV__ && (
+          <>
+            <SectionTitle title="DEBUG · FIRE TEST NOTIFICATION" />
+            <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], overflow: 'hidden' }]}>
+              {(
+                [
+                  { type: 'push'           as TestNotificationType, icon: '🔔', label: 'Push Notification',  subtitle: 'Generic delivery test — fires immediately' },
+                  { type: 'weekly_summary' as TestNotificationType, icon: '📊', label: 'Weekly Summary',     subtitle: 'Same content, no Sunday schedule delay' },
+                  { type: 'budget_warning' as TestNotificationType, icon: '⚠️', label: '80% Warning',        subtitle: 'Sample Food budget at 85%' },
+                  { type: 'budget_over'    as TestNotificationType, icon: '🚨', label: 'Over Budget Alert',  subtitle: 'Sample Entertainment budget exceeded' },
+                ] as const
+              ).map(({ type, icon, label, subtitle }, i, arr) => (
+                <Pressable
+                  key={type}
+                  onPress={async () => {
+                    Haptics.selectionAsync();
+                    try {
+                      const result = await fireTestNotification(type);
+                      if (result.ok) {
+                        Alert.alert('✅ Sent', `"${label}" notification was scheduled.\n\nPull down your notification tray — it should appear within a second.`);
+                      } else {
+                        Alert.alert('❌ Not sent', result.message);
+                      }
+                    } catch (e) {
+                      Alert.alert('❌ Error', e instanceof Error ? e.message : 'Unknown error. Check the console.');
+                    }
+                  }}
+                  style={[
+                    rowStyles.row,
+                    {
+                      paddingHorizontal: spacing[4],
+                      paddingVertical:   spacing[4],
+                      borderBottomWidth: i < arr.length - 1 ? StyleSheet.hairlineWidth : 0,
+                      borderBottomColor: colors.border.subtle,
+                    },
+                  ]}
+                >
+                  <View style={[rowStyles.iconCircle, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full, width: 36, height: 36 }]}>
+                    <Text style={{ fontSize: 18, lineHeight: 22 }}>{icon}</Text>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: spacing[3] }}>
+                    <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary }}>{label}</Text>
+                    <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>{subtitle}</Text>
+                  </View>
+                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.accent.primary }}>Fire →</Text>
+                </Pressable>
+              ))}
+            </View>
+          </>
+        )}
+
       </ScrollView>
       </Animated.View>
     </View>

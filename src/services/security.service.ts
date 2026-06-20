@@ -1,5 +1,7 @@
 import { supabase } from '../lib/supabase';
 import type { SecuritySettings, AutoLockDuration } from '../store/app.store';
+import type { ScoreMode } from '../utils/healthScore';
+import { SCORE_PRESETS } from '../utils/healthScore';
 
 // ── DB ↔ app type conversion ───────────────────────────────────────────────────
 
@@ -60,5 +62,42 @@ export async function upsertSecuritySettings(settings: SecuritySettings): Promis
     .upsert(
       { user_id: user.id, ...toRow(settings) },
       { onConflict: 'user_id' },
+    );
+}
+
+// ── Health score mode ──────────────────────────────────────────────────────────
+
+const SCORE_MODE_KEY = 'health_score_mode';
+
+/**
+ * Fetch the user's chosen health score mode from user_settings.
+ * Returns null on first use (caller should default to 'balanced').
+ */
+export async function fetchScoreMode(): Promise<ScoreMode | null> {
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('setting_value')
+    .eq('setting_key', SCORE_MODE_KEY)
+    .single();
+
+  if (error || !data) return null;
+  // Supports both v0 { mode } and v1 { v: 1, mode } — reads .mode from either
+  const mode = (data.setting_value as { mode?: string })?.mode;
+  return mode && mode in SCORE_PRESETS ? (mode as ScoreMode) : null;
+}
+
+/**
+ * Persist the user's chosen health score mode.
+ * Uses UPSERT on (user_id, setting_key) unique constraint.
+ */
+export async function saveScoreMode(mode: ScoreMode): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
+
+  await supabase
+    .from('user_settings')
+    .upsert(
+      { user_id: user.id, setting_key: SCORE_MODE_KEY, setting_value: { v: 1, mode } },
+      { onConflict: 'user_id,setting_key' },
     );
 }

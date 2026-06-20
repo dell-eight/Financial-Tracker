@@ -71,9 +71,10 @@ export function AddExpenseScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
   const { isOnline } = useNetworkStatus();
   const { symbol, fmt } = useCurrency();
-  const notificationsEnabled = useAppStore(s => s.notificationsEnabled);
-  const alert80Enabled       = useAppStore(s => s.alert80Enabled);
-  const alert100Enabled      = useAppStore(s => s.alert100Enabled);
+  const notificationsEnabled    = useAppStore(s => s.notificationsEnabled);
+  const alert80Enabled          = useAppStore(s => s.alert80Enabled);
+  const alert100Enabled         = useAppStore(s => s.alert100Enabled);
+  const categoryAlertOverrides  = useAppStore(s => s.categoryAlertOverrides);
 
   const { data: accounts = [] } = useAccounts();
 
@@ -149,7 +150,7 @@ export function AddExpenseScreen({ navigation }: Props) {
       if (notificationsEnabled) {
         const now = new Date();
         const freshBudgets = await getBudgets(now.getFullYear(), now.getMonth() + 1);
-        checkBudgetThresholds(freshBudgets, alert80Enabled, alert100Enabled);
+        checkBudgetThresholds(freshBudgets, alert80Enabled, alert100Enabled, categoryAlertOverrides);
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
