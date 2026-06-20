@@ -156,10 +156,10 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
   const avgMonthlyGain = hist.length >= 2 ? (hist[hist.length - 1].nw - hist[0].nw) / (hist.length - 1) : 11_300;
   const monthsToTarget = avgMonthlyGain > 0 ? Math.ceil(toGo / avgMonthlyGain) : 999;
 
-  // 12-month growth % for hero stat
+  // 12-month growth % for hero stat — null when insufficient history or zero baseline
   const growth12m = hist.length >= 2 && hist[0].nw > 0
     ? ((hist[hist.length - 1].nw - hist[0].nw) / hist[0].nw) * 100
-    : 0;
+    : null;
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   const a = [0, 1, 2, 3, 4].map(() => useSharedValue(0));
@@ -192,19 +192,21 @@ export function NetWorthGrowthScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.displayXl, fontFamily: fontFamily.bold, color: colors.text.primary, marginTop: spacing[1], letterSpacing: -1 }}>
               {fmtShort(currentNW)}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 4 }}>
-              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.income }}>
-                +{fmtShort(nwDelta)} this month
-              </Text>
-              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.income }}>
-                (+{((nwDelta / prevNW) * 100).toFixed(1)}%)
-              </Text>
-            </View>
+            {hist.length >= 2 && prevNW > 0 && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 4 }}>
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: nwDelta >= 0 ? colors.income : colors.expense }}>
+                  {nwDelta >= 0 ? '+' : ''}{fmtShort(nwDelta)} this month
+                </Text>
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: nwDelta >= 0 ? colors.income : colors.expense }}>
+                  ({nwDelta >= 0 ? '+' : ''}{((nwDelta / prevNW) * 100).toFixed(1)}%)
+                </Text>
+              </View>
+            )}
             <View style={{ flexDirection: 'row', gap: spacing[4], marginTop: spacing[4], paddingTop: spacing[3], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border.subtle }}>
               {[
                 { label: 'Total Assets', value: fmtShort(totalAssets), color: colors.income },
                 { label: 'Total Debts',  value: fmtShort(totalDebts),  color: colors.expense },
-                { label: '12-mo Growth', value: `${growth12m >= 0 ? '+' : ''}${growth12m.toFixed(1)}%`, color: colors.accent.primary },
+                { label: '12-mo Growth', value: growth12m !== null ? `${growth12m >= 0 ? '+' : ''}${growth12m.toFixed(1)}%` : '—', color: colors.accent.primary },
               ].map(stat => (
                 <View key={stat.label} style={{ flex: 1 }}>
                   <Text style={{ fontSize: 10, fontFamily: fontFamily.regular, color: colors.text.muted }}>{stat.label}</Text>

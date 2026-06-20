@@ -195,8 +195,12 @@ export function SpendingTrendsScreen({ navigation }: Props) {
   }, [period, weeklyHistory, monthlyHistory, totalSpend]);
 
   const hist        = monthlyHistory ?? [];
-  const prevExpense = hist.length >= 2 ? hist[hist.length - 2].expense : 0;
-  const delta       = prevExpense > 0 ? ((periodTotal - prevExpense) / prevExpense) * 100 : 0;
+  // For monthly: compare against the second-to-last month in history.
+  // For weekly/yearly: no valid single-period baseline exists in the available data.
+  const prevExpense = period === 'monthly' && hist.length >= 2 ? hist[hist.length - 2].expense : 0;
+  // Only show a trend when there is a real non-zero baseline to compare against.
+  const hasTrend    = prevExpense > 0;
+  const delta       = hasTrend ? ((periodTotal - prevExpense) / prevExpense) * 100 : 0;
   const isDown      = delta <= 0;
 
   const PERIOD_LABELS: Record<Period, string> = { weekly: 'This Week', monthly: 'This Month', yearly: 'This Year' };
@@ -252,14 +256,16 @@ export function SpendingTrendsScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.displayXl, fontFamily: fontFamily.bold, color: colors.expense, marginTop: spacing[1], letterSpacing: -1 }}>
               {fmt(periodTotal)}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 4 }}>
-              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: isDown ? colors.income : colors.expense }}>
-                {isDown ? '↓' : '↑'} {Math.abs(delta).toFixed(1)}%
-              </Text>
-              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>
-                vs {period === 'monthly' ? 'last month' : period === 'weekly' ? 'last week' : 'last year'}
-              </Text>
-            </View>
+            {hasTrend && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 4 }}>
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: isDown ? colors.income : colors.expense }}>
+                  {isDown ? '↓' : '↑'} {Math.abs(delta).toFixed(1)}%
+                </Text>
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>
+                  vs last month
+                </Text>
+              </View>
+            )}
           </View>
         </Animated.View>
 

@@ -29,6 +29,7 @@ import type { ThemePreference } from '../../store/app.store';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useTransactions } from '../../hooks/queries/useTransactions';
 import { useUserProfile } from '../../hooks/queries/useAuth';
+import { useNetWorthHistory } from '../../hooks/queries/useAnalytics';
 import type { HomeStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<HomeStackParamList, 'Profile'>;
@@ -295,20 +296,43 @@ export function ProfileScreen({ navigation }: Props) {
   const notifEnabled = useAppStore(s => s.notificationsEnabled);
   const setNotif     = useAppStore(s => s.setNotificationsEnabled);
 
-  const { data: assets } = useAssets();
-  const { data: debts  } = useDebts();
-  const { data: txns   } = useTransactions();
+  const { data: assets  } = useAssets();
+  const { data: debts   } = useDebts();
+  const { data: txns    } = useTransactions();
+  const { data: nwHist  } = useNetWorthHistory(2);
 
   const totalAssets = React.useMemo(() => (assets ?? []).reduce((s, a) => s + a.balance, 0), [assets]);
   const totalDebts  = React.useMemo(() => (debts  ?? []).reduce((s, d) => s + d.balance,  0), [debts]);
   const netWorth    = totalAssets - totalDebts;
 
+  // Net worth month-over-month change from snapshot history (null when insufficient data)
+  const netWorthChangePct = React.useMemo(() => {
+    if (!nwHist || nwHist.length < 2) return null;
+    const prev = nwHist[nwHist.length - 2].nw;
+    const curr = nwHist[nwHist.length - 1].nw;
+    if (prev === 0) return null;
+    return Math.round(((curr - prev) / Math.abs(prev)) * 1000) / 10;
+  }, [nwHist]);
+
+  const netWorthChangeSub = netWorthChangePct === null
+    ? undefined
+    : `${netWorthChangePct >= 0 ? '+' : ''}${netWorthChangePct}%`;
+
   const CURRENT_MONTH = new Date().toISOString().substring(0, 7);
-  const monthTxCount  = React.useMemo(() => (txns ?? []).filter(t => t.date.startsWith(CURRENT_MONTH)).length, [txns]);
   const expenseCount  = React.useMemo(() => (txns ?? []).filter(t => t.type === 'expense' && t.date.startsWith(CURRENT_MONTH)).length, [txns]);
   const monthIncome   = React.useMemo(() => (txns ?? []).filter(t => t.type === 'income' && t.date.startsWith(CURRENT_MONTH)).reduce((s, t) => s + t.amount, 0), [txns]);
   const monthExpense  = React.useMemo(() => (txns ?? []).filter(t => t.type === 'expense' && t.date.startsWith(CURRENT_MONTH)).reduce((s, t) => s + t.amount, 0), [txns]);
   const savingsRate   = monthIncome > 0 ? Math.round(((monthIncome - monthExpense) / monthIncome) * 1000) / 10 : 0;
+
+  // Savings label — only shown when there is tracked income this month
+  const savingsSub = React.useMemo(() => {
+    if (monthIncome === 0) return undefined;
+    if (savingsRate < 0)   return '↓ over budget';
+    if (savingsRate < 10)  return '↓ low';
+    if (savingsRate < 20)  return '→ fair';
+    if (savingsRate < 30)  return '↑ good';
+    return '↑ great';
+  }, [monthIncome, savingsRate]);
 
   const displayName = (user?.user_metadata?.display_name as string | undefined)
     ?? (user?.user_metadata?.full_name as string | undefined)
@@ -429,9 +453,9 @@ export function ProfileScreen({ navigation }: Props) {
             },
           ]}
         >
-          <StatCard label="Net Worth"   value={fmtCompact(netWorth)} sub="+1.3%" theme={theme} />
-          <StatCard label="Spent"       value={fmtCompact(monthExpense)} sub={`${expenseCount} expenses`} subColor={colors.expense} theme={theme} />
-          <StatCard label="Savings"     value={`${savingsRate}%`} sub="↑ great"      theme={theme} />
+          <StatCard label="Net Worth" value={fmtCompact(netWorth)} sub={netWorthChangeSub} theme={theme} />
+          <StatCard label="Spent"     value={fmtCompact(monthExpense)} sub={`${expenseCount} expenses`} subColor={colors.expense} theme={theme} />
+          <StatCard label="Savings"   value={monthIncome > 0 ? `${savingsRate}%` : '—'} sub={savingsSub} theme={theme} />
         </Animated.View>
 
         {/* ── Settings sections ── */}

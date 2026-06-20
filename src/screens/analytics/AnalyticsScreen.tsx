@@ -67,7 +67,9 @@ interface PeriodMeta {
   delta:           string;
   vsLabel:         string;
   savingsRate:     number;
-  prevSavingsRate: number;
+  // null = no prior-period income data; suppress the delta badge
+  prevSavingsRate: number | null;
+  hasIncome:       boolean;
 }
 
 // ─── TopCategoriesCard ──────────────────────────────────────────────────────────
@@ -193,18 +195,20 @@ function TopCategoriesCard({ data }: { data: CatStat[] }) {
 // ─── SavingsCard ────────────────────────────────────────────────────────────────
 
 function SavingsCard({
-  rate, prevRate, history,
+  rate, prevRate, history, hasIncome,
 }: {
-  rate:     number;
-  prevRate: number;
-  history:  MonthPoint[];
+  rate:      number;
+  prevRate:  number | null; // null = no prior-period income data
+  history:   MonthPoint[];
+  hasIncome: boolean;
 }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const { fmt } = useCurrency();
 
-  const delta    = rate - prevRate;
-  const positive = delta >= 0;
+  const showDelta = prevRate !== null;
+  const delta     = showDelta ? rate - prevRate : 0;
+  const positive  = delta >= 0;
   const maxSav    = Math.max(...history.map(h => h.savings), 1);
   const ytdSaved  = history.reduce((s, h) => s + h.savings, 0);
   const avgSaved  = history.length > 0 ? Math.round(ytdSaved / history.length) : 0;
@@ -234,40 +238,55 @@ function SavingsCard({
           >
             Savings Rate
           </Text>
-          <Text
-            style={{
-              fontSize:      38,
-              fontFamily:    fontFamily.bold,
-              color:         colors.text.primary,
-              letterSpacing: -1,
-              lineHeight:    46,
-            }}
-          >
-            {rate.toFixed(1)}%
-          </Text>
-          <View
-            style={{
-              alignSelf:         'flex-start',
-              flexDirection:     'row',
-              alignItems:        'center',
-              gap:               4,
-              backgroundColor:   positive ? colors.incomeBg : colors.expenseBg,
-              borderRadius:      borderRadius.full,
-              paddingHorizontal: spacing[2],
-              paddingVertical:   3,
-              marginTop:         spacing[1.5],
-            }}
-          >
+          {hasIncome ? (
             <Text
               style={{
-                fontSize:   fontSize.bodySm,
-                fontFamily: fontFamily.medium,
-                color:      positive ? colors.income : colors.expense,
+                fontSize:      38,
+                fontFamily:    fontFamily.bold,
+                color:         colors.text.primary,
+                letterSpacing: -1,
+                lineHeight:    46,
               }}
             >
-              {positive ? '▲' : '▼'} {Math.abs(delta).toFixed(1)}% vs prev
+              {rate.toFixed(1)}%
             </Text>
-          </View>
+          ) : (
+            <Text
+              style={{
+                fontSize:   fontSize.bodyMd,
+                fontFamily: fontFamily.regular,
+                color:      colors.text.muted,
+                marginTop:  spacing[2],
+              }}
+            >
+              No income tracked
+            </Text>
+          )}
+          {showDelta && (
+            <View
+              style={{
+                alignSelf:         'flex-start',
+                flexDirection:     'row',
+                alignItems:        'center',
+                gap:               4,
+                backgroundColor:   positive ? colors.incomeBg : colors.expenseBg,
+                borderRadius:      borderRadius.full,
+                paddingHorizontal: spacing[2],
+                paddingVertical:   3,
+                marginTop:         spacing[1.5],
+              }}
+            >
+              <Text
+                style={{
+                  fontSize:   fontSize.bodySm,
+                  fontFamily: fontFamily.medium,
+                  color:      positive ? colors.income : colors.expense,
+                }}
+              >
+                {positive ? '▲' : '▼'} {Math.abs(delta).toFixed(1)}% vs prev
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Sparkline (savings by month) */}
@@ -537,7 +556,7 @@ export function AnalyticsScreen({ navigation }: Props) {
       const expense = wk.reduce((s, d) => s + d.expense, 0);
       const net     = income - expense;
       const sr      = income > 0 ? Math.round((net / income) * 1000) / 10 : 0;
-      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'this week', savingsRate: sr, prevSavingsRate: 0 };
+      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'this week', savingsRate: sr, prevSavingsRate: null, hasIncome: income > 0 };
     }
     if (period === 'yearly') {
       const hist = monthlyHistory ?? [];
@@ -545,7 +564,7 @@ export function AnalyticsScreen({ navigation }: Props) {
       const expense = hist.reduce((s, d) => s + d.expense, 0);
       const net     = income - expense;
       const sr      = income > 0 ? Math.round((net / income) * 1000) / 10 : 0;
-      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'last 6 months', savingsRate: sr, prevSavingsRate: 0 };
+      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'last 6 months', savingsRate: sr, prevSavingsRate: null, hasIncome: income > 0 };
     }
     // monthly
     const monthExpense = (txns ?? [])
@@ -561,7 +580,8 @@ export function AnalyticsScreen({ navigation }: Props) {
     const prevExp     = prev?.expense ?? 0;
     const deltaVal    = prevExp > 0 ? ((monthExpense - prevExp) / prevExp) * 100 : 0;
     const deltaStr    = prevExp > 0 ? `${Math.abs(deltaVal).toFixed(1)}% ${deltaVal <= 0 ? 'less' : 'more'}` : '—';
-    const prevSR      = prev && prev.income > 0 ? Math.round(((prev.income - prev.expense) / prev.income) * 1000) / 10 : 0;
+    // null when no prior-period income — suppresses the savings delta badge
+    const prevSR      = prev && prev.income > 0 ? Math.round(((prev.income - prev.expense) / prev.income) * 1000) / 10 : null;
     return {
       total:           fmtFull(monthExpense),
       income:          fmtFull(monthIncome),
@@ -570,6 +590,7 @@ export function AnalyticsScreen({ navigation }: Props) {
       vsLabel:         prev ? `vs ${prev.label}` : '',
       savingsRate,
       prevSavingsRate: prevSR,
+      hasIncome:       monthIncome > 0,
     };
   }, [period, txns, monthlyHistory, weeklyHistory]);
 
@@ -879,6 +900,7 @@ export function AnalyticsScreen({ navigation }: Props) {
             rate={meta.savingsRate}
             prevRate={meta.prevSavingsRate}
             history={monthlyHistory ?? []}
+            hasIncome={meta.hasIncome}
           />
         </Animated.View>
 

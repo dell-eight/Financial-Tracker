@@ -177,12 +177,14 @@ export function IncomeAnalysisScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.displayXl, fontFamily: fontFamily.bold, color: colors.income, marginTop: spacing[1], letterSpacing: -1 }}>
               {fmt(displayIncome)}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 4 }}>
-              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: isUp ? colors.income : colors.expense }}>
-                {isUp ? '↑' : '↓'} {Math.abs(incomeDelta).toFixed(1)}%
-              </Text>
-              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>vs last month</Text>
-            </View>
+            {prevMonthIncome > 0 && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2], marginTop: 4 }}>
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: isUp ? colors.income : colors.expense }}>
+                  {isUp ? '↑' : '↓'} {Math.abs(incomeDelta).toFixed(1)}%
+                </Text>
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>vs last month</Text>
+              </View>
+            )}
             <View style={{ flexDirection: 'row', gap: spacing[4], marginTop: spacing[4], paddingTop: spacing[3], borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border.subtle }}>
               {[
                 { label: 'YTD Total',   value: fmt(ytdTotal) },
