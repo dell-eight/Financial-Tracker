@@ -143,10 +143,13 @@ export const SEED_DEBTS: DebtItem[] = [
 
 export const SEED_DASHBOARD: DashboardSummary = {
   totalBalance:    17098.30,
+  liquidBalance:   17098.30,
   netWorth:        440000.00,
   monthlyIncome:    6472.80,
   monthlyExpenses:  1428.14,
   savingsRate:        77.9,
+  savingsRate3m:      77.9,     // approx — same as savingsRate in seed (no 90d history)
+  income90d:       19418.40,    // approx — 3 × monthlyIncome
   balanceDelta:      3200.00,
   balanceDeltaPct:     0.78,
   totalAssets:     485000.00,

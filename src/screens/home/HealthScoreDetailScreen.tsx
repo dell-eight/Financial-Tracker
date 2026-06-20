@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,17 +20,24 @@ import Svg, { Circle } from 'react-native-svg';
 
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
-import { useDashboard } from '../../hooks/queries/useDashboard';
-import { useSavingsGoals } from '../../hooks/queries/useSavingsGoals';
-import { computeHealthScore, healthBand } from '../../utils/healthScore';
+import { useHealthScore } from '../../hooks/queries/useHealthScore';
+import { healthBand, SCORE_BANDS, SCORE_PRESETS } from '../../utils/healthScore';
+import type { ScoreFactor, FactorId } from '../../utils/healthScore';
+import { useAppStore } from '../../store/app.store';
 import type { HomeStackParamList } from '../../navigation/types';
-import type { ScoreFactor } from '../../utils/healthScore';
 
 type Props = StackScreenProps<HomeStackParamList, 'HealthScoreDetail'>;
 
 const RING_SIZE   = 160;
 const RING_RADIUS = 68;
 const RING_CIRCUM = 2 * Math.PI * RING_RADIUS;
+
+const FACTOR_ICONS: Record<FactorId, string> = {
+  savings:   '💰',
+  emergency: '🛡️',
+  debt:      '🔗',
+  goal:      '🎯',
+};
 
 function ScoreRing({ score, color }: { score: number; color: string }) {
   const dashOffset = RING_CIRCUM * (1 - score / 100);
@@ -78,11 +85,23 @@ function FactorRow({ factor, theme }: { factor: ScoreFactor; theme: ReturnType<t
   const band  = healthBand(Math.round(factor.factor * 100));
   const score = Math.round(factor.factor * 100);
 
+  // Weighted contribution — float arithmetic, round only at display time
+  const earnedPts = factor.factor * factor.weight * 100;
+  const maxPts    = factor.weight * 100;
+  const isMaxed   = Math.abs(earnedPts - maxPts) < 0.5;
+
+  // Next band threshold from centralized constant
+  const nextThreshold =
+    score < SCORE_BANDS.fair      ? SCORE_BANDS.fair      :
+    score < SCORE_BANDS.good      ? SCORE_BANDS.good      :
+    score < SCORE_BANDS.excellent ? SCORE_BANDS.excellent : null;
+
   return (
     <View style={{ backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4], marginBottom: spacing[2] }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing[2] }}>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+            <Text style={{ fontSize: fontSize.bodyLg }}>{FACTOR_ICONS[factor.id]}</Text>
             <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
               {factor.label}
             </Text>
@@ -95,6 +114,10 @@ function FactorRow({ factor, theme }: { factor: ScoreFactor; theme: ReturnType<t
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
             {factor.rawLabel}
           </Text>
+          {/* Weighted contribution */}
+          <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.medium, color: isMaxed ? colors.income : colors.text.muted, marginTop: 1 }}>
+            {earnedPts.toFixed(0)} / {maxPts.toFixed(0)} pts
+          </Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
           <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: band.color }}>
@@ -106,9 +129,21 @@ function FactorRow({ factor, theme }: { factor: ScoreFactor; theme: ReturnType<t
         </View>
       </View>
 
-      {/* Progress bar */}
-      <View style={{ height: 6, backgroundColor: colors.bg.surfaceMuted, borderRadius: 3, overflow: 'hidden' }}>
+      {/* Progress bar with target marker */}
+      <View style={{ height: 6, backgroundColor: colors.bg.surfaceMuted, borderRadius: 3, position: 'relative' }}>
         <Animated.View style={[{ height: 6, backgroundColor: band.color, borderRadius: 3 }, barStyle]} />
+        {nextThreshold !== null && (
+          <View style={{
+            position:        'absolute',
+            left:            `${nextThreshold}%`,
+            top:             -2,
+            width:           2,
+            height:          10,
+            borderRadius:    1,
+            backgroundColor: colors.text.muted,
+            opacity:         0.5,
+          }} />
+        )}
       </View>
 
       {/* Tip */}
@@ -124,29 +159,18 @@ export function HealthScoreDetailScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
 
-  const { data: dashboard, isLoading: dashLoading } = useDashboard();
-  const { data: goals,     isLoading: goalLoading  } = useSavingsGoals();
+  const healthScoreMode                   = useAppStore(s => s.healthScoreMode);
+  const preset                            = SCORE_PRESETS[healthScoreMode];
+  const { result, factors, isLoading }    = useHealthScore(healthScoreMode);
+  const hasGoals                          = factors?.goalProgress !== null && factors?.goalProgress !== undefined;
 
-  const topPad    = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
-  const isLoading = dashLoading || goalLoading;
-
-  const result = useMemo(() => {
-    if (!dashboard) return null;
-    const emergencyMonths = dashboard.monthlyExpenses > 0
-      ? dashboard.totalBalance / dashboard.monthlyExpenses : 0;
-    const annualIncome = dashboard.monthlyIncome * 12;
-    return computeHealthScore({
-      savingsRate:     dashboard.savingsRate,
-      emergencyMonths,
-      debtRatio:       annualIncome > 0 ? dashboard.totalDebts / annualIncome : 0,
-      goalProgress:    goals && goals.length > 0
-        ? goals.reduce((s, g) => s + g.savedAmount / g.targetAmount, 0) / goals.length : 0,
-    });
-  }, [dashboard, goals]);
-
-  const band            = result ? healthBand(result.total) : null;
-  const worstFactor     = result
-    ? result.factors.reduce((a, b) => a.factor < b.factor ? a : b)
+  const topPad             = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
+  const band               = result ? healthBand(result.total) : null;
+  const activeResultFactors = result
+    ? result.factors.filter(f => f.id !== 'goal' || hasGoals)
+    : [];
+  const worstFactor = activeResultFactors.length > 0
+    ? activeResultFactors.reduce((a, b) => a.factor < b.factor ? a : b)
     : null;
 
   return (
@@ -161,7 +185,16 @@ export function HealthScoreDetailScreen({ navigation }: Props) {
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>
           Health Score
         </Text>
-        <View style={{ minWidth: 60 }} />
+        <Pressable
+          onPress={() => navigation.push('HealthScoreSettings')}
+          hitSlop={12}
+          style={{ minWidth: 60, alignItems: 'flex-end', flexDirection: 'row', justifyContent: 'flex-end', alignSelf: 'center', gap: 4 }}
+        >
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.accent.primary }}>
+            {preset.label}
+          </Text>
+          <Text style={{ fontSize: fontSize.bodySm, color: colors.accent.primary }}>⚙</Text>
+        </Pressable>
       </View>
 
       {isLoading || !result || !band ? (
@@ -217,25 +250,30 @@ export function HealthScoreDetailScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: spacing[3] }}>
               Factor Breakdown
             </Text>
-            {result.factors.map(f => (
-              <FactorRow key={f.label} factor={f} theme={theme} />
+            {activeResultFactors.map(f => (
+              <FactorRow key={f.id} factor={f} theme={theme} />
             ))}
           </View>
 
           {/* How is this calculated */}
           <View style={{ marginHorizontal: spacing[4], marginTop: spacing[2], backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4] }}>
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.secondary, marginBottom: spacing[2] }}>
-              How is this calculated?
-            </Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: spacing[2] }}>
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.secondary }}>
+                How is this calculated?
+              </Text>
+              <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.regular, color: colors.text.muted }}>
+                {preset.label} model
+              </Text>
+            </View>
             {[
-              { label: 'Savings Rate',   weight: '30%', target: 'Save ≥ 20% of income' },
-              { label: 'Emergency Fund', weight: '25%', target: '≥ 6 months of expenses' },
-              { label: 'Debt Ratio',     weight: '25%', target: 'Debts < 30% of annual income' },
-              { label: 'Goal Progress',  weight: '20%', target: 'All savings goals funded' },
+              { label: 'Savings Rate',   weight: preset.weights.savings,   target: 'Save ≥ 20% of income' },
+              { label: 'Emergency Fund', weight: preset.weights.emergency,  target: '≥ 6 months of expenses' },
+              { label: 'Debt Ratio',     weight: preset.weights.debt,       target: 'Debts < 30% of annual income' },
+              ...(hasGoals ? [{ label: 'Goal Progress', weight: preset.weights.goal, target: 'All savings goals funded' }] : []),
             ].map(row => (
               <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing[1] }}>
                 <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary, flex: 1 }}>
-                  {row.label} ({row.weight})
+                  {row.label} ({row.weight}%)
                 </Text>
                 <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'right', flex: 1 }}>
                   {row.target}

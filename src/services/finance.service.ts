@@ -9,7 +9,7 @@ import type { CategoryKey } from '../theme';
 
 // ── Raw Supabase row types (query result shapes) ───────────────────────────────
 
-type RawDashboardRow   = { total_debts: unknown; monthly_income: unknown; monthly_expenses: unknown; savings_rate_percent: unknown };
+type RawDashboardRow   = { total_debts: unknown; monthly_income: unknown; monthly_expenses: unknown; savings_rate_percent: unknown; savings_rate_3m: unknown; income_90d: unknown };
 type RawBalanceRow     = { balance: unknown };
 type RawSharesRow      = { shares: unknown; current_price: unknown };
 type RawGoalContribRow = { savings_goal_contributions: Array<{ amount: unknown }> };
@@ -156,10 +156,12 @@ export async function getDashboard(): Promise<DashboardSummary> {
 
   // totalAssets uses the same three sources as getAssets() so both screens always agree
   const totalAssets     = bankTotal + investmentValue + savingsTotal;
-  const totalDebts      = Number(row.total_debts        ?? 0);
-  const monthlyIncome   = Number(row.monthly_income     ?? 0);
-  const monthlyExpenses = Number(row.monthly_expenses   ?? 0);
+  const totalDebts      = Number(row.total_debts          ?? 0);
+  const monthlyIncome   = Number(row.monthly_income       ?? 0);
+  const monthlyExpenses = Number(row.monthly_expenses     ?? 0);
   const savingsRate     = Number(row.savings_rate_percent ?? 0);
+  const savingsRate3m   = Number(row.savings_rate_3m      ?? 0);
+  const income90d       = Number(row.income_90d           ?? 0);
   const netWorth        = totalAssets - totalDebts;
 
   const currentNW      = snaps[0] ? Number(snaps[0].net_worth) : netWorth;
@@ -173,11 +175,14 @@ export async function getDashboard(): Promise<DashboardSummary> {
   void syncWealthProgression();
 
   return {
-    totalBalance: netWorth,
+    totalBalance:  netWorth,
+    liquidBalance: bankTotal,
     netWorth,
     monthlyIncome,
     monthlyExpenses,
     savingsRate,
+    savingsRate3m,
+    income90d,
     balanceDelta,
     balanceDeltaPct,
     totalAssets,

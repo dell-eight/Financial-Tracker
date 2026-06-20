@@ -48,10 +48,13 @@ export interface Budget {
 
 export interface DashboardSummary {
   totalBalance: number;
+  liquidBalance: number;  // bank account balances only (cash available for emergencies)
   netWorth: number;
   monthlyIncome: number;
   monthlyExpenses: number;
   savingsRate: number;
+  savingsRate3m: number;  // 90-day rolling savings rate % (used for health scoring)
+  income90d: number;      // raw 90-day income total; annualized as × 4 for debt ratio
   balanceDelta: number;
   balanceDeltaPct: number;
   totalAssets: number;

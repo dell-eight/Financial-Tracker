@@ -22,7 +22,7 @@ import {
   addResponseListener,
 } from '../services/notifications.service';
 import { migratePinIfNeeded } from '../utils/pin';
-import { fetchSecuritySettings, upsertSecuritySettings } from '../services/security.service';
+import { fetchSecuritySettings, upsertSecuritySettings, fetchScoreMode } from '../services/security.service';
 
 const Root = createStackNavigator<RootStackParamList>();
 
@@ -54,6 +54,8 @@ export function RootNavigator() {
   const loadUserSecurity         = useAppStore(s => s.loadUserSecurity);
   const clearUserSecurity        = useAppStore(s => s.clearUserSecurity);
   const resetAccountSettings     = useAppStore(s => s.resetAccountSettings);
+  const setHealthScoreMode       = useAppStore(s => s.setHealthScoreMode);
+  const clearHealthScoreMode     = useAppStore(s => s.clearHealthScoreMode);
 
   useEffect(() => {
     // Loads this user's security settings from Supabase and hydrates the store.
@@ -76,6 +78,9 @@ export function RootNavigator() {
         await upsertSecuritySettings(migrated);
         loadUserSecurity(migrated);
       }
+      // Load health score mode (best-effort; default 'balanced' if null)
+      fetchScoreMode().then(mode => { if (mode) setHealthScoreMode(mode); }).catch(() => {});
+
       // Migrate old global PIN SecureStore key → per-user key (one-time, no-op after)
       migratePinIfNeeded(userId);
     }
@@ -105,6 +110,7 @@ export function RootNavigator() {
       }
       if (event === 'SIGNED_OUT') {
         clearUserSecurity();
+        clearHealthScoreMode();
         resetAccountSettings();
       }
 

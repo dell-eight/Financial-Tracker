@@ -32,8 +32,9 @@ export type HomeStackParamList = {
   HelpSupport:       undefined;
   PrivacyPolicy:     undefined;
   TermsOfService:    undefined;
-  SetupPIN:          undefined;
-  ChangePIN:         undefined;
+  SetupPIN:             undefined;
+  ChangePIN:            undefined;
+  HealthScoreSettings:  undefined;
   TransactionDetail: { id: string; type: 'expense' | 'income' | 'transfer' };
 };
 
