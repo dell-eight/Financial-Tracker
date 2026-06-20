@@ -17,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
+import { useAuthStore } from '../../store/auth.store';
 import { verifyPIN, storePIN } from '../../utils/pin';
 import type { HomeStackParamList } from '../../navigation/types';
 
@@ -28,6 +29,8 @@ export function ChangePINScreen({ navigation }: Props) {
   const theme  = useTheme();
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily } = theme;
+
+  const userId = useAuthStore(s => s.user?.id ?? '');
 
   const [step,   setStep]   = useState<Step>('current');
   const [newPin, setNewPin] = useState('');
@@ -65,7 +68,7 @@ export function ChangePINScreen({ navigation }: Props) {
     if (next.length < 6) return;
 
     if (step === 'current') {
-      const ok = await verifyPIN(next);
+      const ok = await verifyPIN(next, userId);
       if (ok) {
         setDigits('');
         setError(null);
@@ -83,7 +86,7 @@ export function ChangePINScreen({ navigation }: Props) {
     } else {
       if (next === newPin) {
         setSaving(true);
-        await storePIN(next);
+        await storePIN(next, userId);
         navigation.goBack();
       } else {
         shake();

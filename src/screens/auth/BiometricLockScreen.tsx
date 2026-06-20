@@ -97,7 +97,7 @@ export function BiometricLockScreen() {
     setDigits(next);
     if (next.length === 6) {
       setPinVerifying(true);
-      const ok = await verifyPIN(next);
+      const ok = await verifyPIN(next, user?.id ?? '');
       setPinVerifying(false);
       if (ok) {
         setBiometricUnlocked(true);

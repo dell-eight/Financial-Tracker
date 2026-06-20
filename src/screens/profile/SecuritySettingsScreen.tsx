@@ -20,6 +20,7 @@ import { useAppStore } from '../../store/app.store';
 import { useAuthStore } from '../../store/auth.store';
 import { isBiometricAvailable, authenticateWithBiometrics } from '../../utils/biometrics';
 import { clearPIN } from '../../utils/pin';
+import { upsertSecuritySettings } from '../../services/security.service';
 import type { HomeStackParamList } from '../../navigation/types';
 import type { AutoLockDuration } from '../../store/app.store';
 
@@ -165,22 +166,49 @@ export function SecuritySettingsScreen({ navigation }: Props) {
   const s2 = useAnimatedStyle(() => ({ opacity: a2.value, transform: [{ translateY: interpolate(a2.value, [0,1], [12,0]) }] }));
   const s3 = useAnimatedStyle(() => ({ opacity: a3.value, transform: [{ translateY: interpolate(a3.value, [0,1], [12,0]) }] }));
 
+  // ── Supabase sync ────────────────────────────────────────────────────────
+  // Optimistically update the store first, then persist to Supabase.
+  // Reads the latest state from the store after each setter so the upsert
+  // always contains the full current settings row.
+  function syncToSupabase(patch: Partial<{
+    biometricEnabled: boolean; pinEnabled: boolean;
+    autoLockDuration: typeof autoLockDuration; screenshotPrivacyEnabled: boolean;
+  }>) {
+    const s = useAppStore.getState();
+    upsertSecuritySettings({
+      biometricEnabled:         patch.biometricEnabled         ?? s.biometricEnabled,
+      pinEnabled:               patch.pinEnabled               ?? s.pinEnabled,
+      autoLockDuration:         patch.autoLockDuration         ?? s.autoLockDuration,
+      screenshotPrivacyEnabled: patch.screenshotPrivacyEnabled ?? s.screenshotPrivacyEnabled,
+    }).catch(() => {}); // best-effort; next sign-in reloads from DB
+  }
+
   // ── Handlers ────────────────────────────────────────────────────────────
   async function handleBiometricToggle(value: boolean) {
-    if (!value) { setBiometricEnabled(false); return; }
+    if (!value) {
+      setBiometricEnabled(false);
+      syncToSupabase({ biometricEnabled: false });
+      return;
+    }
     const available = await isBiometricAvailable();
     if (!available) {
       Alert.alert('Not Available', 'Biometrics are not set up on this device. Please enroll Face ID or fingerprint in device Settings first.');
       return;
     }
     const ok = await authenticateWithBiometrics('Confirm to enable biometric unlock');
-    if (ok) setBiometricEnabled(true);
-    else Alert.alert('Authentication Failed', 'Could not verify your identity. Biometric lock was not enabled.');
+    if (ok) {
+      setBiometricEnabled(true);
+      syncToSupabase({ biometricEnabled: true });
+    } else {
+      Alert.alert('Authentication Failed', 'Could not verify your identity. Biometric lock was not enabled.');
+    }
   }
 
   function handlePinToggle(value: boolean) {
     if (value) {
       navigation.push('SetupPIN');
+      // PIN enabled flag is set by SetupPINScreen after the hash is stored;
+      // syncToSupabase is called there via setPinEnabled.
     } else {
       Alert.alert(
         'Remove PIN',
@@ -190,11 +218,25 @@ export function SecuritySettingsScreen({ navigation }: Props) {
           {
             text: 'Remove',
             style: 'destructive',
-            onPress: async () => { await clearPIN(); setPinEnabled(false); },
+            onPress: async () => {
+              await clearPIN(user?.id ?? '');
+              setPinEnabled(false);
+              syncToSupabase({ pinEnabled: false });
+            },
           },
         ],
       );
     }
+  }
+
+  function handleAutoLockChange(value: typeof autoLockDuration) {
+    setAutoLockDuration(value);
+    syncToSupabase({ autoLockDuration: value });
+  }
+
+  function handleScreenshotPrivacyChange(value: boolean) {
+    setScreenshotPrivacy(value);
+    syncToSupabase({ screenshotPrivacyEnabled: value });
   }
 
   function handleDeleteAccount() {
@@ -309,7 +351,7 @@ export function SecuritySettingsScreen({ navigation }: Props) {
                 return (
                   <Pressable
                     key={opt.value}
-                    onPress={() => setAutoLockDuration(opt.value)}
+                    onPress={() => handleAutoLockChange(opt.value)}
                     style={{
                       flex:            1,
                       height:          36,
@@ -338,7 +380,7 @@ export function SecuritySettingsScreen({ navigation }: Props) {
               </View>
               <Switch
                 value={screenshotPrivacyEnabled}
-                onValueChange={setScreenshotPrivacy}
+                onValueChange={handleScreenshotPrivacyChange}
                 trackColor={switchTrack}
                 thumbColor={screenshotPrivacyEnabled ? colors.accent.primary : colors.text.muted}
               />

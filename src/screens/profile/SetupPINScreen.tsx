@@ -18,7 +18,9 @@ import Animated, {
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useAppStore } from '../../store/app.store';
+import { useAuthStore } from '../../store/auth.store';
 import { storePIN } from '../../utils/pin';
+import { upsertSecuritySettings } from '../../services/security.service';
 import type { HomeStackParamList } from '../../navigation/types';
 
 type Props = StackScreenProps<HomeStackParamList, 'SetupPIN'>;
@@ -29,6 +31,7 @@ export function SetupPINScreen({ navigation }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
 
   const setPinEnabled = useAppStore(s => s.setPinEnabled);
+  const userId        = useAuthStore(s => s.user?.id ?? '');
 
   const [step,     setStep]     = useState<'enter' | 'confirm'>('enter');
   const [firstPin, setFirstPin] = useState('');
@@ -73,8 +76,15 @@ export function SetupPINScreen({ navigation }: Props) {
     } else {
       if (next === firstPin) {
         setSaving(true);
-        await storePIN(next);
+        await storePIN(next, userId);
         setPinEnabled(true);
+        const s = useAppStore.getState();
+        upsertSecuritySettings({
+          biometricEnabled:         s.biometricEnabled,
+          pinEnabled:               true,
+          autoLockDuration:         s.autoLockDuration,
+          screenshotPrivacyEnabled: s.screenshotPrivacyEnabled,
+        }).catch(() => {});
         navigation.goBack();
       } else {
         shake();

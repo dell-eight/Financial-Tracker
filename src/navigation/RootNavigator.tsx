@@ -21,6 +21,8 @@ import {
   syncWeeklySummary,
   addResponseListener,
 } from '../services/notifications.service';
+import { migratePinIfNeeded } from '../utils/pin';
+import { fetchSecuritySettings, upsertSecuritySettings } from '../services/security.service';
 
 const Root = createStackNavigator<RootStackParamList>();
 
@@ -49,13 +51,42 @@ export function RootNavigator() {
   const pinEnabled               = useAppStore(s => s.pinEnabled);
   const autoLockDuration         = useAppStore(s => s.autoLockDuration);
   const screenshotPrivacyEnabled = useAppStore(s => s.screenshotPrivacyEnabled);
+  const loadUserSecurity         = useAppStore(s => s.loadUserSecurity);
+  const clearUserSecurity        = useAppStore(s => s.clearUserSecurity);
+  const resetAccountSettings     = useAppStore(s => s.resetAccountSettings);
 
   useEffect(() => {
+    // Loads this user's security settings from Supabase and hydrates the store.
+    // On first sign-in (no DB row yet), any old AsyncStorage values are migrated
+    // then a row is created so subsequent sign-ins restore correctly.
+    async function loadSecurity(userId: string) {
+      const dbSettings = await fetchSecuritySettings();
+      if (dbSettings) {
+        loadUserSecurity(dbSettings);
+      } else {
+        // First sign-in for this account on this device — migrate old local values
+        // if they exist (pre-Supabase installs had flat fields in AsyncStorage).
+        const store = useAppStore.getState();
+        const migrated = {
+          biometricEnabled:         store.biometricEnabled,
+          pinEnabled:               store.pinEnabled,
+          autoLockDuration:         store.autoLockDuration,
+          screenshotPrivacyEnabled: store.screenshotPrivacyEnabled,
+        };
+        await upsertSecuritySettings(migrated);
+        loadUserSecurity(migrated);
+      }
+      // Migrate old global PIN SecureStore key → per-user key (one-time, no-op after)
+      migratePinIfNeeded(userId);
+    }
+
     // Restore session on cold start — use getUser() for server-fresh user_metadata
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         const { data: { user } } = await supabase.auth.getUser();
-        setSession(user ?? session.user ?? null);
+        const activeUser = user ?? session.user ?? null;
+        if (activeUser) await loadSecurity(activeUser.id);
+        setSession(activeUser);
       } else {
         setSession(null);
       }
@@ -72,10 +103,18 @@ export function RootNavigator() {
       if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') {
         queryClient.clear();
       }
+      if (event === 'SIGNED_OUT') {
+        clearUserSecurity();
+        resetAccountSettings();
+      }
 
       if (session) {
         const { data: { user } } = await supabase.auth.getUser();
-        setSession(user ?? session.user ?? null);
+        const activeUser = user ?? session.user ?? null;
+        if (event === 'SIGNED_IN' && activeUser) {
+          await loadSecurity(activeUser.id);
+        }
+        setSession(activeUser);
       } else {
         setSession(null);
       }
