@@ -55,26 +55,34 @@ export function LoginScreen({ navigation }: Props) {
   const login  = useLogin();
   const { colors, spacing, fontSize, fontFamily } = theme;
 
-  const loginLockoutUntil = useAppStore((s) => s.loginLockoutUntil);
-  const recordLoginFailure = useAppStore((s) => s.recordLoginFailure);
-  const clearLoginAttempts = useAppStore((s) => s.clearLoginAttempts);
+  const loginLockoutsByEmail = useAppStore((s) => s.loginLockoutsByEmail);
+  const recordLoginFailure   = useAppStore((s) => s.recordLoginFailure);
+  const clearLoginAttempts   = useAppStore((s) => s.clearLoginAttempts);
+  const sweepExpiredLockouts = useAppStore((s) => s.sweepExpiredLockouts);
 
-  // Countdown clock — ticks every second while locked out
+  // Prune stale lockout entries on mount
+  useEffect(() => { sweepExpiredLockouts(); }, []);
+
+  // Countdown clock — ticks every second while the current email is locked out
   const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    if (!loginLockoutUntil) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [loginLockoutUntil]);
-
-  const isLockedOut  = loginLockoutUntil !== null && now < loginLockoutUntil;
-  const remainingMs  = isLockedOut ? loginLockoutUntil - now : 0;
 
   // Form state
   const [email,         setEmail]         = useState('');
   const [password,      setPassword]      = useState('');
   const [showPass,      setShowPass]      = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Derive lockout from the current email field — reactive as the user types
+  const emailKey     = email.toLowerCase().trim();
+  const emailLockout = loginLockoutsByEmail[emailKey] ?? null;
+  const isLockedOut  = emailLockout !== null && now < emailLockout;
+  const remainingMs  = isLockedOut ? emailLockout - now : 0;
+
+  useEffect(() => {
+    if (!emailLockout) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [emailLockout]);
 
   const [errors, setErrors] = useState<{
     email?: string;
@@ -100,10 +108,14 @@ export function LoginScreen({ navigation }: Props) {
 
   // ── Validation ──────────────────────────────────────────────────────────────
 
+  const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
   function validate(): boolean {
     const next: typeof errors = {};
 
-    if (!email.trim() || !email.includes('@')) {
+    if (!email.trim()) {
+      next.email = 'Email is required.';
+    } else if (!EMAIL_REGEX.test(email.trim())) {
       next.email = 'Enter a valid email address.';
     }
     if (password.length < 1) {
@@ -120,15 +132,15 @@ export function LoginScreen({ navigation }: Props) {
 
     login.mutate({ email, password }, {
       onError: () => {
-        recordLoginFailure();
+        recordLoginFailure(email);
         setErrors({ email: 'Invalid email or password.' });
       },
       onSuccess: ({ error }) => {
         if (error) {
-          recordLoginFailure();
-          setErrors({ email: error });
+          recordLoginFailure(email);
+          setErrors({ email: 'Invalid email or password.' });
         } else {
-          clearLoginAttempts();
+          clearLoginAttempts(email);
           // On success, RootNavigator's onAuthStateChange switches to Main.
         }
       },
@@ -172,26 +184,28 @@ export function LoginScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Back button ── */}
-        <View style={[styles.backRow, { paddingHorizontal: spacing[5] }]}>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={[
-              styles.backBtn,
-              {
-                backgroundColor: colors.bg.surfaceMuted,
-                borderRadius:    theme.borderRadius.full,
-              },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel="Go back"
-            hitSlop={8}
-          >
-            <Text style={{ fontSize: 18, color: colors.text.primary, lineHeight: 24 }}>
-              {'‹'}
-            </Text>
-          </Pressable>
-        </View>
+        {/* ── Back button — only when there is a screen to return to ── */}
+        {navigation.canGoBack() && (
+          <View style={[styles.backRow, { paddingHorizontal: spacing[5] }]}>
+            <Pressable
+              onPress={() => navigation.goBack()}
+              style={[
+                styles.backBtn,
+                {
+                  backgroundColor: colors.bg.surfaceMuted,
+                  borderRadius:    theme.borderRadius.full,
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+              hitSlop={8}
+            >
+              <Text style={{ fontSize: 18, color: colors.text.primary, lineHeight: 24 }}>
+                {'‹'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
 
         {/* ── Header ── */}
         <Animated.View
