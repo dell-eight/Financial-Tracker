@@ -22,8 +22,7 @@ import type { BudgetStackParamList } from '../../navigation/types';
 import { useAppStore } from '../../store/app.store';
 import { useCurrency } from '../../utils/currency';
 import type { CategoryKey } from '../../theme';
-import { syncWeeklySummary, fireTestNotification } from '../../services/notifications.service';
-import type { TestNotificationType } from '../../services/notifications.service';
+import { syncWeeklySummary } from '../../services/notifications.service';
 
 type Props = StackScreenProps<BudgetStackParamList, 'AlertSettings'>;
 
@@ -284,57 +283,6 @@ export function AlertSettingsScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.text.secondary }}>Disable All</Text>
           </Pressable>
         </View>
-        {/* ── Debug: test notifications (DEV only) ──────────────────────────── */}
-        {__DEV__ && (
-          <>
-            <SectionTitle title="DEBUG · FIRE TEST NOTIFICATION" />
-            <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], overflow: 'hidden' }]}>
-              {(
-                [
-                  { type: 'push'           as TestNotificationType, icon: '🔔', label: 'Push Notification',  subtitle: 'Generic delivery test — fires immediately' },
-                  { type: 'weekly_summary' as TestNotificationType, icon: '📊', label: 'Weekly Summary',     subtitle: 'Same content, no Sunday schedule delay' },
-                  { type: 'budget_warning' as TestNotificationType, icon: '⚠️', label: '80% Warning',        subtitle: 'Sample Food budget at 85%' },
-                  { type: 'budget_over'    as TestNotificationType, icon: '🚨', label: 'Over Budget Alert',  subtitle: 'Sample Entertainment budget exceeded' },
-                ] as const
-              ).map(({ type, icon, label, subtitle }, i, arr) => (
-                <Pressable
-                  key={type}
-                  onPress={async () => {
-                    Haptics.selectionAsync();
-                    try {
-                      const result = await fireTestNotification(type);
-                      if (result.ok) {
-                        Alert.alert('✅ Sent', `"${label}" notification was scheduled.\n\nPull down your notification tray — it should appear within a second.`);
-                      } else {
-                        Alert.alert('❌ Not sent', result.message);
-                      }
-                    } catch (e) {
-                      Alert.alert('❌ Error', e instanceof Error ? e.message : 'Unknown error. Check the console.');
-                    }
-                  }}
-                  style={[
-                    rowStyles.row,
-                    {
-                      paddingHorizontal: spacing[4],
-                      paddingVertical:   spacing[4],
-                      borderBottomWidth: i < arr.length - 1 ? StyleSheet.hairlineWidth : 0,
-                      borderBottomColor: colors.border.subtle,
-                    },
-                  ]}
-                >
-                  <View style={[rowStyles.iconCircle, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full, width: 36, height: 36 }]}>
-                    <Text style={{ fontSize: 18, lineHeight: 22 }}>{icon}</Text>
-                  </View>
-                  <View style={{ flex: 1, marginLeft: spacing[3] }}>
-                    <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary }}>{label}</Text>
-                    <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>{subtitle}</Text>
-                  </View>
-                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.accent.primary }}>Fire →</Text>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        )}
 
       </ScrollView>
       </Animated.View>
