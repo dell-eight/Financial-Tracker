@@ -417,7 +417,7 @@ export function AccountTransactionsScreen({ navigation, route }: Props) {
                         categoryIcon={<Text style={{ fontSize: 18, lineHeight: 22 }}>{tx.categoryIcon}</Text>}
                         amount={fmt(tx.amount)}
                         type={tx.type}
-                        date={tx.note ?? tx.categoryLabel}
+                        date={tx.note ?? ''}
                         time={tx.time}
                         showDivider={i < items.length - 1}
                         onPress={() => navigation.push('TransactionDetail', { id: tx.id, type: tx.type })}

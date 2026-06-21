@@ -324,7 +324,7 @@ export function CategoryBudgetDetailScreen({ navigation, route }: Props) {
                 categoryIcon={<Text style={{ fontSize: 16, lineHeight: 20 }}>{tx.categoryIcon}</Text>}
                 amount={fmt(tx.amount)}
                 type={tx.type}
-                date={tx.note ?? tx.categoryLabel}
+                date={tx.note ?? ''}
                 time={formatTime(tx.time)}
                 showDivider={i < monthTxns.length - 1}
               />
