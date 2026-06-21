@@ -71,7 +71,7 @@ interface ChipDef {
 }
 
 const CATEGORY_CHIPS: ChipDef[] = [
-  { key: 'all',          label: 'All',           icon: '≡'  },
+  { key: 'all',          label: 'All',           icon: ''  },
   { key: 'food',         label: 'Food',          icon: '🍔' },
   { key: 'transport',    label: 'Transport',      icon: '🚗' },
   { key: 'shopping',     label: 'Shopping',       icon: '🛍' },
@@ -588,13 +588,19 @@ function CategoryFilterChips({
   const theme = useTheme();
   const { colors, spacing, borderRadius, fontSize, fontFamily, categoryColors } = theme;
 
+  const sortedChips = useMemo(() => {
+    const [allChip, ...rest] = CATEGORY_CHIPS;
+    const sorted = [...rest].sort((a, b) => (activeCounts.get(b.key) ?? 0) - (activeCounts.get(a.key) ?? 0));
+    return [allChip, ...sorted];
+  }, [activeCounts]);
+
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: spacing[5], gap: spacing[2] }}
     >
-      {CATEGORY_CHIPS.map(({ key, label, icon }) => {
+      {sortedChips.map(({ key, label, icon }) => {
         const active    = selected === key;
         const catColor  = key !== 'all' ? categoryColors[key as CategoryKey] : colors.accent.primary;
         const count     = activeCounts.get(key) ?? 0;
@@ -1114,9 +1120,7 @@ export function ExpenseScreen({ navigation, route }: Props) {
         <Animated.View style={[{ marginTop: spacing[5] }, catStyle_]}>
           <SectionHeader
             title="Expense Categories"
-            actionLabel="View All"
-            onAction={() => {}}
-            style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}
+  style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}
           />
           <CategoryBreakdown
             stats={categoryStats}
