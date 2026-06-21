@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
 import Svg, {
   Path,
@@ -8,6 +8,8 @@ import Svg, {
   Stop,
   Line as SvgLine,
   Text as SvgText,
+  Rect,
+  Polygon,
 } from 'react-native-svg';
 import Animated, {
   useSharedValue,
@@ -30,6 +32,8 @@ const X_LABEL_H = 22;
 const Y_PAD     = 12;
 const R_PAD     = 24;
 const CHART_H   = 220;
+const TOOLTIP_H = 44;
+const ARROW_H   = 6;
 
 // Smooth cubic bezier path through points
 function smoothPath(pts: { x: number; y: number }[]): string {
@@ -64,12 +68,14 @@ interface Props {
 export function NetWorthChart({ data, width, height = CHART_H }: Props) {
   const theme = useTheme();
   const { colors, fontFamily } = theme;
-  const { fmtCompact } = useCurrency();
+  const { fmtCompact, fmt } = useCurrency();
+
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
 
   const plotW   = width - Y_LABEL_W - R_PAD;
   const plotH   = height - X_LABEL_H;
 
-  // Animate path draw on mount
+  // Animate path draw on mount; reset tooltip on data change (period switch)
   const drawProgress = useSharedValue(0);
   // Pulse for the live "Now" dot
   const pulseScale   = useSharedValue(1);
@@ -77,6 +83,7 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
   const pathLengthRef = useRef<number>(0);
 
   useEffect(() => {
+    setSelectedIdx(null);
     drawProgress.value = 0;
     drawProgress.value = withTiming(1, { duration: 900, easing: Easing.out(Easing.cubic) });
     pulseScale.value = withRepeat(
@@ -88,7 +95,7 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
     );
   }, [data]);
 
-  if (data.length < 2) return null;
+  if (data.length === 0) return null;
 
   const values    = data.map(d => d.nw);
   const minVal    = Math.min(...values);
@@ -129,6 +136,51 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
   const textColor    = colors.text.muted;
   const gridColor    = colors.border.subtle;
 
+  // Pre-compute tooltip geometry so JSX stays clean
+  let tooltipNode: React.ReactNode = null;
+  if (selectedIdx !== null && pts[selectedIdx]) {
+    const si        = selectedIdx;
+    const pt        = pts[si];
+    const valueText = fmt(data[si].nw);
+    const labelText = data[si].label;
+    const TW        = Math.max(108, Math.max(valueText.length, labelText.length) * 7 + 16);
+
+    const tx        = Math.max(Y_LABEL_W, Math.min(pt.x - TW / 2, width - TW - R_PAD));
+    const aboveFits = pt.y - TOOLTIP_H - ARROW_H - 8 > Y_PAD;
+    const ty        = aboveFits ? pt.y - TOOLTIP_H - ARROW_H - 8 : pt.y + ARROW_H + 8;
+
+    // Arrow centred over dot but clamped inside box
+    const acx = Math.max(tx + 8, Math.min(pt.x, tx + TW - 8));
+    const arrowPts = aboveFits
+      ? `${acx - 5},${ty + TOOLTIP_H} ${acx + 5},${ty + TOOLTIP_H} ${acx},${ty + TOOLTIP_H + ARROW_H}`
+      : `${acx - 5},${ty} ${acx + 5},${ty} ${acx},${ty - ARROW_H}`;
+
+    tooltipNode = (
+      <React.Fragment>
+        {/* Arrow rendered first so the box bg covers the seam */}
+        <Polygon points={arrowPts} fill={colors.bg.surface} />
+        <Rect
+          x={tx} y={ty} width={TW} height={TOOLTIP_H} rx={8} ry={8}
+          fill={colors.bg.surface} stroke={gridColor} strokeWidth={1}
+        />
+        <SvgText
+          x={tx + TW / 2} y={ty + 15}
+          fontSize={9} fontFamily={fontFamily.regular}
+          fill={textColor} textAnchor="middle"
+        >
+          {labelText}
+        </SvgText>
+        <SvgText
+          x={tx + TW / 2} y={ty + 31}
+          fontSize={11} fontFamily={fontFamily.semiBold}
+          fill={colors.text.primary} textAnchor="middle"
+        >
+          {valueText}
+        </SvgText>
+      </React.Fragment>
+    );
+  }
+
   return (
     <View style={{ width, height: height + X_LABEL_H, overflow: 'hidden' }}>
       <Svg width={width} height={height + X_LABEL_H}>
@@ -138,6 +190,13 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
             <Stop offset="1"   stopColor={accentColor} stopOpacity={0}    />
           </SvgGradient>
         </Defs>
+
+        {/* Full-area dismiss zone — sits behind all chart elements */}
+        <Rect
+          x={0} y={0} width={width} height={height + X_LABEL_H}
+          fill="transparent"
+          onPress={() => setSelectedIdx(null)}
+        />
 
         {/* Y-axis grid lines + labels */}
         {yTicks.map((v, i) => {
@@ -172,11 +231,19 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
           animatedProps={animPathProps}
         />
 
-        {/* Regular dots */}
+        {/* Regular dots — highlighted when selected */}
         {pts.map((pt, i) => {
           if (data[i].isLive) return null;
+          const isSelected = selectedIdx === i;
           return (
-            <Circle key={i} cx={pt.x} cy={pt.y} r={4} fill={accentColor} />
+            <Circle
+              key={i}
+              cx={pt.x} cy={pt.y}
+              r={isSelected ? 6 : 4}
+              fill={accentColor}
+              stroke={isSelected ? colors.bg.base : 'none'}
+              strokeWidth={2}
+            />
           );
         })}
 
@@ -188,7 +255,13 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
               fill={accentColor}
               animatedProps={liveDotProps}
             />
-            <Circle cx={livePt.x} cy={livePt.y} r={6} fill={accentColor} />
+            <Circle
+              cx={livePt.x} cy={livePt.y}
+              r={selectedIdx === liveIdx ? 8 : 6}
+              fill={accentColor}
+              stroke={selectedIdx === liveIdx ? colors.bg.base : 'none'}
+              strokeWidth={2}
+            />
           </>
         )}
 
@@ -208,6 +281,20 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
             </SvgText>
           );
         })}
+
+        {/* Invisible hit circles — rendered last to win touch events */}
+        {pts.map((pt, i) => (
+          <Circle
+            key={`hit-${i}`}
+            cx={pt.x} cy={pt.y}
+            r={16}
+            fill="transparent"
+            onPress={() => setSelectedIdx(prev => prev === i ? null : i)}
+          />
+        ))}
+
+        {/* Tooltip — rendered last so it appears on top of everything */}
+        {tooltipNode}
       </Svg>
     </View>
   );

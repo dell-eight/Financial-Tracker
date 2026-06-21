@@ -20,6 +20,7 @@ import { useInvestments } from '../../hooks/queries/useInvestments';
 import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useNetWorthHistory } from '../../hooks/queries/useAnalytics';
 import type { WealthStackParamList } from '../../navigation/types';
+import type { NWPoint } from '../../services/finance.service';
 import { useCurrency } from '../../utils/currency';
 import { useScreenAnimation } from '../../hooks/ui/useScreenAnimation';
 import { NetWorthChart } from '../../components/wealth/NetWorthChart';
@@ -27,6 +28,69 @@ import { NetWorthChart } from '../../components/wealth/NetWorthChart';
 type Props = StackScreenProps<WealthStackParamList, 'WealthMain'>;
 
 type SubTab = 'networth' | 'savings' | 'investments';
+
+const parseUTC = (dateStr: string): Date =>
+  new Date(dateStr.includes('T') ? dateStr : dateStr + 'T00:00:00Z');
+
+type SnapshotPoint = NWPoint & { _time: number; _year: number };
+
+const MONTH_ABBRS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function fillMonths(data: NWPoint[], months: number): NWPoint[] {
+  const today = new Date();
+  const slots: NWPoint[] = [];
+  let prevYear: number | null = null;
+  for (let i = months - 1; i >= 1; i--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const year = d.getFullYear();
+    const yearMonth = `${year}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const monthAbbr = MONTH_ABBRS[d.getMonth()];
+    // Show 'YY suffix on the first slot and whenever the year rolls over
+    const label =
+      prevYear === null || year !== prevYear
+        ? `${monthAbbr} '${String(year).slice(2)}`
+        : monthAbbr;
+    prevYear = year;
+    const existing = data.find(p => !p.isLive && p.date?.startsWith(yearMonth));
+    slots.push(existing ? { ...existing, label } : { label, nw: 0 });
+  }
+  const live = data.find(p => p.isLive);
+  if (live) slots.push(live);
+  return slots;
+}
+
+function groupByYear(data: NWPoint[]): NWPoint[] {
+  const currentYear = new Date().getUTCFullYear();
+
+  const snapshots: SnapshotPoint[] = data
+    .filter(item => !item.isLive && !!item.date)
+    .map(item => {
+      const d = parseUTC(item.date!);
+      return { ...item, _time: d.getTime(), _year: d.getUTCFullYear() };
+    });
+
+  const yearlyMap = new Map<number, SnapshotPoint>();
+  for (const item of snapshots) {
+    const existing = yearlyMap.get(item._year);
+    if (!existing || item._time > existing._time) {
+      yearlyMap.set(item._year, item);
+    }
+  }
+
+  const historical: NWPoint[] = Array.from(yearlyMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([year, item]) => ({ label: String(year), nw: item.nw }));
+
+  const livePoint = data.filter(i => i.isLive).pop();
+  if (!livePoint) return historical;
+
+  const liveEntry: NWPoint = { label: String(currentYear), nw: livePoint.nw, isLive: true };
+  const filtered  = historical.filter(r => Number(r.label) !== currentYear);
+  const insertAt  = filtered.findIndex(r => Number(r.label) > currentYear);
+  return insertAt === -1
+    ? [...filtered, liveEntry]
+    : [...filtered.slice(0, insertAt), liveEntry, ...filtered.slice(insertAt)];
+}
 
 const SUB_TABS: { key: SubTab; label: string; icon: string; phase: string }[] = [
   { key: 'networth',     label: 'Net Worth',   icon: '◈', phase: 'Phase 7' },
@@ -73,7 +137,7 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
   const openModal = useChartModalStore(s => s.open);
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
 
-  const [period, setPeriod] = useState<6 | 12 | 24>(12);
+  const [period, setPeriod] = useState<6 | 12 | 36>(12);
   const { data: assets } = useAssets();
   const { data: debts  } = useDebts();
   const { data: nwHist } = useNetWorthHistory(period);
@@ -137,6 +201,7 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
     return remaining > 0 ? Math.ceil(remaining / monthlyProgress) : 0;
   }, [nextMilestone, monthlyProgress, netWorth, totalDebts]);
 
+  const chartData   = period === 36 ? groupByYear(nwHist ?? []) : fillMonths(nwHist ?? [], period);
   const hasTimeline = (nwHist ?? []).filter(p => !p.isLive).length >= 1;
 
   return (
@@ -209,7 +274,7 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
             <View style={{ flexDirection: 'row', gap: spacing[1], backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full, padding: 3 }}>
-              {([6, 12, 24] as const).map(p => (
+              {([6, 12, 36] as const).map(p => (
                 <Pressable
                   key={p}
                   onPress={() => setPeriod(p)}
@@ -225,7 +290,7 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
                     fontFamily: period === p ? fontFamily.semiBold : fontFamily.regular,
                     color:      period === p ? colors.text.primary : colors.text.muted,
                   }}>
-                    {p === 6 ? '6M' : p === 12 ? '1Y' : 'All'}
+                    {p === 6 ? '6M' : p === 12 ? '1Y' : '3Y'}
                   </Text>
                 </Pressable>
               ))}
@@ -234,9 +299,9 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
         </View>
 
         {hasTimeline ? (
-          <View style={{ paddingHorizontal: CHART_SIDE_PAD }}>
-            <NetWorthChart data={nwHist ?? []} width={chartW} />
-          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: CHART_SIDE_PAD }}>
+            <NetWorthChart data={chartData} width={Math.max(chartW - CHART_SIDE_PAD * 2, chartData.length * 44)} />
+          </ScrollView>
         ) : (
           <View style={{ paddingVertical: spacing[6], alignItems: 'center', paddingHorizontal: spacing[5] }}>
             <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary, textAlign: 'center' }}>

@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useEffect } from 'react';
+﻿import React, { useMemo, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing,
 } from 'react-native-reanimated';
-import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line as SvgLine, Circle } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line as SvgLine, Circle, Rect } from 'react-native-svg';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme }        from '../../hooks/ui/useTheme';
 import { useTransactions } from '../../hooks/queries/useTransactions';
@@ -42,9 +42,12 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 function IncomeLineChart({ data, color, width }: { data: { label: string; value: number }[]; color: string; width?: number }) {
   const theme = useTheme();
   const { colors, fontFamily } = theme;
-  const { fmtCompact: fmtK } = useCurrency();
+  const { fmtCompact: fmtK, fmt } = useCurrency();
+
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+
   const W = width ?? (SCREEN_W - 40);
-  const Y_W = 40, X_H = 24, Y_PAD = 12, CHART_H = 168;
+  const Y_W = 40, X_H = 24, Y_PAD = 12, CHART_H = 220;
   const plotW = W - Y_W;
   const plotH = CHART_H - X_H - Y_PAD;
 
@@ -67,10 +70,29 @@ function IncomeLineChart({ data, color, width }: { data: { label: string; value:
 
   const reveal = useSharedValue(0);
   useEffect(() => {
+    setSelectedIdx(null);
     reveal.value = 0;
     reveal.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) });
-  }, []);
+  }, [data]);
   const rs = useAnimatedStyle(() => ({ width: Math.max(1, reveal.value * plotW) }));
+
+  // Pre-compute tooltip position in parent View coordinates
+  let tooltipLeft  = 0;
+  let tooltipTop   = 0;
+  let tooltipW     = 108;
+  let tooltipLabel = '';
+  let tooltipValue = '';
+
+  if (selectedIdx !== null && pts[selectedIdx]) {
+    const pt = pts[selectedIdx];
+    tooltipValue = fmt(data[selectedIdx].value);
+    tooltipLabel = data[selectedIdx].label;
+    tooltipW = Math.max(108, Math.max(tooltipValue.length, tooltipLabel.length) * 7 + 16);
+    const rawLeft = Y_W + pt.x - tooltipW / 2;
+    tooltipLeft   = Math.max(0, Math.min(rawLeft, W - tooltipW));
+    const aboveFits = pt.y - 52 > 0;
+    tooltipTop = aboveFits ? pt.y - 52 : pt.y + 12;
+  }
 
   return (
     <View style={{ width: W, height: CHART_H }}>
@@ -86,13 +108,31 @@ function IncomeLineChart({ data, color, width }: { data: { label: string; value:
               <Stop offset="1" stopColor={color} stopOpacity="0" />
             </SvgGradient>
           </Defs>
+          {/* Dismiss zone */}
+          <Rect x={0} y={0} width={plotW} height={CHART_H - X_H} fill="transparent" onPress={() => setSelectedIdx(null)} />
           {yTicks.map((v, i) => {
             const y = Y_PAD + (1 - v / yMax) * plotH;
             return <SvgLine key={i} x1={0} y1={y} x2={plotW} y2={y} stroke={colors.chart.gridLine} strokeWidth={1} strokeDasharray={i > 0 ? '4 4' : undefined} opacity={0.5} />;
           })}
           <Path d={fill} fill="url(#incGrad)" />
           <Path d={line} stroke={color} strokeWidth={2.5} fill="none" strokeLinecap="round" />
-          {pts.map((p, i) => <Circle key={i} cx={p.x} cy={p.y} r={i === pts.length - 1 ? 5 : 3.5} fill={i === pts.length - 1 ? color : colors.chart.dataPoint} stroke={colors.chart.dataPointBorder} strokeWidth={2} />)}
+          {/* Dots — highlighted when selected */}
+          {pts.map((p, i) => {
+            const isSelected = selectedIdx === i;
+            const isLast     = i === pts.length - 1;
+            return (
+              <Circle key={i} cx={p.x} cy={p.y}
+                r={isSelected ? 6 : isLast ? 5 : 3.5}
+                fill={isSelected || isLast ? color : colors.chart.dataPoint}
+                stroke={isSelected ? colors.bg.base : colors.chart.dataPointBorder}
+                strokeWidth={2} />
+            );
+          })}
+          {/* Hit circles — last to win touch events */}
+          {pts.map((p, i) => (
+            <Circle key={`hit-${i}`} cx={p.x} cy={p.y} r={16} fill="transparent"
+              onPress={() => setSelectedIdx(prev => prev === i ? null : i)} />
+          ))}
         </Svg>
       </Animated.View>
       <View style={{ position: 'absolute', left: Y_W, bottom: 0, width: plotW, height: X_H }}>
@@ -109,6 +149,25 @@ function IncomeLineChart({ data, color, width }: { data: { label: string; value:
           );
         })}
       </View>
+
+      {/* Tooltip — outside Animated.View to avoid reveal clip */}
+      {selectedIdx !== null && (
+        <View
+          style={{
+            position: 'absolute', left: tooltipLeft, top: tooltipTop,
+            width: tooltipW, height: 44,
+            backgroundColor: colors.bg.surface, borderRadius: 8,
+            borderWidth: 1, borderColor: colors.border.subtle,
+            paddingHorizontal: 8, paddingVertical: 6,
+            shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1, shadowRadius: 4, elevation: 3,
+          }}
+          pointerEvents="none"
+        >
+          <Text style={{ fontSize: 9, fontFamily: fontFamily.regular, color: colors.chart.axisLabel }} numberOfLines={1}>{tooltipLabel}</Text>
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginTop: 2 }} numberOfLines={1}>{tooltipValue}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -209,15 +268,15 @@ export function IncomeAnalysisScreen({ navigation }: Props) {
 
         {/* 6-month trend chart */}
         <Animated.View style={[as[1], { marginHorizontal: spacing[5], marginBottom: spacing[4] }]}>
-          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4] }]}>
-            <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
+          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, paddingVertical: spacing[4] }]}>
+            <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3], paddingHorizontal: spacing[4] }}>
               6-Month Income Trend
             </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing[5] }}>
               <IncomeLineChart
                 data={incomeHistory.length > 0 ? incomeHistory : [{ label: '—', value: 0 }]}
                 color={colors.income}
-                width={Math.max(SCREEN_W - 40, incomeHistory.length * 40)}
+                width={Math.max(SCREEN_W - 80, incomeHistory.length * 40)}
               />
             </ScrollView>
           </View>
