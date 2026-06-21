@@ -379,6 +379,28 @@ export function EditProfileScreen({ navigation }: Props) {
             <Text style={{ fontSize: 18, color: colors.text.muted }}>›</Text>
           </Pressable>
         </FieldRow>
+
+        {/* Security */}
+        <FieldRow label="Security">
+          <Pressable
+            onPress={() => navigation.push('ChangePassword')}
+            style={({ pressed }) => ({
+              backgroundColor:   pressed ? colors.bg.surfaceMuted : colors.bg.surface,
+              marginHorizontal:  spacing[4],
+              borderRadius:      borderRadius.card,
+              paddingHorizontal: spacing[5],
+              paddingVertical:   spacing[4],
+              flexDirection:     'row',
+              alignItems:        'center',
+              justifyContent:    'space-between',
+            })}
+          >
+            <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.primary }}>
+              Change Password
+            </Text>
+            <Text style={{ fontSize: 18, color: colors.text.muted }}>›</Text>
+          </Pressable>
+        </FieldRow>
         </Animated.View>
 
       </ScrollView>

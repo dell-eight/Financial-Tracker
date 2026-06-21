@@ -16,6 +16,7 @@ import { PrivacyPolicyScreen }      from '../../screens/profile/PrivacyPolicyScr
 import { TermsOfServiceScreen }     from '../../screens/profile/TermsOfServiceScreen';
 import { SetupPINScreen }              from '../../screens/profile/SetupPINScreen';
 import { ChangePINScreen }             from '../../screens/profile/ChangePINScreen';
+import { ChangePasswordScreen }        from '../../screens/profile/ChangePasswordScreen';
 import { HealthScoreSettingsScreen }   from '../../screens/home/HealthScoreSettingsScreen';
 
 const Stack = createStackNavigator<HomeStackParamList>();
@@ -38,6 +39,7 @@ export function HomeStack() {
       <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
       <Stack.Screen name="SetupPIN"             component={SetupPINScreen} />
       <Stack.Screen name="ChangePIN"            component={ChangePINScreen} />
+      <Stack.Screen name="ChangePassword"       component={ChangePasswordScreen} />
       <Stack.Screen name="HealthScoreSettings"  component={HealthScoreSettingsScreen} />
     </Stack.Navigator>
   );
