@@ -39,7 +39,7 @@ type Period  = 'weekly' | 'monthly' | 'yearly';
 const _CURRENT_MONTH = new Date().toISOString().substring(0, 7);
 
 // Chart height constants
-const LINE_H = 200;
+const LINE_H = 220;
 const BAR_H  = 200;
 
 // Minimum px per data point — drives horizontal scroll width for bar charts with many points
@@ -49,7 +49,7 @@ const MIN_BAR_PT_W = 52;
 
 interface BarPoint   { label: string; income: number; expense: number }
 interface LinePoint  { label: string; value: number }
-interface MonthPoint extends BarPoint { savings: number }
+interface MonthPoint extends BarPoint { savings: number; month: string }
 
 interface CatStat {
   key:    CategoryKey;
@@ -60,15 +60,18 @@ interface CatStat {
 }
 
 interface PeriodMeta {
-  total:           string;
-  income:          string;
-  net:             string;
-  delta:           string;
-  vsLabel:         string;
-  savingsRate:     number;
+  total:             string;
+  income:            string;
+  net:               string;
+  delta:             string;
+  vsLabel:           string;
+  savingsRate:       number;
   // null = no prior-period income data; suppress the delta badge
-  prevSavingsRate: number | null;
-  hasIncome:       boolean;
+  prevSavingsRate:   number | null;
+  hasIncome:         boolean;
+  thisMonthSavings:  number;
+  ytdSavings:        number;
+  avgSavings:        number;
 }
 
 // ─── TopCategoriesCard ──────────────────────────────────────────────────────────
@@ -195,23 +198,35 @@ function TopCategoriesCard({ data }: { data: CatStat[] }) {
 
 function SavingsCard({
   rate, prevRate, history, hasIncome,
+  thisMonthSavings, ytdSavings, avgSavings,
 }: {
-  rate:      number;
-  prevRate:  number | null; // null = no prior-period income data
-  history:   MonthPoint[];
-  hasIncome: boolean;
+  rate:              number;
+  prevRate:          number | null; // null = no prior-period income data
+  history:           MonthPoint[];  // sparkline only
+  hasIncome:         boolean;
+  thisMonthSavings:  number;
+  ytdSavings:        number;
+  avgSavings:        number;
 }) {
   const theme = useTheme();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
-  const { fmt } = useCurrency();
+  const { fmt, fmtCompact } = useCurrency();
+
+  const [sparkIdx, setSparkIdx] = useState<number | null>(null);
 
   const showDelta = prevRate !== null;
   const delta     = showDelta ? rate - prevRate : 0;
   const positive  = delta >= 0;
-  const maxSav    = Math.max(...history.map(h => h.savings), 1);
-  const ytdSaved  = history.reduce((s, h) => s + h.savings, 0);
-  const avgSaved  = history.length > 0 ? Math.round(ytdSaved / history.length) : 0;
-  const thisMonth = history.length > 0 ? (history[history.length - 1].savings ?? 0) : 0;
+  // Use absolute values so negative-savings months still render proportional bars
+  const absMax = Math.max(...history.map(h => Math.abs(h.savings)), 1);
+  // Color-code the rate: green ≥20%, amber 0–20%, red <0%
+  const rateColor = !hasIncome
+    ? colors.text.muted
+    : rate >= 20
+      ? colors.income
+      : rate >= 0
+        ? colors.warning
+        : colors.expense;
 
   return (
     <View
@@ -242,7 +257,7 @@ function SavingsCard({
               style={{
                 fontSize:      38,
                 fontFamily:    fontFamily.bold,
-                color:         colors.text.primary,
+                color:         rateColor,
                 letterSpacing: -1,
                 lineHeight:    46,
               }}
@@ -289,24 +304,81 @@ function SavingsCard({
         </View>
 
         {/* Sparkline (savings by month) */}
-        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 64, paddingBottom: 2 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 64, paddingBottom: 2, position: 'relative' }}>
+          {/* Dismiss layer */}
+          <Pressable
+            onPress={() => setSparkIdx(null)}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          />
           {history.map((h, i) => {
-            const bh     = Math.max(4, (h.savings / maxSav) * 56);
+            const bh     = Math.max(4, (Math.abs(h.savings) / absMax) * 56);
             const isLast = i === history.length - 1;
+            const isPos  = h.savings >= 0;
             return (
-              <View
+              <Pressable
                 key={i}
-                style={{
-                  width:                10,
-                  height:               bh,
-                  backgroundColor:      isLast ? colors.accent.primary : colors.bg.surfaceMuted,
-                  borderTopLeftRadius:  3,
-                  borderTopRightRadius: 3,
-                  opacity:              isLast ? 1 : 0.65 + i * 0.05,
-                }}
-              />
+                onPress={() => setSparkIdx(prev => prev === i ? null : i)}
+                style={{ alignSelf: 'stretch', width: 10, justifyContent: 'flex-end' }}
+              >
+                <View
+                  style={{
+                    width:                10,
+                    height:               bh,
+                    backgroundColor:      sparkIdx !== null && sparkIdx !== i
+                      ? (isPos ? colors.bg.surfaceMuted : colors.expense + '30')
+                      : isLast
+                        ? (isPos ? colors.accent.primary : colors.expense)
+                        : (isPos ? colors.bg.surfaceMuted : colors.expense + '50'),
+                    borderTopLeftRadius:  3,
+                    borderTopRightRadius: 3,
+                    opacity:              sparkIdx !== null && sparkIdx !== i
+                      ? 0.3
+                      : isLast ? 1 : 0.65 + i * 0.05,
+                  }}
+                />
+              </Pressable>
             );
           })}
+
+          {/* Tooltip — overlays top of sparkline container */}
+          {sparkIdx !== null && (() => {
+            const h  = history[sparkIdx];
+            const isPos = h.savings >= 0;
+            // center on tapped bar: each bar is 10px wide + 4px gap
+            const barCenterX = sparkIdx * 14 + 5;
+            const sparkW     = history.length * 10 + Math.max(0, history.length - 1) * 4;
+            const TW         = 76;
+            const left       = Math.max(0, Math.min(barCenterX - TW / 2, sparkW - TW));
+            return (
+              <View
+                pointerEvents="none"
+                style={{
+                  position:          'absolute',
+                  top:               0,
+                  left,
+                  width:             TW,
+                  backgroundColor:   colors.bg.surface,
+                  borderRadius:      6,
+                  borderWidth:       1,
+                  borderColor:       colors.border.subtle,
+                  paddingHorizontal: 6,
+                  paddingVertical:   4,
+                  shadowColor:       '#000',
+                  shadowOffset:      { width: 0, height: 1 },
+                  shadowOpacity:     0.08,
+                  shadowRadius:      3,
+                  elevation:         2,
+                }}
+              >
+                <Text style={{ fontSize: 9, fontFamily: fontFamily.regular, color: colors.text.muted }}>
+                  {h.label}
+                </Text>
+                <Text style={{ fontSize: 10, fontFamily: fontFamily.semiBold, color: isPos ? colors.income : colors.expense }}>
+                  {isPos ? '+' : ''}{fmtCompact(h.savings)}
+                </Text>
+              </View>
+            );
+          })()}
         </View>
       </View>
 
@@ -321,11 +393,11 @@ function SavingsCard({
           gap:             spacing[4],
         }}
       >
-        {([
-          { label: 'This Month', value: fmt(thisMonth), color: colors.income          },
-          { label: 'YTD Total',  value: fmt(ytdSaved),  color: colors.accent.primary  },
-          { label: 'Monthly Avg',value: fmt(avgSaved),  color: colors.text.secondary  },
-        ] as const).map(({ label, value, color }) => (
+        {[
+          { label: 'This Month', value: fmt(thisMonthSavings), color: thisMonthSavings >= 0 ? colors.income         : colors.expense },
+          { label: 'YTD Total',  value: fmt(ytdSavings),       color: ytdSavings       >= 0 ? colors.accent.primary : colors.expense },
+          { label: 'Monthly Avg',value: fmt(avgSavings),        color: avgSavings       >= 0 ? colors.text.secondary : colors.expense },
+        ].map(({ label, value, color }) => (
           <View key={label} style={{ flex: 1 }}>
             <Text
               style={{
@@ -341,7 +413,7 @@ function SavingsCard({
               style={{
                 fontSize:   fontSize.bodyMd,
                 fontFamily: fontFamily.semiBold,
-                color:      color as string,
+                color,
                 lineHeight: 20,
               }}
               numberOfLines={1}
@@ -557,15 +629,20 @@ export function AnalyticsScreen({ navigation }: Props) {
       const expense = wk.reduce((s, d) => s + d.expense, 0);
       const net     = income - expense;
       const sr      = income > 0 ? Math.round((net / income) * 1000) / 10 : 0;
-      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'this week', savingsRate: sr, prevSavingsRate: null, hasIncome: income > 0 };
+      const mhW     = monthlyHistory ?? [];
+      const ytdW    = mhW.reduce((s, h) => s + h.savings, 0);
+      const avgW    = mhW.length > 0 ? Math.round(ytdW / mhW.length) : 0;
+      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'this week', savingsRate: sr, prevSavingsRate: null, hasIncome: income > 0, thisMonthSavings: mhW[mhW.length - 1]?.savings ?? 0, ytdSavings: ytdW, avgSavings: avgW };
     }
     if (period === 'yearly') {
-      const hist = monthlyHistory ?? [];
+      const hist    = monthlyHistory ?? [];
       const income  = hist.reduce((s, d) => s + d.income,  0);
       const expense = hist.reduce((s, d) => s + d.expense, 0);
       const net     = income - expense;
       const sr      = income > 0 ? Math.round((net / income) * 1000) / 10 : 0;
-      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'last 6 months', savingsRate: sr, prevSavingsRate: null, hasIncome: income > 0 };
+      const ytdY    = hist.reduce((s, h) => s + h.savings, 0);
+      const avgY    = hist.length > 0 ? Math.round(ytdY / hist.length) : 0;
+      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'last 6 months', savingsRate: sr, prevSavingsRate: null, hasIncome: income > 0, thisMonthSavings: hist[hist.length - 1]?.savings ?? 0, ytdSavings: ytdY, avgSavings: avgY };
     }
     // monthly
     const monthExpense = (txns ?? [])
@@ -574,24 +651,31 @@ export function AnalyticsScreen({ navigation }: Props) {
     const monthIncome = (txns ?? [])
       .filter(t => t.type === 'income' && t.date.startsWith(_CURRENT_MONTH))
       .reduce((s, t) => s + t.amount, 0);
-    const net         = monthIncome - monthExpense;
-    const savingsRate = monthIncome > 0 ? Math.round((net / monthIncome) * 1000) / 10 : 0;
-    const hist        = monthlyHistory ?? [];
-    const prev        = hist.length >= 2 ? hist[hist.length - 2] : null;
-    const prevExp     = prev?.expense ?? 0;
-    const deltaVal    = prevExp > 0 ? ((monthExpense - prevExp) / prevExp) * 100 : 0;
-    const deltaStr    = prevExp > 0 ? `${Math.abs(deltaVal).toFixed(1)}% ${deltaVal <= 0 ? 'less' : 'more'}` : '—';
+    const net             = monthIncome - monthExpense;
+    const savingsRate     = monthIncome > 0 ? Math.round((net / monthIncome) * 1000) / 10 : 0;
+    const hist            = monthlyHistory ?? [];
+    const prev            = hist.length >= 2 ? hist[hist.length - 2] : null;
+    const prevExp         = prev?.expense ?? 0;
+    const deltaVal        = prevExp > 0 ? ((monthExpense - prevExp) / prevExp) * 100 : 0;
+    const deltaStr        = prevExp > 0 ? `${Math.abs(deltaVal).toFixed(1)}% ${deltaVal <= 0 ? 'less' : 'more'}` : '—';
     // null when no prior-period income — suppresses the savings delta badge
-    const prevSR      = prev && prev.income > 0 ? Math.round(((prev.income - prev.expense) / prev.income) * 1000) / 10 : null;
+    const prevSR          = prev && prev.income > 0 ? Math.round(((prev.income - prev.expense) / prev.income) * 1000) / 10 : null;
+    // Use live net for current month; exclude the current-month DB entry (partial/stale) when summing completed months
+    const completedMonths = hist.filter(h => !h.month.startsWith(_CURRENT_MONTH));
+    const ytdM            = completedMonths.reduce((s, h) => s + h.savings, 0) + net;
+    const avgM            = Math.round(ytdM / (completedMonths.length + 1));
     return {
-      total:           fmtFull(monthExpense),
-      income:          fmtFull(monthIncome),
-      net:             fmtFull(Math.max(0, net)),
-      delta:           deltaStr,
-      vsLabel:         prev ? `vs ${prev.label}` : '',
+      total:            fmtFull(monthExpense),
+      income:           fmtFull(monthIncome),
+      net:              fmtFull(Math.max(0, net)),
+      delta:            deltaStr,
+      vsLabel:          prev ? `vs ${prev.label}` : '',
       savingsRate,
-      prevSavingsRate: prevSR,
-      hasIncome:       monthIncome > 0,
+      prevSavingsRate:  prevSR,
+      hasIncome:        monthIncome > 0,
+      thisMonthSavings: net,
+      ytdSavings:       ytdM,
+      avgSavings:       avgM,
     };
   }, [period, txns, monthlyHistory, weeklyHistory]);
 
@@ -868,10 +952,11 @@ export function AnalyticsScreen({ navigation }: Props) {
               : period === 'yearly' ? 'Quarterly expense trend'
               : 'Monthly expense trend'
             }
-            minHeight={LINE_H + 80}
+            minHeight={LINE_H + 40}
             chartHeight={LINE_H}
+            scrollable
           >
-            {(w) => <SpendingLineChart data={lineData} chartW={w} animDelay={200} />}
+            {(w) => <SpendingLineChart data={lineData} chartW={Math.max(w, lineData.length * 40)} animDelay={200} />}
           </ChartCard>
         </Animated.View>
 
@@ -898,6 +983,9 @@ export function AnalyticsScreen({ navigation }: Props) {
             prevRate={meta.prevSavingsRate}
             history={monthlyHistory ?? []}
             hasIncome={meta.hasIncome}
+            thisMonthSavings={meta.thisMonthSavings}
+            ytdSavings={meta.ytdSavings}
+            avgSavings={meta.avgSavings}
           />
         </Animated.View>
 

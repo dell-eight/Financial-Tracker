@@ -13,7 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, withDelay, Easing,
 } from 'react-native-reanimated';
-import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line as SvgLine, Circle } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient as SvgGradient, Stop, Line as SvgLine, Circle, Rect } from 'react-native-svg';
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme }        from '../../hooks/ui/useTheme';
 import { useTransactions } from '../../hooks/queries/useTransactions';
@@ -26,7 +26,7 @@ type Props   = StackScreenProps<AnalyticsStackParamList, 'SpendingTrends'>;
 type Period  = 'weekly' | 'monthly' | 'yearly';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const CHART_H = 180;
+const CHART_H = 220;
 const X_H     = 24;
 const Y_W     = 40;
 const Y_PAD   = 12;
@@ -49,7 +49,10 @@ function smoothPath(pts: { x: number; y: number }[]): string {
 function SpendingChart({ data, color, width }: { data: { label: string; value: number }[]; color: string; width: number }) {
   const theme = useTheme();
   const { colors, fontFamily } = theme;
-  const { fmtCompact: fmtK } = useCurrency();
+  const { fmtCompact: fmtK, fmt } = useCurrency();
+
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+
   const W = width;
   const plotW = W - Y_W;
   const plotH = CHART_H - X_H - Y_PAD;
@@ -73,10 +76,32 @@ function SpendingChart({ data, color, width }: { data: { label: string; value: n
 
   const reveal = useSharedValue(0);
   useEffect(() => {
+    setSelectedIdx(null);
     reveal.value = 0;
     reveal.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) });
   }, [data]);
   const revealStyle = useAnimatedStyle(() => ({ width: Math.max(1, reveal.value * plotW) }));
+
+  // Pre-compute tooltip position in parent View coordinates
+  let tooltipLeft  = 0;
+  let tooltipTop   = 0;
+  let tooltipW     = 108;
+  let tooltipLabel = '';
+  let tooltipValue = '';
+
+  if (selectedIdx !== null && pts[selectedIdx]) {
+    const pt = pts[selectedIdx];
+    tooltipValue = fmt(data[selectedIdx].value);
+    tooltipLabel = data[selectedIdx].label;
+    tooltipW = Math.max(108, Math.max(tooltipValue.length, tooltipLabel.length) * 7 + 16);
+
+    const rawLeft = Y_W + pt.x - tooltipW / 2;
+    tooltipLeft   = Math.max(0, Math.min(rawLeft, W - tooltipW));
+
+    const TOOLTIP_H = 44;
+    const aboveFits = pt.y - TOOLTIP_H - 8 > 0;
+    tooltipTop = aboveFits ? pt.y - TOOLTIP_H - 8 : pt.y + 12;
+  }
 
   return (
     <View style={{ width: W, height: CHART_H }}>
@@ -96,14 +121,38 @@ function SpendingChart({ data, color, width }: { data: { label: string; value: n
               <Stop offset="1" stopColor={color} stopOpacity="0" />
             </SvgGradient>
           </Defs>
+          {/* Dismiss zone behind all chart elements */}
+          <Rect x={0} y={0} width={plotW} height={CHART_H - X_H} fill="transparent" onPress={() => setSelectedIdx(null)} />
           {ticks.map((v, i) => {
             const y = Y_PAD + (1 - v / yMax) * plotH;
             return <SvgLine key={i} x1={0} y1={y} x2={plotW} y2={y} stroke={colors.chart.gridLine} strokeWidth={1} strokeDasharray={i > 0 ? '4 4' : undefined} opacity={0.5} />;
           })}
           <Path d={fillPath} fill="url(#spendGrad)" />
           <Path d={line} stroke={color} strokeWidth={2.5} fill="none" strokeLinecap="round" />
+          {/* Dots — highlighted when selected */}
+          {pts.map((p, i) => {
+            const isSelected = selectedIdx === i;
+            const isLast     = i === pts.length - 1;
+            return (
+              <Circle
+                key={i}
+                cx={p.x} cy={p.y}
+                r={isSelected ? 6 : isLast ? 5 : 3.5}
+                fill={isSelected ? color : isLast ? color : colors.chart.dataPoint}
+                stroke={isSelected ? colors.chart.dataPointBorder : colors.chart.dataPointBorder}
+                strokeWidth={2}
+              />
+            );
+          })}
+          {/* Hit circles — last inside SVG to win touch events */}
           {pts.map((p, i) => (
-            <Circle key={i} cx={p.x} cy={p.y} r={i === pts.length - 1 ? 5 : 3.5} fill={i === pts.length - 1 ? color : colors.chart.dataPoint} stroke={colors.chart.dataPointBorder} strokeWidth={2} />
+            <Circle
+              key={`hit-${i}`}
+              cx={p.x} cy={p.y}
+              r={16}
+              fill="transparent"
+              onPress={() => setSelectedIdx(prev => prev === i ? null : i)}
+            />
           ))}
         </Svg>
       </Animated.View>
@@ -121,6 +170,38 @@ function SpendingChart({ data, color, width }: { data: { label: string; value: n
           );
         })}
       </View>
+
+      {/* Tooltip — outside Animated.View so it isn't clipped by the reveal animation */}
+      {selectedIdx !== null && (
+        <View
+          style={{
+            position: 'absolute',
+            left: tooltipLeft,
+            top: tooltipTop,
+            width: tooltipW,
+            height: 44,
+            backgroundColor: colors.bg.surface,
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: colors.border.subtle,
+            paddingHorizontal: 8,
+            paddingVertical: 6,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 3,
+          }}
+          pointerEvents="none"
+        >
+          <Text style={{ fontSize: 9, fontFamily: fontFamily.regular, color: colors.chart.axisLabel }} numberOfLines={1}>
+            {tooltipLabel}
+          </Text>
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginTop: 2 }} numberOfLines={1}>
+            {tooltipValue}
+          </Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -136,7 +217,9 @@ export function SpendingTrendsScreen({ navigation }: Props) {
   const { data: monthlyHistory } = useMonthlyHistory(6);
   const { data: weeklyHistory }  = useWeeklyHistory();
 
-  const [period, setPeriod] = useState<Period>('monthly');
+  const [period, setPeriod]     = useState<Period>('monthly');
+  const [selectedDow, setSelectedDow] = useState<number | null>(null);
+  const [dowContainerW, setDowContainerW] = useState(0);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -164,15 +247,24 @@ export function SpendingTrendsScreen({ navigation }: Props) {
   const chartData = useMemo(() => {
     if (period === 'weekly') return (weeklyHistory ?? []).map(d => ({ label: d.label, value: d.expense }));
     if (period === 'yearly') {
-      // Aggregate monthly into quarterly
-      const src = monthlyHistory ?? [];
-      const quarters: { label: string; value: number }[] = [];
-      for (let i = 0; i < src.length; i += 3) {
-        const slice = src.slice(i, i + 3);
-        const total = slice.reduce((s, d) => s + d.expense, 0);
-        quarters.push({ label: slice[0]?.label ?? `Q${Math.floor(i/3)+1}`, value: total });
+      // Aggregate by calendar quarter, labelled "Q1 '26" etc.
+      // MonthPoint has no date field, so derive year by comparing the month index
+      // against the current month — any month index > currentMonth must be last year.
+      const ABBRS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      const today = new Date();
+      const currentYear  = today.getFullYear();
+      const currentMonth = today.getMonth(); // 0-indexed
+
+      const quarterMap = new Map<string, number>(); // preserves insertion order
+      for (const d of (monthlyHistory ?? [])) {
+        const mIdx = ABBRS.indexOf(d.label);
+        if (mIdx === -1) continue;
+        const year  = mIdx > currentMonth ? currentYear - 1 : currentYear;
+        const qNum  = Math.floor(mIdx / 3) + 1;
+        const key   = `Q${qNum} '${String(year).slice(2)}`;
+        quarterMap.set(key, (quarterMap.get(key) ?? 0) + d.expense);
       }
-      return quarters;
+      return [...quarterMap.entries()].map(([label, value]) => ({ label, value }));
     }
     return (monthlyHistory ?? []).map(d => ({ label: d.label, value: d.expense }));
   }, [period, monthlyHistory, weeklyHistory]);
@@ -186,7 +278,7 @@ export function SpendingTrendsScreen({ navigation }: Props) {
       totals[idx] += t.amount;
     }
     const maxVal = Math.max(...totals, 1);
-    return DAY.map((label, i) => ({ label, pct: totals[i] / maxVal }));
+    return DAY.map((label, i) => ({ label, pct: totals[i] / maxVal, amount: totals[i] }));
   }, [txns]);
 
   const peakDow = useMemo(() => {
@@ -210,6 +302,9 @@ export function SpendingTrendsScreen({ navigation }: Props) {
   const isDown      = delta <= 0;
 
   const PERIOD_LABELS: Record<Period, string> = { weekly: 'This Week', monthly: 'This Month', yearly: 'This Year' };
+
+  // Reset DoW selection when period or data changes
+  useEffect(() => { setSelectedDow(null); }, [period, txns]);
 
   // Staggered card entrance
   // eslint-disable-next-line react-hooks/rules-of-hooks
@@ -277,15 +372,17 @@ export function SpendingTrendsScreen({ navigation }: Props) {
 
         {/* Spending chart */}
         <Animated.View style={[styles_a[2], { marginHorizontal: spacing[5], marginBottom: spacing[4] }]}>
-          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, padding: spacing[4] }]}>
-            <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
+          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, paddingVertical: spacing[4] }]}>
+            <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3], paddingHorizontal: spacing[4] }}>
               {period === 'weekly' ? 'Daily Expenses' : period === 'yearly' ? 'Quarterly Expenses' : '6-Month Trend'}
             </Text>
-            <SpendingChart
-              data={chartData}
-              color={colors.expense}
-              width={SCREEN_W - 40}
-            />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing[5] }}>
+              <SpendingChart
+                data={chartData}
+                color={colors.expense}
+                width={Math.max(SCREEN_W - 80, chartData.length * 52)}
+              />
+            </ScrollView>
           </View>
         </Animated.View>
 
@@ -296,18 +393,73 @@ export function SpendingTrendsScreen({ navigation }: Props) {
               <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
                 Spending by Day of Week
               </Text>
-              <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 80, gap: 6 }}>
+              <View
+                style={{ flexDirection: 'row', alignItems: 'flex-end', height: 80, gap: 6, position: 'relative' }}
+                onLayout={(e) => setDowContainerW(e.nativeEvent.layout.width)}
+              >
                 {dowBars.map((d, i) => (
-                  <View key={i} style={{ flex: 1, alignItems: 'center', gap: 4 }}>
+                  <Pressable
+                    key={i}
+                    style={{ flex: 1, alignItems: 'center', gap: 4, alignSelf: 'stretch', justifyContent: 'flex-end' }}
+                    onPress={() => setSelectedDow(prev => prev === i ? null : i)}
+                  >
                     <View style={{ flex: 1, justifyContent: 'flex-end', width: '100%' }}>
-                      <View style={{ height: `${Math.max(d.pct * 100, 4)}%`, backgroundColor: d.pct >= 0.99 ? colors.expense : colors.expense + '60', borderRadius: 4 }} />
+                      <View style={{
+                        height: `${Math.max(d.pct * 100, 4)}%`,
+                        backgroundColor: selectedDow !== null && selectedDow !== i
+                          ? colors.expense + '30'
+                          : d.pct >= 0.99 ? colors.expense : colors.expense + '60',
+                        borderRadius: 4,
+                      }} />
                     </View>
-                    <Text style={{ fontSize: 9, fontFamily: fontFamily.regular, color: colors.text.muted }}>{d.label}</Text>
-                  </View>
+                    <Text style={{
+                      fontSize: 9,
+                      fontFamily: fontFamily.regular,
+                      color: selectedDow === i ? colors.text.primary : colors.text.muted,
+                    }}>{d.label}</Text>
+                  </Pressable>
                 ))}
+
+                {/* Tooltip */}
+                {selectedDow !== null && dowContainerW > 0 && dowBars[selectedDow]?.amount > 0 && (() => {
+                  const d    = dowBars[selectedDow];
+                  const TW   = 108;
+                  const slotW = dowContainerW / 7;
+                  const cx   = (selectedDow + 0.5) * slotW;
+                  const left = Math.max(4, Math.min(cx - TW / 2, dowContainerW - TW - 4));
+                  return (
+                    <View
+                      pointerEvents="none"
+                      style={{
+                        position:          'absolute',
+                        top:               4,
+                        left,
+                        width:             TW,
+                        backgroundColor:   colors.bg.surface,
+                        borderRadius:      8,
+                        borderWidth:       1,
+                        borderColor:       colors.border.subtle,
+                        paddingHorizontal: 8,
+                        paddingVertical:   6,
+                        shadowColor:       '#000',
+                        shadowOffset:      { width: 0, height: 2 },
+                        shadowOpacity:     0.1,
+                        shadowRadius:      4,
+                        elevation:         3,
+                      }}
+                    >
+                      <Text style={{ fontSize: 9, fontFamily: fontFamily.regular, color: colors.chart.axisLabel }}>
+                        {d.label}
+                      </Text>
+                      <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.expense, marginTop: 2 }}>
+                        {fmt(d.amount)}
+                      </Text>
+                    </View>
+                  );
+                })()}
               </View>
               <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: spacing[3] }}>
-                {peakDow}s have the highest spending this month.
+                {selectedDow !== null ? `${dowBars[selectedDow].label}: ${fmt(dowBars[selectedDow].amount)}` : `${peakDow}s have the highest spending this month.`}
               </Text>
             </View>
           </Animated.View>
