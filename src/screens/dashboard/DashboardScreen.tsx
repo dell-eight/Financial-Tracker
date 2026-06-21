@@ -40,6 +40,7 @@ import { ProgressBar, SectionHeader, ExpenseItem } from '../../components';
 import type { HomeStackParamList, MainTabParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
 import { computeHealthScore } from '../../utils/healthScore';
+import { useUnreadNotificationCount } from '../../hooks/queries/useNotifications';
 
 type Props = StackScreenProps<HomeStackParamList, 'HomeMain'>;
 
@@ -428,6 +429,7 @@ export function DashboardScreen({ navigation }: Props) {
   const { data: txns,      isLoading: txLoading,   refetch: refetchTxns }  = useTransactions();
   const { data: budgets,   isLoading: budgLoading,  refetch: refetchBudg }  = useBudgets();
   const { data: goals,     isLoading: goalLoading,  refetch: refetchGoals } = useSavingsGoals();
+  const { data: unreadCount = 0 } = useUnreadNotificationCount();
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
 
@@ -583,9 +585,29 @@ export function DashboardScreen({ navigation }: Props) {
             <Pressable
               onPress={() => navigation.push('Notifications')}
               style={[styles.iconBtn, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full }]}
-              accessibilityLabel="Notifications"
+              accessibilityLabel={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
             >
               <Text style={{ fontSize: 18, lineHeight: 24 }}>🔔</Text>
+              {unreadCount > 0 && (
+                <View style={{
+                  position:         'absolute',
+                  top:              0,
+                  right:            0,
+                  minWidth:         16,
+                  height:           16,
+                  borderRadius:     8,
+                  backgroundColor:  colors.expense,
+                  alignItems:       'center',
+                  justifyContent:   'center',
+                  paddingHorizontal: unreadCount > 9 ? 3 : 0,
+                  borderWidth:      1.5,
+                  borderColor:      colors.bg.surfaceMuted,
+                }}>
+                  <Text style={{ fontSize: 9, fontFamily: fontFamily.bold, color: '#FFFFFF', lineHeight: 12 }}>
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </Text>
+                </View>
+              )}
             </Pressable>
             <Pressable
               onPress={() => navigation.push('Profile')}

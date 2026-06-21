@@ -311,7 +311,7 @@ export function ProfileScreen({ navigation }: Props) {
     const prev = nwHist[nwHist.length - 2].nw;
     const curr = nwHist[nwHist.length - 1].nw;
     if (prev === 0) return null;
-    return Math.round(((curr - prev) / Math.abs(prev)) * 1000) / 10;
+    return Math.round(((curr - prev) / Math.abs(prev)) * 10000) / 100;
   }, [nwHist]);
 
   const netWorthChangeSub = netWorthChangePct === null

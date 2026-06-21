@@ -24,6 +24,7 @@ import { useNetworkStatus } from '../../hooks/ui/useNetworkStatus';
 import { TRANSACTIONS_KEY } from '../../hooks/queries/useTransactions';
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
 import { BUDGETS_KEY } from '../../hooks/queries/useBudgets';
+import { NOTIFICATIONS_KEY, NOTIFICATIONS_COUNT_KEY } from '../../hooks/queries/useNotifications';
 import { addExpense, getBudgets } from '../../services/finance.service';
 import { useAccounts } from '../../hooks/queries/useAccounts';
 import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
@@ -146,11 +147,13 @@ export function AddExpenseScreen({ navigation }: Props) {
       if (fromAccount) keys.push(queryClient.invalidateQueries({ queryKey: ASSETS_KEY }));
       await Promise.all(keys);
 
-      // Fire budget threshold notifications for the current month
+      // Fire budget threshold notifications and persist them to the inbox
       if (notificationsEnabled) {
         const now = new Date();
         const freshBudgets = await getBudgets(now.getFullYear(), now.getMonth() + 1);
-        checkBudgetThresholds(freshBudgets, alert80Enabled, alert100Enabled, categoryAlertOverrides);
+        await checkBudgetThresholds(freshBudgets, alert80Enabled, alert100Enabled, categoryAlertOverrides);
+        queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+        queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_COUNT_KEY });
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

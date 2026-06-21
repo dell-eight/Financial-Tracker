@@ -20,6 +20,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useTransactions, TRANSACTIONS_KEY } from '../../hooks/queries/useTransactions';
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
+import { BUDGETS_KEY } from '../../hooks/queries/useBudgets';
 import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { getCategoryBgColor } from '../../theme';
 import { deleteTransaction, updateExpense, updateIncome, getTransferById, deleteTransfer } from '../../services/finance.service';
@@ -202,6 +203,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
             await Promise.all([
               queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }),
               queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
+              queryClient.invalidateQueries({ queryKey: BUDGETS_KEY }),
               queryClient.invalidateQueries({ queryKey: ASSETS_KEY }),
             ]);
             navigation.goBack();

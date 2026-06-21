@@ -2,7 +2,7 @@ import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
-import type { Budget } from '../types/models';
+import type { Budget, AppNotification } from '../types/models';
 import type { CategoryKey } from '../theme';
 
 // expo-notifications auto-registers for push tokens at import time via TokenAutoRegistration.fxs.js,
@@ -79,6 +79,92 @@ export async function savePushToken(token: string): Promise<void> {
     );
 }
 
+// ── In-app notification inbox ──────────────────────────────────────────────────
+
+const VALID_NOTIFICATION_TYPES = ['budget_warning', 'budget_over'] as const;
+
+async function notifUid(): Promise<string> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+  return user.id;
+}
+
+type RawNotificationRow = {
+  id: string; type: string; title: string; body: string;
+  data: Record<string, unknown> | null; dedupe_key: string | null;
+  read_at: string | null; created_at: string;
+};
+
+function mapNotification(row: RawNotificationRow): AppNotification | null {
+  if (!(VALID_NOTIFICATION_TYPES as readonly string[]).includes(row.type)) return null;
+  return {
+    id: row.id, type: row.type as AppNotification['type'],
+    title: row.title, body: row.body, data: row.data,
+    dedupeKey: row.dedupe_key, readAt: row.read_at, createdAt: row.created_at,
+  };
+}
+
+export async function saveNotification(
+  userId:    string,
+  type:      'budget_warning' | 'budget_over',
+  title:     string,
+  body:      string,
+  dedupeKey: string,
+  data?:     Record<string, unknown>,
+): Promise<void> {
+  await supabase.from('notifications').upsert(
+    { user_id: userId, type, title, body, dedupe_key: dedupeKey, data: data ?? null },
+    { onConflict: 'user_id,dedupe_key', ignoreDuplicates: true },
+  );
+}
+
+export async function getNotifications(): Promise<AppNotification[]> {
+  const userId = await notifUid();
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id, type, title, body, data, dedupe_key, read_at, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  return (data as RawNotificationRow[])
+    .map(mapNotification)
+    .filter((n): n is AppNotification => n !== null);
+}
+
+export async function getUnreadNotificationCount(): Promise<number> {
+  const userId = await notifUid();
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('id')
+    .eq('user_id', userId)
+    .is('read_at', null)
+    .limit(100);
+  if (error) throw error;
+  return (data ?? []).length;
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  const userId = await notifUid();
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('user_id', userId)
+    .is('read_at', null);
+  if (error) throw error;
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const userId = await notifUid();
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .is('read_at', null);
+  if (error) throw error;
+}
+
 // ── Budget threshold notifications ─────────────────────────────────────────────
 // Deduplication key: "notif_<threshold>_<budgetId>_<year>_<month>"
 // Stored in AsyncStorage so each threshold fires at most once per budget per month.
@@ -102,6 +188,12 @@ export async function checkBudgetThresholds(
   const N = getNotifs();
   if (!N) return;
 
+  let currentUserId: string | null = null;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    currentUserId = user?.id ?? null;
+  } catch { /* proceed without DB persistence */ }
+
   for (const budget of budgets) {
     if (budget.limit <= 0) continue;
     if (categoryAlertOverrides[budget.category] === false) continue;
@@ -109,34 +201,40 @@ export async function checkBudgetThresholds(
     const monthKey = `${budget.year}_${budget.month}`;
 
     if (alert100Enabled && ratio >= 1) {
-      const key = `100_${budget.id}_${monthKey}`;
+      const key   = `100_${budget.id}_${monthKey}`;
+      const title = `🚨 Over Budget: ${budget.label}`;
+      const body  = `You've exceeded your ${budget.label} budget (limit ₱${budget.limit.toLocaleString('en-PH', { minimumFractionDigits: 0 })}).`;
       if (!(await wasAlreadyFired(key))) {
         await N.scheduleNotificationAsync({
           identifier: key,
-          content: {
-            title:            `🚨 Over Budget: ${budget.label}`,
-            body:             `You've exceeded your ${budget.label} budget (limit ₱${budget.limit.toLocaleString('en-PH', { minimumFractionDigits: 0 })}).`,
-            data:             { type: 'budget_over', budgetId: budget.id },
-            categoryIdentifier: 'budget-alerts',
-          },
+          content: { title, body, data: { type: 'budget_over', budgetId: budget.id }, categoryIdentifier: 'budget-alerts' },
           trigger: null,
         });
         await markFired(key);
+        if (currentUserId) {
+          saveNotification(currentUserId, 'budget_over', title, body, key, {
+            budgetId: budget.id, ratio, spent: budget.spent, limit: budget.limit,
+            month: budget.month, year: budget.year,
+          }).catch(() => {});
+        }
       }
     } else if (alert80Enabled && ratio >= 0.8) {
-      const key = `80_${budget.id}_${monthKey}`;
+      const key   = `80_${budget.id}_${monthKey}`;
+      const title = `⚠️ Budget Warning: ${budget.label}`;
+      const body  = `You've used ${Math.round(ratio * 100)}% of your ${budget.label} budget.`;
       if (!(await wasAlreadyFired(key))) {
         await N.scheduleNotificationAsync({
           identifier: key,
-          content: {
-            title:            `⚠️ Budget Warning: ${budget.label}`,
-            body:             `You've used ${Math.round(ratio * 100)}% of your ${budget.label} budget.`,
-            data:             { type: 'budget_warning', budgetId: budget.id },
-            categoryIdentifier: 'budget-alerts',
-          },
+          content: { title, body, data: { type: 'budget_warning', budgetId: budget.id }, categoryIdentifier: 'budget-alerts' },
           trigger: null,
         });
         await markFired(key);
+        if (currentUserId) {
+          saveNotification(currentUserId, 'budget_warning', title, body, key, {
+            budgetId: budget.id, ratio, spent: budget.spent, limit: budget.limit,
+            month: budget.month, year: budget.year,
+          }).catch(() => {});
+        }
       }
     }
   }

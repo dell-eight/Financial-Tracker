@@ -43,8 +43,8 @@ interface AppState {
   categoryAlertOverrides:  Partial<Record<CategoryKey, boolean>>;
 
   // ── Device-level brute-force guard (persisted, never reset) ───────────
-  loginAttempts:     number;
-  loginLockoutUntil: number | null;
+  loginAttemptsByEmail: Record<string, number>;
+  loginLockoutsByEmail: Record<string, number | null>;
 
   // ── Active security settings (NOT persisted — loaded from Supabase on sign-in) ──
   biometricEnabled:         boolean;
@@ -72,8 +72,9 @@ interface AppState {
   setPinEnabled:               (enabled: boolean) => void;
   setAutoLockDuration:         (duration: AutoLockDuration) => void;
   setScreenshotPrivacyEnabled: (enabled: boolean) => void;
-  recordLoginFailure:          () => void;
-  clearLoginAttempts:          () => void;
+  recordLoginFailure:          (email: string) => void;
+  clearLoginAttempts:          (email: string) => void;
+  sweepExpiredLockouts:        () => void;
   addPendingMilestones:        (milestones: PendingMilestone[]) => void;
   shiftPendingMilestone:       () => void;
   setHealthScoreMode:          (mode: ScoreMode) => void;
@@ -99,8 +100,8 @@ export const useAppStore = create<AppState>()(
       alert100Enabled:        true,
       weeklySummaryEnabled:   false,
       categoryAlertOverrides: {},
-      loginAttempts:          0,
-      loginLockoutUntil:    null,
+      loginAttemptsByEmail: {},
+      loginLockoutsByEmail: {},
       ...DEFAULT_SECURITY,
       healthScoreMode:      'balanced' as ScoreMode,
       isBiometricUnlocked:  false,
@@ -123,16 +124,37 @@ export const useAppStore = create<AppState>()(
       setScreenshotPrivacyEnabled: (screenshotPrivacyEnabled) => set({ screenshotPrivacyEnabled }),
 
       // ── Auth rate limiting ───────────────────────────────────────────
-      recordLoginFailure: () => set((s) => {
-        const next = s.loginAttempts + 1;
+      recordLoginFailure: (email) => set((s) => {
+        const key             = email.toLowerCase().trim();
+        const existingLockout = s.loginLockoutsByEmail[key] ?? null;
+        const lockoutExpired  = existingLockout !== null && Date.now() >= existingLockout;
+        const currentAttempts = lockoutExpired ? 0 : (s.loginAttemptsByEmail[key] ?? 0);
+        const next            = currentAttempts + 1;
+        const newLockout      = next >= MAX_LOGIN_ATTEMPTS
+          ? Date.now() + LOCKOUT_DURATION_MS
+          : (lockoutExpired ? null : existingLockout);
         return {
-          loginAttempts:     next,
-          loginLockoutUntil: next >= MAX_LOGIN_ATTEMPTS
-            ? Date.now() + LOCKOUT_DURATION_MS
-            : s.loginLockoutUntil,
+          loginAttemptsByEmail: { ...s.loginAttemptsByEmail, [key]: next },
+          loginLockoutsByEmail: { ...s.loginLockoutsByEmail, [key]: newLockout },
         };
       }),
-      clearLoginAttempts: () => set({ loginAttempts: 0, loginLockoutUntil: null }),
+      clearLoginAttempts: (email) => set((s) => {
+        const key = email.toLowerCase().trim();
+        const { [key]: _a, ...restAttempts } = s.loginAttemptsByEmail;
+        const { [key]: _l, ...restLockouts } = s.loginLockoutsByEmail;
+        return { loginAttemptsByEmail: restAttempts, loginLockoutsByEmail: restLockouts };
+      }),
+      sweepExpiredLockouts: () => set((s) => {
+        const now = Date.now();
+        const filteredAttempts: Record<string, number>        = {};
+        const filteredLockouts: Record<string, number | null> = {};
+        for (const [key, lockout] of Object.entries(s.loginLockoutsByEmail)) {
+          if (lockout !== null && now >= lockout) continue;
+          filteredAttempts[key] = s.loginAttemptsByEmail[key] ?? 0;
+          filteredLockouts[key] = lockout;
+        }
+        return { loginAttemptsByEmail: filteredAttempts, loginLockoutsByEmail: filteredLockouts };
+      }),
 
       // ── Milestone celebrations ───────────────────────────────────────
       addPendingMilestones: (milestones) => set((s) => ({
@@ -185,8 +207,8 @@ export const useAppStore = create<AppState>()(
         alert100Enabled:        state.alert100Enabled,
         weeklySummaryEnabled:   state.weeklySummaryEnabled,
         categoryAlertOverrides: state.categoryAlertOverrides,
-        loginAttempts:        state.loginAttempts,
-        loginLockoutUntil:    state.loginLockoutUntil,
+        loginAttemptsByEmail: state.loginAttemptsByEmail,
+        loginLockoutsByEmail: state.loginLockoutsByEmail,
       }),
     },
   ),

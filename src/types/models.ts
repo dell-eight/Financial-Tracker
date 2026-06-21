@@ -125,3 +125,16 @@ export interface AuthResponse {
   user: User;
   token: string;
 }
+
+export type NotificationType = 'budget_warning' | 'budget_over';
+
+export interface AppNotification {
+  id:         string;
+  type:       NotificationType;
+  title:      string;
+  body:       string;
+  data:       Record<string, unknown> | null;
+  dedupeKey:  string | null;
+  readAt:     string | null;   // ISO timestamptz, null = unread
+  createdAt:  string;
+}

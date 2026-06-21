@@ -69,7 +69,7 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 const stepStyles = StyleSheet.create({
   row:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
   dot:  {},
-  line: { flex: 1, height: 2, borderRadius: 1 },
+  line: { width: 24, height: 2, borderRadius: 1 },
 });
 
 // ─── CategoryRow ──────────────────────────────────────────────────────────────

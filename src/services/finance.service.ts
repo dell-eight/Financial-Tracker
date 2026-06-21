@@ -214,6 +214,21 @@ const MILESTONE_DEFS = [
 export async function upsertMonthlySnapshot(): Promise<void> {
   const userId = await uid();
 
+  const now          = new Date();
+  const snapshotDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+
+  // Skip if a snapshot already exists for this month. The DB-level ON CONFLICT
+  // DO NOTHING is the safety net, but this guard avoids the expensive asset/debt
+  // queries on every dashboard load once the month is covered.
+  const { data: existing } = await supabase
+    .from('net_worth_snapshots')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('snapshot_date', snapshotDate)
+    .maybeSingle();
+
+  if (existing) return;
+
   const [bankRes, holdingRes, goalRes, debtRes] = await Promise.all([
     supabase.from('asset_accounts').select('balance, asset_type').eq('user_id', userId).is('deleted_at', null),
     supabase.from('investment_holdings').select('shares, current_price').eq('user_id', userId).is('deleted_at', null),
@@ -243,9 +258,6 @@ export async function upsertMonthlySnapshot(): Promise<void> {
   const totalDebts  = debtRows.reduce((s, d) => s + Number(d.balance ?? 0), 0);
   const netWorth    = totalAssets - totalDebts;
 
-  const now           = new Date();
-  const snapshotDate  = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-
   await supabase.rpc('upsert_net_worth_snapshot', {
     p_user_id:       userId,
     p_snapshot_date: snapshotDate,
@@ -256,6 +268,7 @@ export async function upsertMonthlySnapshot(): Promise<void> {
     p_investments:   investments,
     p_real_estate:   realEstate,
     p_other_assets:  otherAssets,
+    p_captured_at:   now.toISOString(),
   });
 }
 
@@ -1512,10 +1525,17 @@ export async function getNetWorthHistory(months = 12): Promise<NWPoint[]> {
     supabase.from('debt_accounts').select('balance').eq('user_id', userId).is('deleted_at', null),
   ]);
 
-  const snapshots = (snapRes.data as RawNWRow[] ?? []).map((r: RawNWRow) => ({
-    label: monthLabel(r.snapshot_date),
-    nw:    Number(r.net_worth ?? 0),
-  }));
+  // Exclude the current month's snapshot — "Now" (appended below) already
+  // represents the current live state, so keeping the current-month snapshot
+  // would make the last two entries nearly identical and collapse the MoM delta to ~0%.
+  const today = new Date();
+  const currentMonthPrefix = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const snapshots = (snapRes.data as RawNWRow[] ?? [])
+    .filter((r: RawNWRow) => !r.snapshot_date.startsWith(currentMonthPrefix))
+    .map((r: RawNWRow) => ({
+      label: monthLabel(r.snapshot_date),
+      nw:    Number(r.net_worth ?? 0),
+    }));
 
   // Compute live net worth to append as the "Now" point
   const bankTotal      = (bankRes.data    as RawBalanceRow[]     ?? []).reduce((s, a) => s + Number(a.balance ?? 0), 0);

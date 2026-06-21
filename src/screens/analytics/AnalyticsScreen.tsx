@@ -42,9 +42,8 @@ const _CURRENT_MONTH = new Date().toISOString().substring(0, 7);
 const LINE_H = 200;
 const BAR_H  = 200;
 
-// Minimum px per data point — drives horizontal scroll width when there are many points
-const MIN_BAR_PT_W  = 52;
-const MIN_LINE_PT_W = 38;
+// Minimum px per data point — drives horizontal scroll width for bar charts with many points
+const MIN_BAR_PT_W = 52;
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -360,6 +359,7 @@ function SavingsCard({
 // ─── BudgetPerformanceCard ──────────────────────────────────────────────────────
 
 interface BudgetPerfItem {
+  id:    string;
   key:   CategoryKey;
   label: string;
   color: string;
@@ -396,7 +396,7 @@ function BudgetPerformanceCard({ data }: { data: BudgetPerfItem[] }) {
             : colors.accent.primary;
 
         return (
-          <View key={item.key} style={{ marginBottom: i < data.length - 1 ? spacing[4] : 0 }}>
+          <View key={item.id} style={{ marginBottom: i < data.length - 1 ? spacing[4] : 0 }}>
             {/* Label row */}
             <View
               style={{
@@ -527,6 +527,7 @@ export function AnalyticsScreen({ navigation }: Props) {
 
   const budgetPerfData = useMemo<BudgetPerfItem[]>(() => {
     return (budgets ?? []).map(b => ({
+      id:    b.id,
       key:   b.category,
       label: b.label.split(' ')[0],
       color: b.color,
@@ -868,13 +869,9 @@ export function AnalyticsScreen({ navigation }: Props) {
               : 'Monthly expense trend'
             }
             minHeight={LINE_H + 80}
-            scrollable
             chartHeight={LINE_H}
           >
-            {(w) => {
-              const effectiveW = Math.max(w, lineData.length * MIN_LINE_PT_W);
-              return <SpendingLineChart data={lineData} chartW={effectiveW} animDelay={200} />;
-            }}
+            {(w) => <SpendingLineChart data={lineData} chartW={w} animDelay={200} />}
           </ChartCard>
         </Animated.View>
 
