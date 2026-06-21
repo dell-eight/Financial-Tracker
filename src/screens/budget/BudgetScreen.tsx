@@ -922,14 +922,26 @@ export function BudgetScreen({ navigation }: Props) {
             </Pressable>
             <Pressable
               onPress={() => navigation.push('BudgetSetupWizard')}
-              style={[screenStyles.addBtn, { backgroundColor: colors.accent.primary, borderRadius: borderRadius.button }]}
+              style={({ pressed }) => [
+                screenStyles.addBtn,
+                {
+                  backgroundColor: pressed ? colors.accent.primary : colors.accent.muted,
+                  borderRadius:    borderRadius.full,
+                  borderWidth:     1.5,
+                  borderColor:     colors.accent.primary,
+                },
+              ]}
               accessibilityRole="button"
-              accessibilityLabel="Set up budget"
+              accessibilityLabel="Edit budgets"
             >
-              <Text style={{ fontSize: 18, fontFamily: fontFamily.bold, color: '#FFFFFF', lineHeight: 22 }}>+</Text>
-              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: '#FFFFFF', marginLeft: 4 }}>
-                Edit
-              </Text>
+              {({ pressed }) => (
+                <>
+                  <Text style={{ fontSize: 12, color: pressed ? '#FFFFFF' : colors.accent.primary, lineHeight: 16 }}>✎</Text>
+                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: pressed ? '#FFFFFF' : colors.accent.primary, marginLeft: 5 }}>
+                    Edit Budgets
+                  </Text>
+                </>
+              )}
             </Pressable>
           </View>
         </Animated.View>
