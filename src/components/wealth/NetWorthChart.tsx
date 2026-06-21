@@ -20,6 +20,7 @@ import Animated, {
 import type { NWPoint } from '../../services/finance.service';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useCurrency } from '../../utils/currency';
+import { niceTicks } from '../../utils/chartUtils';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 const AnimatedPath   = Animated.createAnimatedComponent(Path);
@@ -27,8 +28,8 @@ const AnimatedPath   = Animated.createAnimatedComponent(Path);
 const Y_LABEL_W = 48;
 const X_LABEL_H = 22;
 const Y_PAD     = 12;
-const R_PAD     = 10;
-const CHART_H   = 160;
+const R_PAD     = 24;
+const CHART_H   = 220;
 
 // Smooth cubic bezier path through points
 function smoothPath(pts: { x: number; y: number }[]): string {
@@ -52,6 +53,7 @@ function closedFillPath(pts: { x: number; y: number }[], plotH: number): string 
   const first = pts[0];
   return `${linePath} L ${last.x.toFixed(2)},${plotH.toFixed(2)} L ${first.x.toFixed(2)},${plotH.toFixed(2)} Z`;
 }
+
 
 interface Props {
   data:    NWPoint[];
@@ -88,21 +90,24 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
 
   if (data.length < 2) return null;
 
-  const values  = data.map(d => d.nw);
-  const minVal  = Math.min(...values);
-  const maxVal  = Math.max(...values);
-  const range   = maxVal - minVal || 1;
+  const values    = data.map(d => d.nw);
+  const minVal    = Math.min(...values);
+  const maxVal    = Math.max(...values);
+  const yTicks    = niceTicks(minVal, maxVal);
+  const axisMin   = yTicks[0];
+  const axisMax   = yTicks[yTicks.length - 1];
+  const axisRange = axisMax - axisMin;
 
   const pts = data.map((d, i) => ({
-    x: Y_LABEL_W + (i / (data.length - 1)) * plotW,
-    y: Y_PAD + ((1 - (d.nw - minVal) / range) * (plotH - Y_PAD)),
+    x: data.length === 1
+      ? Y_LABEL_W + plotW / 2
+      : Y_LABEL_W + (i / (data.length - 1)) * plotW,
+    y: Y_PAD + ((1 - (d.nw - axisMin) / axisRange) * (plotH - Y_PAD)),
   }));
 
   const linePath = smoothPath(pts);
   const fillPath = closedFillPath(pts, plotH);
 
-  // Measure path length for stroke-dash animation
-  // We estimate: use a fixed large value; stroke-dashoffset animates from total to 0
   const ESTIMATED_LEN = width * 3;
 
   const animPathProps = useAnimatedProps(() => ({
@@ -113,14 +118,12 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
   const livePt   = liveIdx >= 0 ? pts[liveIdx] : null;
 
   const liveDotProps = useAnimatedProps(() => ({
-    r: 4 * pulseScale.value,
+    r: 6 * pulseScale.value,
     opacity: 0.3 + 0.7 * (1 - (pulseScale.value - 1) / 0.5),
   }));
 
   // X-axis labels — show every other when many points
   const labelStep = data.length > 7 ? 2 : 1;
-  // Y-axis ticks
-  const yTicks = [minVal, minVal + range / 2, maxVal];
 
   const accentColor  = colors.accent.primary;
   const textColor    = colors.text.muted;
@@ -138,7 +141,7 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
 
         {/* Y-axis grid lines + labels */}
         {yTicks.map((v, i) => {
-          const y = Y_PAD + ((1 - (v - minVal) / range) * (plotH - Y_PAD));
+          const y = Y_PAD + ((1 - (v - axisMin) / axisRange) * (plotH - Y_PAD));
           return (
             <React.Fragment key={i}>
               <SvgLine
@@ -173,11 +176,11 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
         {pts.map((pt, i) => {
           if (data[i].isLive) return null;
           return (
-            <Circle key={i} cx={pt.x} cy={pt.y} r={3} fill={accentColor} />
+            <Circle key={i} cx={pt.x} cy={pt.y} r={4} fill={accentColor} />
           );
         })}
 
-        {/* Live "Now" pulsing dot */}
+        {/* Live "Now" pulsing dot — larger to visually dominate */}
         {livePt && (
           <>
             <AnimatedCircle
@@ -185,7 +188,7 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
               fill={accentColor}
               animatedProps={liveDotProps}
             />
-            <Circle cx={livePt.x} cy={livePt.y} r={3} fill={accentColor} />
+            <Circle cx={livePt.x} cy={livePt.y} r={6} fill={accentColor} />
           </>
         )}
 

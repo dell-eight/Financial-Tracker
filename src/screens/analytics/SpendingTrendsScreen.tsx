@@ -20,6 +20,7 @@ import { useTransactions } from '../../hooks/queries/useTransactions';
 import { useMonthlyHistory, useWeeklyHistory } from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
+import { spendingTicks } from '../../utils/chartUtils';
 
 type Props   = StackScreenProps<AnalyticsStackParamList, 'SpendingTrends'>;
 type Period  = 'weekly' | 'monthly' | 'yearly';
@@ -54,9 +55,8 @@ function SpendingChart({ data, color, width }: { data: { label: string; value: n
   const plotH = CHART_H - X_H - Y_PAD;
 
   const maxVal = Math.max(...data.map(d => d.value), 1);
-  const yTicks = 4;
-  const yStep  = Math.ceil(maxVal / yTicks / 100) * 100;
-  const yMax   = yStep * yTicks;
+  const ticks  = spendingTicks(maxVal);
+  const yMax   = ticks[ticks.length - 1];
 
   const pts = data.map((d, i) => ({
     x: (i / Math.max(data.length - 1, 1)) * plotW,
@@ -80,8 +80,7 @@ function SpendingChart({ data, color, width }: { data: { label: string; value: n
 
   return (
     <View style={{ width: W, height: CHART_H }}>
-      {[0, 1, 2, 3, 4].map(i => {
-        const v = i * yStep;
+      {ticks.map((v, i) => {
         const y = Y_PAD + (1 - v / yMax) * plotH;
         return (
           <Text key={i} style={{ position: 'absolute', left: 0, top: y - 7, width: Y_W - 4, textAlign: 'right', fontSize: 9, fontFamily: fontFamily.regular, color: colors.chart.axisLabel }}>
@@ -97,8 +96,8 @@ function SpendingChart({ data, color, width }: { data: { label: string; value: n
               <Stop offset="1" stopColor={color} stopOpacity="0" />
             </SvgGradient>
           </Defs>
-          {[0, 1, 2, 3, 4].map(i => {
-            const y = Y_PAD + (1 - (i * yStep) / yMax) * plotH;
+          {ticks.map((v, i) => {
+            const y = Y_PAD + (1 - v / yMax) * plotH;
             return <SvgLine key={i} x1={0} y1={y} x2={plotW} y2={y} stroke={colors.chart.gridLine} strokeWidth={1} strokeDasharray={i > 0 ? '4 4' : undefined} opacity={0.5} />;
           })}
           <Path d={fillPath} fill="url(#spendGrad)" />
@@ -109,11 +108,18 @@ function SpendingChart({ data, color, width }: { data: { label: string; value: n
         </Svg>
       </Animated.View>
       <View style={{ position: 'absolute', left: Y_W, bottom: 0, width: plotW, height: X_H, flexDirection: 'row' }}>
-        {data.map((d, i) => (
-          <View key={i} style={{ position: 'absolute', left: (i / Math.max(data.length - 1, 1)) * plotW - 16, width: 32, alignItems: 'center' }}>
-            <Text style={{ fontSize: 9, fontFamily: fontFamily.regular, color: colors.chart.axisLabel }}>{d.label}</Text>
-          </View>
-        ))}
+        {data.map((d, i) => {
+          const xPos = (i / Math.max(data.length - 1, 1)) * plotW;
+          const isFirst = i === 0;
+          const isLast  = i === data.length - 1;
+          const left    = isFirst ? 0 : isLast ? plotW - 32 : xPos - 16;
+          const align   = isFirst ? 'flex-start' : isLast ? 'flex-end' : 'center';
+          return (
+            <View key={i} style={{ position: 'absolute', left, width: 32, alignItems: align }}>
+              <Text style={{ fontSize: 9, fontFamily: fontFamily.regular, color: colors.chart.axisLabel }}>{d.label}</Text>
+            </View>
+          );
+        })}
       </View>
     </View>
   );
@@ -275,13 +281,11 @@ export function SpendingTrendsScreen({ navigation }: Props) {
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: spacing[3] }}>
               {period === 'weekly' ? 'Daily Expenses' : period === 'yearly' ? 'Quarterly Expenses' : '6-Month Trend'}
             </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <SpendingChart
-                data={chartData}
-                color={colors.expense}
-                width={Math.max(SCREEN_W - 40, chartData.length * 40)}
-              />
-            </ScrollView>
+            <SpendingChart
+              data={chartData}
+              color={colors.expense}
+              width={SCREEN_W - 40}
+            />
           </View>
         </Animated.View>
 

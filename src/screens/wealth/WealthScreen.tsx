@@ -87,12 +87,13 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
   const screenW  = Dimensions.get('window').width;
   const chartW   = screenW - CHART_SIDE_PAD * 2;
 
-  // Month-over-month delta (last two non-live points)
+  // Month-over-month delta: live "Now" vs the most recent monthly snapshot
   const { deltaAmt, deltaPct } = useMemo(() => {
     const snaps = (nwHist ?? []).filter(p => !p.isLive);
-    if (snaps.length < 2) return { deltaAmt: 0, deltaPct: 0 };
-    const curr = snaps[snaps.length - 1].nw;
-    const prev = snaps[snaps.length - 2].nw;
+    const live  = (nwHist ?? []).find(p => p.isLive);
+    if (snaps.length < 1 || !live) return { deltaAmt: 0, deltaPct: 0 };
+    const curr = live.nw;
+    const prev = snaps[snaps.length - 1].nw;
     const amt  = curr - prev;
     const pct  = prev !== 0 ? (amt / Math.abs(prev)) * 100 : 0;
     return { deltaAmt: amt, deltaPct: pct };
@@ -153,7 +154,7 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
         </Text>
         {deltaAmt !== 0 && (
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: deltaAmt >= 0 ? colors.income : colors.expense, marginTop: spacing[1] }}>
-            {deltaAmt >= 0 ? '↑' : '↓'} {fmtShort(Math.abs(deltaAmt))} ({deltaAmt >= 0 ? '+' : ''}{deltaPct.toFixed(1)}%) vs last month
+            {deltaAmt >= 0 ? '↑' : '↓'} {fmt(Math.abs(deltaAmt))} ({deltaAmt >= 0 ? '+' : ''}{deltaPct.toFixed(2)}%) vs last month
           </Text>
         )}
 
@@ -233,9 +234,9 @@ function NetWorthOverview({ navigation }: { navigation: Props['navigation'] }) {
         </View>
 
         {hasTimeline ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: CHART_SIDE_PAD }}>
-            <NetWorthChart data={nwHist ?? []} width={Math.max(chartW, (nwHist ?? []).length * 28)} />
-          </ScrollView>
+          <View style={{ paddingHorizontal: CHART_SIDE_PAD }}>
+            <NetWorthChart data={nwHist ?? []} width={chartW} />
+          </View>
         ) : (
           <View style={{ paddingVertical: spacing[6], alignItems: 'center', paddingHorizontal: spacing[5] }}>
             <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.semiBold, color: colors.text.primary, textAlign: 'center' }}>

@@ -20,6 +20,7 @@ import { useAssets, useDebts } from '../../hooks/queries/useNetWorth';
 import { useNetWorthHistory }  from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
+import { niceTicks } from '../../utils/chartUtils';
 
 type Props = StackScreenProps<AnalyticsStackParamList, 'NetWorthGrowth'>;
 
@@ -47,12 +48,15 @@ function NWChart({ data, width }: { data: { label: string; nw: number }[]; width
   const plotW = W - Y_W;
   const plotH = CHART_H - X_H - Y_PAD;
 
-  const allVals = data.map(d => d.nw);
-  const minV    = allVals.length > 0 ? Math.min(...allVals) * 0.97 : 0;
-  const maxV    = allVals.length > 0 ? Math.max(...allVals) * 1.02 : 1;
-  const range   = maxV - minV || 1;
+  const allVals  = data.map(d => d.nw);
+  const dataMin  = allVals.length > 0 ? Math.min(...allVals) : 0;
+  const dataMax  = allVals.length > 0 ? Math.max(...allVals) : 1;
+  const ticks    = niceTicks(dataMin, dataMax);
+  const axisMin  = ticks[0];
+  const axisMax  = ticks[ticks.length - 1];
+  const axisRange = axisMax - axisMin || 1;
 
-  const toY = (v: number) => Y_PAD + (1 - (v - minV) / range) * plotH;
+  const toY = (v: number) => Y_PAD + (1 - (v - axisMin) / axisRange) * plotH;
 
   const nwPts  = data.map((d, i) => ({ x: (i / Math.max(data.length - 1, 1)) * plotW, y: toY(d.nw) }));
   const hasPts = nwPts.length >= 2;
@@ -61,9 +65,6 @@ function NWChart({ data, width }: { data: { label: string; nw: number }[]; width
   const nwFill = hasPts
     ? nwLine + ` L${last.x.toFixed(1)},${(Y_PAD + plotH).toFixed(1)} L0,${(Y_PAD + plotH).toFixed(1)}Z`
     : '';
-
-  const tickStep = Math.ceil((maxV - minV) / 4 / 10000) * 10000;
-  const ticks    = [0, 1, 2, 3, 4].map(i => minV + i * tickStep);
 
   const reveal = useSharedValue(0);
   useEffect(() => {
@@ -104,9 +105,13 @@ function NWChart({ data, width }: { data: { label: string; nw: number }[]; width
       <View style={{ position: 'absolute', left: Y_W, bottom: 0, width: plotW, height: X_H }}>
         {data.filter((_, i) => i % 2 === 0 || i === data.length - 1).map(d => {
           const origIdx = data.indexOf(d);
-          const x = (origIdx / (data.length - 1)) * plotW;
+          const x       = (origIdx / Math.max(data.length - 1, 1)) * plotW;
+          const isFirst = origIdx === 0;
+          const isLast  = origIdx === data.length - 1;
+          const left    = isFirst ? 0 : isLast ? plotW - 24 : x - 12;
+          const align   = isFirst ? 'flex-start' : isLast ? 'flex-end' : 'center';
           return (
-            <View key={origIdx} style={{ position: 'absolute', left: x - 12, width: 24, alignItems: 'center' }}>
+            <View key={origIdx} style={{ position: 'absolute', left, width: 24, alignItems: align }}>
               <Text style={{ fontSize: 9, fontFamily: fontFamily.regular, color: colors.chart.axisLabel }}>{d.label}</Text>
             </View>
           );

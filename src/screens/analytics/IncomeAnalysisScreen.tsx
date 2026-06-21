@@ -20,6 +20,7 @@ import { useTransactions } from '../../hooks/queries/useTransactions';
 import { useMonthlyHistory, useIncomeStreams } from '../../hooks/queries/useAnalytics';
 import type { AnalyticsStackParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
+import { spendingTicks } from '../../utils/chartUtils';
 
 type Props = StackScreenProps<AnalyticsStackParamList, 'IncomeAnalysis'>;
 
@@ -47,12 +48,12 @@ function IncomeLineChart({ data, color, width }: { data: { label: string; value:
   const plotW = W - Y_W;
   const plotH = CHART_H - X_H - Y_PAD;
 
-  const maxV  = Math.max(...data.map(d => d.value), 1);
-  const yStep = Math.ceil(maxV / 4 / 500) * 500;
-  const yMax  = yStep * 4;
+  const maxV   = Math.max(...data.map(d => d.value), 1);
+  const yTicks = spendingTicks(maxV);
+  const yMax   = yTicks[yTicks.length - 1];
 
   const pts = data.map((d, i) => ({
-    x: (i / (data.length - 1)) * plotW,
+    x: (i / Math.max(data.length - 1, 1)) * plotW,
     y: Y_PAD + (1 - d.value / yMax) * plotH,
     label: d.label,
   }));
@@ -73,8 +74,7 @@ function IncomeLineChart({ data, color, width }: { data: { label: string; value:
 
   return (
     <View style={{ width: W, height: CHART_H }}>
-      {[0, 1, 2, 3, 4].map(i => {
-        const v = i * yStep;
+      {yTicks.map((v, i) => {
         const y = Y_PAD + (1 - v / yMax) * plotH;
         return <Text key={i} style={{ position: 'absolute', left: 0, top: y - 7, width: Y_W - 4, textAlign: 'right', fontSize: 9, fontFamily: fontFamily.regular, color: colors.chart.axisLabel }}>{fmtK(v)}</Text>;
       })}
@@ -86,8 +86,8 @@ function IncomeLineChart({ data, color, width }: { data: { label: string; value:
               <Stop offset="1" stopColor={color} stopOpacity="0" />
             </SvgGradient>
           </Defs>
-          {[0, 1, 2, 3, 4].map(i => {
-            const y = Y_PAD + (1 - (i * yStep) / yMax) * plotH;
+          {yTicks.map((v, i) => {
+            const y = Y_PAD + (1 - v / yMax) * plotH;
             return <SvgLine key={i} x1={0} y1={y} x2={plotW} y2={y} stroke={colors.chart.gridLine} strokeWidth={1} strokeDasharray={i > 0 ? '4 4' : undefined} opacity={0.5} />;
           })}
           <Path d={fill} fill="url(#incGrad)" />
@@ -96,11 +96,18 @@ function IncomeLineChart({ data, color, width }: { data: { label: string; value:
         </Svg>
       </Animated.View>
       <View style={{ position: 'absolute', left: Y_W, bottom: 0, width: plotW, height: X_H }}>
-        {data.map((d, i) => (
-          <View key={i} style={{ position: 'absolute', left: (i / (data.length - 1)) * plotW - 16, width: 32, alignItems: 'center' }}>
-            <Text style={{ fontSize: 9, fontFamily: fontFamily.regular, color: colors.chart.axisLabel }}>{d.label}</Text>
-          </View>
-        ))}
+        {data.map((d, i) => {
+          const x       = (i / Math.max(data.length - 1, 1)) * plotW;
+          const isFirst = i === 0;
+          const isLast  = i === data.length - 1;
+          const left    = isFirst ? 0 : isLast ? plotW - 32 : x - 16;
+          const align   = isFirst ? 'flex-start' : isLast ? 'flex-end' : 'center';
+          return (
+            <View key={i} style={{ position: 'absolute', left, width: 32, alignItems: align }}>
+              <Text style={{ fontSize: 9, fontFamily: fontFamily.regular, color: colors.chart.axisLabel }}>{d.label}</Text>
+            </View>
+          );
+        })}
       </View>
     </View>
   );

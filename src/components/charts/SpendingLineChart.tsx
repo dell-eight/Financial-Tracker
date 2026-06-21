@@ -17,6 +17,7 @@ import Svg, {
 } from 'react-native-svg';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useCurrency } from '../../utils/currency';
+import { spendingTicks } from '../../utils/chartUtils';
 
 export interface LinePoint { label: string; value: number }
 
@@ -54,10 +55,8 @@ export function SpendingLineChart({
   const PLOT_H = chartH - X_LABEL_H - Y_PAD;
 
   const rawMax  = Math.max(...data.map(d => d.value), 100);
-  const Y_TICKS = 4;
-  const yStep   = Math.ceil(rawMax / Y_TICKS / 100) * 100;
-  const yMax    = yStep * Y_TICKS;
-  const yLabels = Array.from({ length: Y_TICKS + 1 }, (_, i) => i * yStep);
+  const yLabels = spendingTicks(rawMax);
+  const yMax    = yLabels[yLabels.length - 1];
 
   const pts = data.map((d, i) => ({
     x: (i / Math.max(data.length - 1, 1)) * PLOT_W,
@@ -146,9 +145,13 @@ export function SpendingLineChart({
         }}
       >
         {data.map((d, i) => {
-          const x = (i / Math.max(data.length - 1, 1)) * PLOT_W;
+          const x       = (i / Math.max(data.length - 1, 1)) * PLOT_W;
+          const isFirst = i === 0;
+          const isLast  = i === data.length - 1;
+          const left    = isFirst ? 0 : isLast ? PLOT_W - 40 : x - 20;
+          const align   = isFirst ? 'flex-start' : isLast ? 'flex-end' : 'center';
           return (
-            <View key={i} style={{ position: 'absolute', left: x - 20, width: 40, alignItems: 'center' }}>
+            <View key={i} style={{ position: 'absolute', left, width: 40, alignItems: align }}>
               <Text style={{ fontSize: 10, fontFamily: FF.regular, color: colors.chart.axisLabel, textAlign: 'center' }}>
                 {d.label}
               </Text>
