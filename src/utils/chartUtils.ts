@@ -22,6 +22,9 @@ export function niceTicks(dataMin: number, dataMax: number): number[] {
   for (let v = start; ticks.length < MAX_TICKS && v <= hi + niceStep * 0.01; v += niceStep) {
     ticks.push(Math.round(v));
   }
+  if (ticks.length > 0 && ticks[ticks.length - 1] < dataMax) {
+    ticks.push(Math.round(ticks[ticks.length - 1] + niceStep));
+  }
   return ticks;
 }
 
@@ -37,9 +40,15 @@ export function spendingTicks(dataMax: number): number[] {
   const niceStep = [1, 2, 2.5, 5, 10]
     .map(m => m * mag)
     .find(s => s >= rawStep) ?? mag * 10;
+  // Round to the same order of magnitude as niceStep — avoids collapsing all ticks to 0
+  // when dealing with small daily amounts (e.g. weekly view with ₱200–₱2000 per day).
+  const roundTo  = Math.max(1, Math.pow(10, Math.floor(Math.log10(niceStep))));
   const ticks: number[] = [];
   for (let i = 0; ticks.length < MAX_TICKS && i * niceStep <= dataMax + niceStep * 0.5; i++) {
-    ticks.push(Math.round(i * niceStep / 1000) * 1000);
+    ticks.push(Math.round(i * niceStep / roundTo) * roundTo);
+  }
+  if (ticks.length > 0 && ticks[ticks.length - 1] < dataMax) {
+    ticks.push(Math.round(ticks.length * niceStep / roundTo) * roundTo);
   }
   return ticks;
 }
