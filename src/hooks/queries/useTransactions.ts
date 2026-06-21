@@ -3,10 +3,11 @@ import { getTransactions } from '../../services/finance.service';
 
 export const TRANSACTIONS_KEY = ['transactions'] as const;
 
-export function useTransactions() {
+export function useTransactions(from?: string, to?: string) {
+  const hasRange = !!from && !!to;
   return useQuery({
-    queryKey: TRANSACTIONS_KEY,
-    queryFn:  getTransactions,
-    staleTime: 30_000,
+    queryKey:  hasRange ? ['transactions', from, to] : TRANSACTIONS_KEY,
+    queryFn:   () => getTransactions(hasRange ? { from, to } : undefined),
+    staleTime: hasRange ? 5 * 60_000 : 30_000,
   });
 }

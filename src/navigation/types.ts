@@ -2,12 +2,13 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 
 // ── Shared filter state (passed between TransactionList ↔ FilterSheet) ─────────
 export type FilterState = {
-  type?:      'all' | 'income' | 'expense' | 'transfer';
-  period?:    'week' | 'month' | 'year';
-  minAmount?: number;
-  maxAmount?: number;
+  type?:        'all' | 'income' | 'expense' | 'transfer';
+  period?:      'week' | 'month' | 'year';
+  minAmount?:   number;
+  maxAmount?:   number;
   accountId?:   string;
   accountName?: string;
+  selectedDate?: string;  // YYYY-MM-DD, local timezone — anchor for week/month/year range
 };
 
 // ── Auth stack ─────────────────────────────────────────────────────────────────

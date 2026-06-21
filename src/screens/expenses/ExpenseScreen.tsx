@@ -2,12 +2,14 @@
 import {
   View,
   Text,
+  FlatList,
   ScrollView,
   Pressable,
   TextInput,
   StyleSheet,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,6 +24,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import type { StackScreenProps } from '@react-navigation/stack';
 
+import * as Haptics from 'expo-haptics';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme }        from '../../hooks/ui/useTheme';
 import { useTransactions } from '../../hooks/queries/useTransactions';
 import { ExpenseItem, SectionHeader } from '../../components';
@@ -53,14 +57,21 @@ interface Transaction {
 type Period     = 'week' | 'month' | 'year';
 type TypeFilter = 'all' | 'income' | 'expense' | 'transfer';
 
-// ─── Dynamic date constants ───────────────────────────────────────────────────
+// ─── Timezone-safe local date formatter ──────────────────────────────────────
+
+function localDateString(d: Date): string {
+  const y  = d.getFullYear();
+  const m  = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+// ─── Dynamic date constants (for Today/Yesterday labels only) ─────────────────
 
 const _now      = new Date();
-const TODAY     = _now.toISOString().split('T')[0];
+const TODAY     = localDateString(_now);
 const _yd       = new Date(_now); _yd.setDate(_yd.getDate() - 1);
-const YESTERDAY = _yd.toISOString().split('T')[0];
-const _ws       = new Date(_now); _ws.setDate(_ws.getDate() - 6);
-const WEEK_START = _ws.toISOString().split('T')[0];
+const YESTERDAY = localDateString(_yd);
 
 // ─── Category chip definitions ────────────────────────────────────────────────
 
@@ -82,10 +93,81 @@ const CATEGORY_CHIPS: ChipDef[] = [
   { key: 'other',        label: 'Other',          icon: '💰' },
 ];
 
-function isInPeriod(date: string, period: Period): boolean {
-  if (period === 'week')  return date >= WEEK_START && date <= TODAY;
-  if (period === 'month') return date.startsWith(TODAY.substring(0, 7));
-  return date.startsWith(TODAY.substring(0, 4));
+function isInPeriod(date: string, period: Period, anchor: Date): boolean {
+  if (period === 'week') {
+    const day = anchor.getDay();                       // 0=Sun … 6=Sat
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    const mon = new Date(anchor); mon.setDate(anchor.getDate() + diffToMon);
+    const sun = new Date(mon);   sun.setDate(mon.getDate() + 6);
+    return date >= localDateString(mon) && date <= localDateString(sun);
+  }
+  if (period === 'month') {
+    const ym = `${anchor.getFullYear()}-${String(anchor.getMonth() + 1).padStart(2, '0')}`;
+    return date.startsWith(ym);
+  }
+  return date.startsWith(String(anchor.getFullYear()));
+}
+
+function periodLabel(period: Period, anchor: Date): string {
+  if (period === 'week') {
+    const day = anchor.getDay();
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    const mon = new Date(anchor); mon.setDate(anchor.getDate() + diffToMon);
+    const sun = new Date(mon);   sun.setDate(mon.getDate() + 6);
+    const fmt = (d: Date) => d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+    return `${fmt(mon)} – ${fmt(sun)}`;
+  }
+  if (period === 'month') {
+    return anchor.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+  }
+  return String(anchor.getFullYear());
+}
+
+function stepDate(period: Period, anchor: Date, dir: 'prev' | 'next'): Date {
+  const d = new Date(anchor);
+  if (period === 'week') {
+    d.setDate(anchor.getDate() + (dir === 'prev' ? -7 : 7));
+  } else if (period === 'month') {
+    d.setDate(1);
+    d.setMonth(anchor.getMonth() + (dir === 'prev' ? -1 : 1));
+  } else {
+    d.setFullYear(anchor.getFullYear() + (dir === 'prev' ? -1 : 1));
+    d.setMonth(0);
+    d.setDate(1);
+  }
+  return d;
+}
+
+function monOf(d: Date): Date {
+  const day = d.getDay();
+  const r = new Date(d);
+  r.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  return r;
+}
+
+function canStepNext(period: Period, anchor: Date): boolean {
+  const now = new Date();
+  if (period === 'week') {
+    return localDateString(monOf(stepDate('week', anchor, 'next')))
+        <= localDateString(monOf(now));
+  }
+  if (period === 'month') {
+    const next = stepDate('month', anchor, 'next');
+    return next.getFullYear() < now.getFullYear() ||
+      (next.getFullYear() === now.getFullYear() && next.getMonth() <= now.getMonth());
+  }
+  return anchor.getFullYear() + 1 <= now.getFullYear();
+}
+
+function isCurrentPeriod(period: Period, anchor: Date): boolean {
+  const now = new Date();
+  if (period === 'week') {
+    return localDateString(monOf(anchor)) === localDateString(monOf(now));
+  }
+  if (period === 'month') {
+    return anchor.getFullYear() === now.getFullYear() && anchor.getMonth() === now.getMonth();
+  }
+  return anchor.getFullYear() === now.getFullYear();
 }
 
 function formatDateLabel(date: string): string {
@@ -261,6 +343,106 @@ const ptStyles = StyleSheet.create({
   },
 });
 
+// ─── PeriodNavigator ─────────────────────────────────────────────────────────
+
+function PeriodNavigator({
+  period,
+  selectedDate,
+  onStep,
+  onPickDate,
+  onToday,
+}: {
+  period:       Period;
+  selectedDate: Date;
+  onStep:       (dir: 'prev' | 'next') => void;
+  onPickDate:   (date: Date) => void;
+  onToday:      () => void;
+}) {
+  const theme = useTheme();
+  const { colors, spacing, borderRadius, fontSize, fontFamily } = theme;
+  const [showPicker, setShowPicker] = useState(false);
+  const canNext   = canStepNext(period, selectedDate);
+  const isCurrent = isCurrentPeriod(period, selectedDate);
+
+  const arrowBtn = (enabled: boolean) => ({
+    width:           28,
+    height:          28,
+    borderRadius:    borderRadius.full,
+    backgroundColor: colors.bg.surfaceMuted,
+    alignItems:      'center'  as const,
+    justifyContent:  'center'  as const,
+    opacity:         enabled ? 1 : 0.3,
+  });
+
+  return (
+    <View style={{ marginTop: spacing[2] }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+        {/* Prev */}
+        <Pressable onPress={() => onStep('prev')} hitSlop={8} style={arrowBtn(true)}>
+          <Text style={{ color: colors.text.primary, fontSize: 14, lineHeight: 17 }}>‹</Text>
+        </Pressable>
+
+        {/* Tappable label */}
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync();
+            setShowPicker(p => !p);
+          }}
+          style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+        >
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.secondary }}>
+            {periodLabel(period, selectedDate)}
+          </Text>
+          <Text style={{ fontSize: 9, color: colors.text.muted, lineHeight: 13 }}>▼</Text>
+        </Pressable>
+
+        {/* Next */}
+        <Pressable
+          onPress={() => { if (canNext) onStep('next'); }}
+          hitSlop={8}
+          style={arrowBtn(canNext)}
+          accessibilityState={{ disabled: !canNext }}
+        >
+          <Text style={{ color: colors.text.primary, fontSize: 14, lineHeight: 17 }}>›</Text>
+        </Pressable>
+
+        {/* Today — only when not on current period */}
+        {!isCurrent && (
+          <Pressable
+            onPress={() => { onToday(); setShowPicker(false); }}
+            hitSlop={8}
+            style={{
+              paddingHorizontal: spacing[3],
+              paddingVertical:   spacing[1],
+              borderRadius:      borderRadius.full,
+              backgroundColor:   colors.accent.muted,
+            }}
+          >
+            <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.accent.primary }}>
+              Today
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Date picker — iOS inline toggle, Android modal */}
+      {showPicker && (
+        <DateTimePicker
+          value={selectedDate}
+          mode="date"
+          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          maximumDate={new Date()}
+          onChange={(_, date) => {
+            setShowPicker(false);
+            if (date) onPickDate(date);
+          }}
+          style={{ marginTop: spacing[1] }}
+        />
+      )}
+    </View>
+  );
+}
+
 // ─── SummaryCards ─────────────────────────────────────────────────────────────
 
 interface Summary { income: number; expense: number; net: number; count: number }
@@ -424,13 +606,12 @@ function CategoryBreakdown({
             onPress={() => onSelect(isActive ? 'all' : stat.key)}
             style={[
               catStyles.card,
-              shadows.sm,
               {
                 backgroundColor: isActive ? `${catColor}18` : colors.bg.surface,
                 borderRadius:    borderRadius.lg,
                 padding:         spacing[3],
                 borderWidth:     1.5,
-                borderColor:     isActive ? catColor : 'transparent',
+                borderColor:     isActive ? catColor : colors.border.subtle,
                 width:           96,
               },
             ]}
@@ -685,7 +866,7 @@ const chipStyles = StyleSheet.create({
 
 // ─── TransactionGroup ─────────────────────────────────────────────────────────
 
-function TransactionGroup({
+const TransactionGroup = React.memo(function TransactionGroup({
   dateLabel,
   items,
   dayTotal,
@@ -744,7 +925,7 @@ function TransactionGroup({
             categoryIcon={<TxIcon icon={tx.icon} />}
             amount={fmt(tx.amount)}
             type={tx.type}
-            date={tx.note ?? tx.label}
+            date={tx.note ?? ''}
             time={tx.time}
             showDivider={i < items.length - 1}
             onPress={onPressTx ? () => onPressTx(tx.id, tx.type) : undefined}
@@ -753,7 +934,7 @@ function TransactionGroup({
       </View>
     </View>
   );
-}
+});
 
 const grpStyles = StyleSheet.create({
   header: {
@@ -889,7 +1070,44 @@ export function ExpenseScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
 
-  const { data: rawTxns } = useTransactions();
+  // ── Filter state ────────────────────────────────────────────────────────────
+  const [period,       setPeriod]       = useState<Period>('month');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [searchQuery,  setSearchQuery]  = useState('');
+  const [catFilter,    setCatFilter]    = useState<'all' | CategoryKey>('all');
+  const [typeFilter,   setTypeFilter]   = useState<TypeFilter>('all');
+  const [minAmount,    setMinAmount]    = useState<number | null>(null);
+  const [maxAmount,    setMaxAmount]    = useState<number | null>(null);
+  const [accountId,    setAccountId]    = useState<string | null>(null);
+  const [accountName,  setAccountName]  = useState<string | null>(null);
+
+  const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
+  const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
+
+  // ── Date range for server-side filtering ────────────────────────────────────
+  const { from, to } = useMemo(() => {
+    if (period === 'week') {
+      const day = selectedDate.getDay();
+      const diffToMon = day === 0 ? -6 : 1 - day;
+      const mon = new Date(selectedDate);
+      mon.setDate(selectedDate.getDate() + diffToMon);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      return { from: localDateString(mon), to: localDateString(sun) };
+    }
+    if (period === 'month') {
+      const y = selectedDate.getFullYear();
+      const m = selectedDate.getMonth();
+      return {
+        from: localDateString(new Date(y, m, 1)),
+        to:   localDateString(new Date(y, m + 1, 0)),
+      };
+    }
+    const y = selectedDate.getFullYear();
+    return { from: `${y}-01-01`, to: `${y}-12-31` };
+  }, [period, selectedDate]);
+
+  const { data: rawTxns, isLoading } = useTransactions(from, to);
 
   // Map seed Transaction shape → local Transaction shape
   const allTransactions = useMemo<Transaction[]>(() => {
@@ -908,22 +1126,9 @@ export function ExpenseScreen({ navigation, route }: Props) {
     }));
   }, [rawTxns]);
 
-  // ── Filter state ────────────────────────────────────────────────────────────
-  const [period,       setPeriod]       = useState<Period>('month');
-  const [searchQuery,  setSearchQuery]  = useState('');
-  const [catFilter,    setCatFilter]    = useState<'all' | CategoryKey>('all');
-  const [typeFilter,   setTypeFilter]   = useState<TypeFilter>('all');
-  const [minAmount,    setMinAmount]    = useState<number | null>(null);
-  const [maxAmount,    setMaxAmount]    = useState<number | null>(null);
-  const [accountId,    setAccountId]    = useState<string | null>(null);
-  const [accountName,  setAccountName]  = useState<string | null>(null);
-
-  const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
-  const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
-
   // ── Filtered transactions ───────────────────────────────────────────────────
   const filtered = useMemo<Transaction[]>(() => {
-    let result = allTransactions.filter(tx => isInPeriod(tx.date, period));
+    let result = [...allTransactions]; // already date-range filtered by server
 
     if (accountId !== null) {
       result = result.filter(tx => tx.accountId === accountId);
@@ -945,7 +1150,7 @@ export function ExpenseScreen({ navigation, route }: Props) {
     if (minAmount !== null) result = result.filter(tx => tx.amount >= minAmount);
     if (maxAmount !== null) result = result.filter(tx => tx.amount <= maxAmount);
     return result;
-  }, [allTransactions, period, typeFilter, catFilter, searchQuery, minAmount, maxAmount, accountId]);
+  }, [allTransactions, typeFilter, catFilter, searchQuery, minAmount, maxAmount, accountId]);
 
   // ── Grouped by date ─────────────────────────────────────────────────────────
   const grouped = useMemo(() => {
@@ -974,19 +1179,18 @@ export function ExpenseScreen({ navigation, route }: Props) {
 
   // ── Category breakdown stats (expense only, period filter only) ─────────────
   const categoryStats = useMemo<CatStat[]>(() => {
-    const periodTxs = allTransactions.filter(t => t.type === 'expense' && isInPeriod(t.date, period));
     const map = new Map<CategoryKey, CatStat>();
-    for (const tx of periodTxs) {
+    for (const tx of allTransactions) {
+      if (tx.type !== 'expense') continue;
       const curr = map.get(tx.category) ?? { key: tx.category, label: tx.label, icon: tx.icon, amount: 0, count: 0 };
       map.set(tx.category, { ...curr, amount: curr.amount + tx.amount, count: curr.count + 1 });
     }
     return Array.from(map.values()).sort((a, b) => b.amount - a.amount);
-  }, [allTransactions, period]);
+  }, [allTransactions]);
 
   // ── Chip counts (for current period + type filter, before cat filter) ────────
   const chipCounts = useMemo(() => {
     const base = allTransactions.filter(t => {
-      if (!isInPeriod(t.date, period)) return false;
       if (typeFilter !== 'all' && t.type !== typeFilter) return false;
       if (searchQuery.trim()) {
         const q = searchQuery.trim().toLowerCase();
@@ -1000,16 +1204,17 @@ export function ExpenseScreen({ navigation, route }: Props) {
       map.set(tx.category, (map.get(tx.category) ?? 0) + 1);
     }
     return map;
-  }, [allTransactions, period, typeFilter, searchQuery]);
+  }, [allTransactions, typeFilter, searchQuery]);
 
   // ── Sync incoming filter params (from FilterSheet or MyAccounts drill-down) ──
   useEffect(() => {
     const p = route.params;
     if (!p) return;
-    if (p.type       !== undefined) setTypeFilter(p.type as TypeFilter);
-    if (p.period     !== undefined) setPeriod(p.period as Period);
-    if (p.accountId  !== undefined) setAccountId(p.accountId ?? null);
-    if (p.accountName !== undefined) setAccountName(p.accountName ?? null);
+    if (p.type         !== undefined) setTypeFilter(p.type as TypeFilter);
+    if (p.period       !== undefined) setPeriod(p.period as Period);
+    if (p.selectedDate !== undefined) setSelectedDate(new Date(p.selectedDate + 'T12:00:00'));
+    if (p.accountId    !== undefined) setAccountId(p.accountId ?? null);
+    if (p.accountName  !== undefined) setAccountName(p.accountName ?? null);
     setMinAmount(p.minAmount ?? null);
     setMaxAmount(p.maxAmount ?? null);
   }, [route.params]);
@@ -1027,12 +1232,19 @@ export function ExpenseScreen({ navigation, route }: Props) {
 
   const hasActiveFilters = catFilter !== 'all' || typeFilter !== 'all' || searchQuery.length > 0 || minAmount !== null || maxAmount !== null || accountId !== null;
 
+  const handleStepPeriod = useCallback((dir: 'prev' | 'next') => {
+    setSelectedDate(prev => stepDate(period, prev, dir));
+  }, [period]);
+
+  const handlePressTx = useCallback((id: string, type: 'income' | 'expense' | 'transfer') => {
+    navigation.push('TransactionDetail', { id, type });
+  }, [navigation]);
+
   // ── Entrance animations ─────────────────────────────────────────────────────
   const headerAnim  = useSharedValue(0);
   const sumAnim     = useSharedValue(0);
   const catAnim     = useSharedValue(0);
   const filterAnim  = useSharedValue(0);
-  const listAnim    = useSharedValue(0);
 
   useEffect(() => {
     const e = Easing.out(Easing.cubic);
@@ -1040,7 +1252,6 @@ export function ExpenseScreen({ navigation, route }: Props) {
     sumAnim.value    = withDelay(80,  withTiming(1, { duration: 440, easing: e }));
     catAnim.value    = withDelay(160, withTiming(1, { duration: 440, easing: e }));
     filterAnim.value = withDelay(240, withTiming(1, { duration: 440, easing: e }));
-    listAnim.value   = withDelay(320, withTiming(1, { duration: 480, easing: e }));
   }, []);
 
   const headerStyle  = useAnimatedStyle(() => ({
@@ -1059,10 +1270,6 @@ export function ExpenseScreen({ navigation, route }: Props) {
     opacity:   filterAnim.value,
     transform: [{ translateY: interpolate(filterAnim.value,  [0, 1], [16, 0]) }],
   }));
-  const listStyle    = useAnimatedStyle(() => ({
-    opacity:   listAnim.value,
-    transform: [{ translateY: interpolate(listAnim.value,    [0, 1], [16, 0]) }],
-  }));
 
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1070,119 +1277,142 @@ export function ExpenseScreen({ navigation, route }: Props) {
     <View style={[scr.root, { backgroundColor: colors.bg.base }]}>
       <StatusBar style={theme.statusBarStyle} />
 
-      <ScrollView
+      <FlatList
+        data={grouped}
+        keyExtractor={item => item.label}
+        renderItem={({ item }) => (
+          <TransactionGroup
+            dateLabel={item.label}
+            items={item.items}
+            dayTotal={item.dayNet}
+            onPressTx={handlePressTx}
+          />
+        )}
+        ListHeaderComponent={
+          <>
+            {/* ── 1. Header ────────────────────────────────────────────────── */}
+            <Animated.View style={[headerStyle, { paddingHorizontal: spacing[5] }]}>
+              <Text numberOfLines={1} style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: colors.text.primary, letterSpacing: -0.4, lineHeight: 28 }}>
+                {accountName ? accountName : 'Transactions'}
+              </Text>
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
+                {accountName
+                  ? `${filtered.length} transactions`
+                  : `${allTransactions.length} total transactions`}
+              </Text>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[3] }}>
+                <PeriodToggle value={period} onChange={setPeriod} />
+
+                <Pressable
+                  onPress={() => navigation.push('Filter', {
+                    current: {
+                      type:         typeFilter,
+                      period,
+                      selectedDate: localDateString(selectedDate),
+                      minAmount:    minAmount ?? undefined,
+                      maxAmount:    maxAmount ?? undefined,
+                    },
+                  })}
+                  style={[
+                    scr.iconBtn,
+                    {
+                      backgroundColor: hasActiveFilters ? colors.accent.muted : colors.bg.surface,
+                      borderRadius:    borderRadius.full,
+                      borderWidth:     1,
+                      borderColor:     hasActiveFilters ? colors.accent.primary : colors.border.subtle,
+                    },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Filter transactions"
+                >
+                  <Text style={{ fontSize: 16, color: hasActiveFilters ? colors.accent.primary : colors.text.secondary }}>≡</Text>
+                </Pressable>
+              </View>
+
+              <PeriodNavigator
+                period={period}
+                selectedDate={selectedDate}
+                onStep={handleStepPeriod}
+                onPickDate={setSelectedDate}
+                onToday={() => setSelectedDate(new Date())}
+              />
+            </Animated.View>
+
+            {/* ── 2. Summary Cards ─────────────────────────────────────────── */}
+            <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[5] }, sumStyle]}>
+              <SummaryCards s={summary} period={period} />
+            </Animated.View>
+
+            {/* ── 3. Expense Categories breakdown ──────────────────────────── */}
+            <Animated.View style={[{ marginTop: spacing[5] }, catStyle_]}>
+              <SectionHeader
+                title="Expense Categories"
+                style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}
+              />
+              <CategoryBreakdown
+                stats={categoryStats}
+                selected={catFilter}
+                onSelect={setCatFilter}
+              />
+            </Animated.View>
+
+            {/* ── 4. Search + filters ───────────────────────────────────────── */}
+            <Animated.View style={[{ marginTop: spacing[5] }, filterStyle]}>
+              <View style={{ paddingHorizontal: spacing[5] }}>
+                <SearchBar
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  onClear={() => setSearchQuery('')}
+                />
+              </View>
+              <View style={{ marginTop: spacing[3] }}>
+                <CategoryFilterChips
+                  selected={catFilter}
+                  onSelect={setCatFilter}
+                  activeCounts={chipCounts}
+                />
+              </View>
+              <View style={{ paddingHorizontal: spacing[5], marginTop: spacing[3] }}>
+                <TypeToggle value={typeFilter} onChange={setTypeFilter} />
+              </View>
+            </Animated.View>
+
+            {/* ── 5. Results count + clear ──────────────────────────────────── */}
+            <Animated.View style={[{ marginTop: spacing[4] }, filterStyle]}>
+              <ActiveFilterBar
+                count={filtered.length}
+                category={catFilter}
+                typeFilter={typeFilter}
+                searchQuery={searchQuery}
+                onClear={clearFilters}
+              />
+            </Animated.View>
+
+            <View style={{ height: spacing[3] }} />
+          </>
+        }
+        ListEmptyComponent={
+          isLoading ? (
+            <View style={{ paddingVertical: 48, alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={colors.accent.primary} />
+              <Text style={{ color: colors.text.muted, marginTop: 12, fontSize: fontSize.bodySm, fontFamily: fontFamily.regular }}>
+                Loading transactions…
+              </Text>
+            </View>
+          ) : (
+            <EmptyState hasActiveFilters={hasActiveFilters} onClear={clearFilters} />
+          )
+        }
+        contentContainerStyle={[scr.scroll, { paddingTop: topPad + spacing[2], paddingBottom: btmPad + spacing[8] }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerStyle={[scr.scroll, { paddingTop: topPad + spacing[2], paddingBottom: btmPad + spacing[8] }]}
-      >
-        {/* ── 1. Header ──────────────────────────────────────────────────────── */}
-        <Animated.View style={[headerStyle, { paddingHorizontal: spacing[5] }]}>
-          {/* Row 1 — title + subtitle */}
-          <Text numberOfLines={1} style={{ fontSize: fontSize.headingLg, fontFamily: fontFamily.bold, color: colors.text.primary, letterSpacing: -0.4, lineHeight: 28 }}>
-            {accountName ? accountName : 'Transactions'}
-          </Text>
-          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
-            {accountName ? `${filtered.length} transactions` : `${allTransactions.length} total transactions`}
-          </Text>
-
-          {/* Row 2 — period toggle + filter button */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[3] }}>
-            <PeriodToggle value={period} onChange={setPeriod} />
-
-            <Pressable
-              onPress={() => navigation.push('Filter', {
-                current: { type: typeFilter, period, minAmount: minAmount ?? undefined, maxAmount: maxAmount ?? undefined },
-              })}
-              style={[
-                scr.iconBtn,
-                {
-                  backgroundColor: hasActiveFilters ? colors.accent.muted : colors.bg.surface,
-                  borderRadius:    borderRadius.full,
-                  borderWidth:     1,
-                  borderColor:     hasActiveFilters ? colors.accent.primary : colors.border.subtle,
-                },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="Filter transactions"
-            >
-              <Text style={{ fontSize: 16, color: hasActiveFilters ? colors.accent.primary : colors.text.secondary }}>≡</Text>
-            </Pressable>
-          </View>
-        </Animated.View>
-
-        {/* ── 2. Summary Cards ───────────────────────────────────────────────── */}
-        <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[5] }, sumStyle]}>
-          <SummaryCards s={summary} period={period} />
-        </Animated.View>
-
-        {/* ── 3. Expense Categories breakdown ────────────────────────────────── */}
-        <Animated.View style={[{ marginTop: spacing[5] }, catStyle_]}>
-          <SectionHeader
-            title="Expense Categories"
-  style={{ paddingHorizontal: spacing[5], marginBottom: spacing[3] }}
-          />
-          <CategoryBreakdown
-            stats={categoryStats}
-            selected={catFilter}
-            onSelect={setCatFilter}
-          />
-        </Animated.View>
-
-        {/* ── 4. Search + filters ─────────────────────────────────────────────── */}
-        <Animated.View style={[{ marginTop: spacing[5] }, filterStyle]}>
-          {/* Search bar */}
-          <View style={{ paddingHorizontal: spacing[5] }}>
-            <SearchBar
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              onClear={() => setSearchQuery('')}
-            />
-          </View>
-
-          {/* Category filter chips */}
-          <View style={{ marginTop: spacing[3] }}>
-            <CategoryFilterChips
-              selected={catFilter}
-              onSelect={setCatFilter}
-              activeCounts={chipCounts}
-            />
-          </View>
-
-          {/* Type toggle */}
-          <View style={{ paddingHorizontal: spacing[5], marginTop: spacing[3] }}>
-            <TypeToggle value={typeFilter} onChange={setTypeFilter} />
-          </View>
-        </Animated.View>
-
-        {/* ── 5. Results count + clear ────────────────────────────────────────── */}
-        <Animated.View style={[{ marginTop: spacing[4] }, filterStyle]}>
-          <ActiveFilterBar
-            count={filtered.length}
-            category={catFilter}
-            typeFilter={typeFilter}
-            searchQuery={searchQuery}
-            onClear={clearFilters}
-          />
-        </Animated.View>
-
-        {/* ── 6. Transaction list / empty state ───────────────────────────────── */}
-        <Animated.View style={[{ marginTop: spacing[3] }, listStyle]}>
-          {grouped.length === 0 ? (
-            <EmptyState hasActiveFilters={hasActiveFilters} onClear={clearFilters} />
-          ) : (
-            grouped.map(({ label, items, dayNet }) => (
-              <TransactionGroup
-                key={label}
-                dateLabel={label}
-                items={items}
-                dayTotal={dayNet}
-                onPressTx={(id, type) => navigation.push('TransactionDetail', { id, type })}
-              />
-            ))
-          )}
-        </Animated.View>
-      </ScrollView>
+        initialNumToRender={8}
+        maxToRenderPerBatch={5}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
+      />
     </View>
   );
 }

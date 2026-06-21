@@ -114,8 +114,22 @@ export function ExpenseItem({
             }}
             numberOfLines={1}
           >
-            {categoryLabel} · {date}
+            {categoryLabel}
           </Text>
+          {!!date && (
+            <Text
+              style={{
+                fontSize:   fontSize.bodySm,
+                fontFamily: fontFamily.regular,
+                color:      colors.text.muted,
+                lineHeight: 17,
+                opacity:    0.75,
+              }}
+              numberOfLines={1}
+            >
+              {date}
+            </Text>
+          )}
         </View>
 
         {/* Amount + time */}

@@ -385,35 +385,39 @@ export async function syncWealthProgression(): Promise<void> {
 
 // ── Transactions ───────────────────────────────────────────────────────────────
 
-export async function getTransactions(): Promise<Transaction[]> {
+export async function getTransactions(opts?: { from?: string; to?: string }): Promise<Transaction[]> {
   const userId = await uid();
+  const limit  = opts?.from ? 500 : 100;
 
-  const [expRes, incRes, trRes] = await Promise.all([
-    supabase
-      .from('expenses')
-      .select('id, description, amount, date, created_at, notes, account_id, expense_categories(name, icon, color), asset_accounts(name)')
-      .eq('user_id', userId)
-      .is('deleted_at', null)
-      .order('date', { ascending: false })
-      .limit(100),
+  let expQ = supabase
+    .from('expenses')
+    .select('id, description, amount, date, created_at, notes, account_id, expense_categories(name, icon, color), asset_accounts(name)')
+    .eq('user_id', userId)
+    .is('deleted_at', null);
+  if (opts?.from) expQ = expQ.gte('date', opts.from);
+  if (opts?.to)   expQ = expQ.lte('date', opts.to);
+  expQ = expQ.order('date', { ascending: false }).limit(limit);
 
-    supabase
-      .from('income_records')
-      .select('id, description, amount, date, created_at, notes, account_id, income_sources(name, type, icon), asset_accounts(name)')
-      .eq('user_id', userId)
-      .is('deleted_at', null)
-      .order('date', { ascending: false })
-      .limit(100),
+  let incQ = supabase
+    .from('income_records')
+    .select('id, description, amount, date, created_at, notes, account_id, income_sources(name, type, icon), asset_accounts(name)')
+    .eq('user_id', userId)
+    .is('deleted_at', null);
+  if (opts?.from) incQ = incQ.gte('date', opts.from);
+  if (opts?.to)   incQ = incQ.lte('date', opts.to);
+  incQ = incQ.order('date', { ascending: false }).limit(limit);
 
-    supabase
-      .from('transfers')
-      .select(`id, amount, date, created_at, notes, from_account_id, to_account_id,
-               from:asset_accounts!from_account_id(name),
-               to:asset_accounts!to_account_id(name)`)
-      .eq('user_id', userId)
-      .order('date', { ascending: false })
-      .limit(100),
-  ]);
+  let trQ = supabase
+    .from('transfers')
+    .select(`id, amount, date, created_at, notes, from_account_id, to_account_id,
+             from:asset_accounts!from_account_id(name),
+             to:asset_accounts!to_account_id(name)`)
+    .eq('user_id', userId);
+  if (opts?.from) trQ = trQ.gte('date', opts.from);
+  if (opts?.to)   trQ = trQ.lte('date', opts.to);
+  trQ = trQ.order('date', { ascending: false }).limit(limit);
+
+  const [expRes, incRes, trRes] = await Promise.all([expQ, incQ, trQ]);
 
   const expenses: Transaction[] = (expRes.data as unknown as RawExpenseRow[] ?? []).map((e: RawExpenseRow) => {
     const name = e.expense_categories?.name ?? 'Other';
@@ -1417,15 +1421,17 @@ export async function getAssets(): Promise<AssetItem[]> {
 
 export interface MonthPoint {
   label:   string;
+  month:   string;  // YYYY-MM-01 from DB; empty string for weekly day-of-week entries
   income:  number;
   expense: number;
   savings: number;
 }
 
 export interface NWPoint {
-  label:  string;
-  nw:     number;
+  label:   string;
+  nw:      number;
   isLive?: boolean;
+  date?:   string;   // ISO date "YYYY-MM-DD"; present on snapshots, absent on the live point
 }
 
 export interface IncomeStream {
@@ -1462,6 +1468,7 @@ export async function getMonthlyHistory(months = 6): Promise<MonthPoint[]> {
 
   return (data as RawCashFlowRow[] ?? []).map((r: RawCashFlowRow) => ({
     label:   monthLabel(r.month),
+    month:   r.month,
     income:  Number(r.total_income   ?? 0),
     expense: Number(r.total_expenses ?? 0),
     savings: Number(r.net_cash_flow  ?? 0),
@@ -1489,7 +1496,7 @@ export async function getWeeklyHistory(): Promise<MonthPoint[]> {
   ]);
 
   const DAY = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const result: MonthPoint[] = DAY.map(label => ({ label, income: 0, expense: 0, savings: 0 }));
+  const result: MonthPoint[] = DAY.map(label => ({ label, month: '', income: 0, expense: 0, savings: 0 }));
 
   for (const e of expRes.data ?? []) {
     const idx = (new Date(e.date + 'T00:00:00').getDay() + 6) % 7;
@@ -1535,6 +1542,7 @@ export async function getNetWorthHistory(months = 12): Promise<NWPoint[]> {
     .map((r: RawNWRow) => ({
       label: monthLabel(r.snapshot_date),
       nw:    Number(r.net_worth ?? 0),
+      date:  r.snapshot_date,
     }));
 
   // Compute live net worth to append as the "Now" point

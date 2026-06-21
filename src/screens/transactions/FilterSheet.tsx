@@ -14,6 +14,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useCurrency } from '../../utils/currency';
 import type { TransactionsStackParamList, FilterState } from '../../navigation/types';
@@ -138,6 +139,30 @@ const amtStyles = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center' },
 });
 
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function localDateString(d: Date): string {
+  const y  = d.getFullYear();
+  const m  = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+function dateRangeLabel(period: Period, anchor: Date): string {
+  if (period === 'week') {
+    const day = anchor.getDay();
+    const diffToMon = day === 0 ? -6 : 1 - day;
+    const mon = new Date(anchor); mon.setDate(anchor.getDate() + diffToMon);
+    const sun = new Date(mon);   sun.setDate(mon.getDate() + 6);
+    const fmt = (d: Date) => d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+    return `${fmt(mon)} – ${fmt(sun)}`;
+  }
+  if (period === 'month') {
+    return anchor.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' });
+  }
+  return String(anchor.getFullYear());
+}
+
 // ─── FilterSheet ──────────────────────────────────────────────────────────────
 
 export function FilterSheet({ navigation, route }: Props) {
@@ -148,27 +173,34 @@ export function FilterSheet({ navigation, route }: Props) {
 
   const initial = route.params?.current;
 
-  const [txType,     setTxType]     = useState<TxType>(initial?.type   ?? 'all');
-  const [period,     setPeriod]     = useState<Period>(initial?.period  ?? 'month');
-  const [minAmtStr,  setMinAmtStr]  = useState(initial?.minAmount != null ? String(initial.minAmount) : '');
-  const [maxAmtStr,  setMaxAmtStr]  = useState(initial?.maxAmount != null ? String(initial.maxAmount) : '');
+  const [txType,       setTxType]       = useState<TxType>(initial?.type   ?? 'all');
+  const [period,       setPeriod]       = useState<Period>(initial?.period  ?? 'month');
+  const [selectedDate, setSelectedDate] = useState<Date>(
+    initial?.selectedDate ? new Date(initial.selectedDate + 'T12:00:00') : new Date()
+  );
+  const [showPicker,   setShowPicker]   = useState(false);
+  const [minAmtStr,    setMinAmtStr]    = useState(initial?.minAmount != null ? String(initial.minAmount) : '');
+  const [maxAmtStr,    setMaxAmtStr]    = useState(initial?.maxAmount != null ? String(initial.maxAmount) : '');
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
 
+  const today      = localDateString(new Date());
   const hasFilters =
     txType !== 'all' ||
     period !== 'month' ||
+    localDateString(selectedDate) !== today ||
     minAmtStr.length > 0 ||
     maxAmtStr.length > 0;
 
   function handleApply() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const filters: FilterState = {
-      type:       txType,
+      type:         txType,
       period,
-      minAmount:  minAmtStr ? parseFloat(minAmtStr) : undefined,
-      maxAmount:  maxAmtStr ? parseFloat(maxAmtStr) : undefined,
+      selectedDate: localDateString(selectedDate),
+      minAmount:    minAmtStr ? parseFloat(minAmtStr) : undefined,
+      maxAmount:    maxAmtStr ? parseFloat(maxAmtStr) : undefined,
     };
     navigation.navigate('TransactionList', filters);
   }
@@ -177,9 +209,14 @@ export function FilterSheet({ navigation, route }: Props) {
     Haptics.selectionAsync();
     setTxType('all');
     setPeriod('month');
+    setSelectedDate(new Date());
     setMinAmtStr('');
     setMaxAmtStr('');
-    navigation.navigate('TransactionList', {});
+    navigation.navigate('TransactionList', {
+      type:         'all',
+      period:       'month',
+      selectedDate: localDateString(new Date()),
+    });
   }
 
   const H_PAD = spacing[5];
@@ -236,13 +273,55 @@ export function FilterSheet({ navigation, route }: Props) {
         <SectionLabel title="PERIOD" />
         <SegmentedControl
           options={[
-            { key: 'week',  label: 'This Week'  },
-            { key: 'month', label: 'This Month' },
-            { key: 'year',  label: 'This Year'  },
+            { key: 'week',  label: 'Week'  },
+            { key: 'month', label: 'Month' },
+            { key: 'year',  label: 'Year'  },
           ]}
           value={period}
           onChange={setPeriod}
         />
+
+        {/* ── Date selector ───────────────────────────────────────────────────── */}
+        <SectionLabel title="DATE" />
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync();
+            if (Platform.OS === 'android') setShowPicker(true);
+          }}
+          style={{
+            flexDirection:   'row',
+            alignItems:      'center',
+            justifyContent:  'space-between',
+            backgroundColor: colors.bg.surface,
+            borderRadius:    borderRadius.input,
+            borderWidth:     1,
+            borderColor:     colors.border.subtle,
+            paddingHorizontal: spacing[4],
+            paddingVertical:   spacing[3],
+          }}
+        >
+          <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary }}>
+            {dateRangeLabel(period, selectedDate)}
+          </Text>
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.accent.primary }}>
+            Change
+          </Text>
+        </Pressable>
+
+        {/* iOS: always-visible inline spinner; Android: modal on showPicker */}
+        {(showPicker || Platform.OS === 'ios') && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            maximumDate={new Date()}
+            onChange={(_, date) => {
+              setShowPicker(false);
+              if (date) setSelectedDate(date);
+            }}
+            style={{ marginTop: spacing[1] }}
+          />
+        )}
 
         {/* ── Amount range ────────────────────────────────────────────────────── */}
         <SectionLabel title="AMOUNT RANGE" />
@@ -265,9 +344,9 @@ export function FilterSheet({ navigation, route }: Props) {
                 • Type: {txType === 'expense' ? 'Expenses only' : txType === 'income' ? 'Income only' : 'Transfers only'}
               </Text>
             )}
-            {period !== 'month' && (
+            {(period !== 'month' || localDateString(selectedDate) !== today) && (
               <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary }}>
-                • Period: {period === 'week' ? 'This week' : 'This year'}
+                • Period: {dateRangeLabel(period, selectedDate)}
               </Text>
             )}
             {minAmtStr.length > 0 && (

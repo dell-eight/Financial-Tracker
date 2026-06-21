@@ -30,16 +30,25 @@ export function getCurrencySymbol(code: string): string {
 
 // ── Formatters ─────────────────────────────────────────────────────────────────
 
+// Cached formatters — Intl.NumberFormat construction is expensive in Hermes;
+// reuse the same instance for the same currency code across all calls.
+const _fullFormatters = new Map<string, Intl.NumberFormat>();
+
 // Full format  →  ₱1,234.56  /  $1,234.56  /  ¥1,235
 export function formatFull(n: number, code: string): string {
-  const fractionDigits = ['JPY', 'KRW'].includes(code) ? 0 : 2;
-  return new Intl.NumberFormat('en-US', {
-    style:                 'currency',
-    currency:              code,
-    currencyDisplay:       'narrowSymbol',
-    minimumFractionDigits: fractionDigits,
-    maximumFractionDigits: fractionDigits,
-  }).format(n);
+  let fmt = _fullFormatters.get(code);
+  if (!fmt) {
+    const fractionDigits = ['JPY', 'KRW'].includes(code) ? 0 : 2;
+    fmt = new Intl.NumberFormat('en-US', {
+      style:                 'currency',
+      currency:              code,
+      currencyDisplay:       'narrowSymbol',
+      minimumFractionDigits: fractionDigits,
+      maximumFractionDigits: fractionDigits,
+    });
+    _fullFormatters.set(code, fmt);
+  }
+  return fmt.format(n);
 }
 
 // Compact format  →  ₱1.2K  /  ₱1.2M

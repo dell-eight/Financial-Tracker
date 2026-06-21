@@ -33,6 +33,10 @@ const MAX_LOGIN_ATTEMPTS  = 5;
 const LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 interface AppState {
+  // ── Device-level onboarding flag (persisted, never reset) ─────────────
+  hasOnboarded: boolean;
+  setHasOnboarded: (value: boolean) => void;
+
   // ── Account-level preferences (persisted, reset on sign-out) ──────────
   themePreference:      ThemePreference;
   currency:             string;
@@ -93,6 +97,7 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       // ── Initial values ───────────────────────────────────────────────
+      hasOnboarded:         false,
       themePreference:      'system',
       currency:             'PHP',
       notificationsEnabled:   true,
@@ -106,6 +111,8 @@ export const useAppStore = create<AppState>()(
       healthScoreMode:      'balanced' as ScoreMode,
       isBiometricUnlocked:  false,
       pendingMilestones:    [],
+
+      setHasOnboarded: (hasOnboarded) => set({ hasOnboarded }),
 
       // ── Account setters ──────────────────────────────────────────────
       setThemePreference:          (themePreference)          => set({ themePreference }),
@@ -200,6 +207,7 @@ export const useAppStore = create<AppState>()(
       // sign-in so they follow the account, not the device.
       // isBiometricUnlocked and pendingMilestones are session-only.
       partialize: (state) => ({
+        hasOnboarded:         state.hasOnboarded,
         themePreference:      state.themePreference,
         currency:             state.currency,
         notificationsEnabled:   state.notificationsEnabled,
