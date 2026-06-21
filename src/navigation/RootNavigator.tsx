@@ -56,6 +56,8 @@ export function RootNavigator() {
   const resetAccountSettings     = useAppStore(s => s.resetAccountSettings);
   const setHealthScoreMode       = useAppStore(s => s.setHealthScoreMode);
   const clearHealthScoreMode     = useAppStore(s => s.clearHealthScoreMode);
+  const hasOnboarded             = useAppStore(s => s.hasOnboarded);
+  const setHasOnboarded          = useAppStore(s => s.setHasOnboarded);
 
   useEffect(() => {
     // Loads this user's security settings from Supabase and hydrates the store.
@@ -85,18 +87,36 @@ export function RootNavigator() {
       migratePinIfNeeded(userId);
     }
 
-    // Restore session on cold start — use getUser() for server-fresh user_metadata
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
-        const { data: { user } } = await supabase.auth.getUser();
-        const activeUser = user ?? session.user ?? null;
-        if (activeUser) await loadSecurity(activeUser.id);
-        setSession(activeUser);
-      } else {
-        setSession(null);
-      }
-      setLoading(false);
+    // Restore session on cold start — use getUser() for server-fresh user_metadata.
+    // Race against an 8 s timeout: a stalled SecureStore read or slow getUser() network
+    // call should never leave the user stuck on the loading screen indefinitely.
+    const AUTH_TIMEOUT_MS = 8_000;
+    let restoreCancelled = false;
+    let restoreTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const sessionRestorePromise = supabase.auth.getSession().then(async ({ data: { session } }) => {
+      // Cancel the timeout as soon as we have a result — prevents the timer from
+      // calling setSession(null) after we've already authenticated the user.
+      if (restoreTimeoutId !== null) clearTimeout(restoreTimeoutId);
+      if (restoreCancelled) return;
+      if (!session) { setSession(null); return; }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (restoreCancelled) return;
+      const activeUser = user ?? session.user ?? null;
+      if (activeUser) await loadSecurity(activeUser.id);
+      if (restoreCancelled) return;
+      setSession(activeUser);
     });
+
+    const timeoutPromise = new Promise<void>(resolve => {
+      restoreTimeoutId = setTimeout(() => {
+        restoreCancelled = true;
+        setSession(null);   // fall through to login screen
+        resolve();
+      }, AUTH_TIMEOUT_MS);
+    });
+
+    Promise.race([sessionRestorePromise, timeoutPromise]).finally(() => setLoading(false));
 
     // Keep store in sync with Supabase auth events (login, logout, token refresh)
     // getUser() ensures user_metadata (e.g. avatar_url) is always server-authoritative
@@ -118,7 +138,17 @@ export function RootNavigator() {
         const { data: { user } } = await supabase.auth.getUser();
         const activeUser = user ?? session.user ?? null;
         if (event === 'SIGNED_IN' && activeUser) {
-          await loadSecurity(activeUser.id);
+          // loadSecurity is best-effort — a failure or slow DB must not block navigation.
+          // Race against 10 s so a hung Supabase call never leaves the user on Login.
+          try {
+            await Promise.race([
+              loadSecurity(activeUser.id),
+              new Promise<void>(resolve => setTimeout(resolve, 10_000)),
+            ]);
+          } catch {
+            // DB query failed (e.g. RLS, network). App proceeds with store defaults.
+          }
+          setHasOnboarded(true);
         }
         setSession(activeUser);
       } else {
@@ -176,16 +206,9 @@ export function RootNavigator() {
     return () => sub.remove();
   }, [isAuthenticated, notificationsEnabled]);
 
-  // Track whether the user has ever been authenticated this session so that
-  // signing out lands on Login instead of the Welcome/onboarding screen.
-  const wasAuthenticatedRef = useRef(false);
-  useEffect(() => {
-    if (isAuthenticated) wasAuthenticatedRef.current = true;
-  }, [isAuthenticated]);
-
   const AuthScreen = useCallback(
-    () => <AuthNavigator initialRoute={wasAuthenticatedRef.current ? 'Login' : 'Welcome'} />,
-    [],
+    () => <AuthNavigator initialRoute={hasOnboarded ? 'Login' : 'Welcome'} />,
+    [hasOnboarded],
   );
 
   // Show lock screen when authenticated but not yet unlocked and at least one auth method is enabled

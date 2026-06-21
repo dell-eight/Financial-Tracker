@@ -60,10 +60,16 @@ export async function signUp(credentials: AuthCredentials): Promise<AuthResponse
  */
 export async function signIn(credentials: AuthCredentials): Promise<AuthResponse> {
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: credentials.email,
-      password: credentials.password,
-    });
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Sign in timed out. Check your connection and try again.')), 15_000),
+    );
+    const { data, error } = await Promise.race([
+      supabase.auth.signInWithPassword({
+        email: credentials.email,
+        password: credentials.password,
+      }),
+      timeout,
+    ]);
 
     if (error) {
       return {
