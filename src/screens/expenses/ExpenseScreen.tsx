@@ -55,7 +55,7 @@ interface Transaction {
 }
 
 type Period     = 'week' | 'month' | 'year';
-type TypeFilter = 'all' | 'income' | 'expense' | 'transfer';
+type TypeFilter = 'all' | 'income' | 'expense';
 
 // ─── Timezone-safe local date formatter ──────────────────────────────────────
 
@@ -701,10 +701,9 @@ function TypeToggle({ value, onChange }: { value: TypeFilter; onChange: (v: Type
   const { colors, spacing, borderRadius, fontSize, fontFamily } = theme;
 
   const opts: { key: TypeFilter; label: string; color?: string }[] = [
-    { key: 'all',      label: 'All'           },
-    { key: 'expense',  label: '↓ Expenses',   color: colors.expense        },
-    { key: 'income',   label: '↑ Income',     color: colors.income         },
-    { key: 'transfer', label: '↔ Transfers',  color: colors.accent.primary },
+    { key: 'all',     label: 'All'         },
+    { key: 'expense', label: '↓ Expenses', color: colors.expense },
+    { key: 'income',  label: '↑ Income',   color: colors.income  },
   ];
 
   return (

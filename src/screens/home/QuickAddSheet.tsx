@@ -17,9 +17,8 @@ import type { RootStackParamList } from '../../navigation/types';
 type Props = StackScreenProps<RootStackParamList, 'QuickAddSheet'>;
 
 const OPTIONS = [
-  { key: 'expense',  label: 'Expense',  icon: '💸', color: '#FF6E52', description: 'Log a purchase or bill' },
-  { key: 'income',   label: 'Income',   icon: '💰', color: '#00C318', description: 'Record salary or payment' },
-  { key: 'transfer', label: 'Transfer', icon: '↔️', color: '#755DEF', description: 'Move money between accounts' },
+  { key: 'expense', label: 'Expense', icon: '💸', color: '#FF6E52', description: 'Log a purchase or bill' },
+  { key: 'income',  label: 'Income',  icon: '💰', color: '#00C318', description: 'Record salary or payment' },
 ] as const;
 
 export function QuickAddSheet({ navigation }: Props) {
@@ -27,14 +26,12 @@ export function QuickAddSheet({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
 
-  function handleOption(key: 'expense' | 'income' | 'transfer') {
+  function handleOption(key: 'expense' | 'income') {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     navigation.goBack();
-    // Navigate to the correct Add screen inside Transactions stack
     const screenMap = {
-      expense:  'AddExpense',
-      income:   'AddIncome',
-      transfer: 'AddTransfer',
+      expense: 'AddExpense',
+      income:  'AddIncome',
     } as const;
     // Use setTimeout to allow the modal dismiss animation to complete
     setTimeout(() => {

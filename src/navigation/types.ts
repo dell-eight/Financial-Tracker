@@ -2,7 +2,7 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 
 // ── Shared filter state (passed between TransactionList ↔ FilterSheet) ─────────
 export type FilterState = {
-  type?:        'all' | 'income' | 'expense' | 'transfer';
+  type?:        'all' | 'income' | 'expense';
   period?:      'week' | 'month' | 'year';
   minAmount?:   number;
   maxAmount?:   number;
@@ -46,7 +46,6 @@ export type TransactionsStackParamList = {
   TransactionDetail: { id: string; type: 'expense' | 'income' | 'transfer' };
   AddExpense:        undefined;
   AddIncome:         undefined;
-  AddTransfer:       undefined;
   Filter:            { current?: FilterState } | undefined;
   BulkEdit:          undefined;
 };

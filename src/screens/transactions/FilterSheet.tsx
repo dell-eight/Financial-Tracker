@@ -21,7 +21,7 @@ import type { TransactionsStackParamList, FilterState } from '../../navigation/t
 
 type Props = StackScreenProps<TransactionsStackParamList, 'Filter'>;
 
-type TxType  = 'all' | 'income' | 'expense' | 'transfer';
+type TxType  = 'all' | 'income' | 'expense';
 type Period  = 'week' | 'month' | 'year';
 
 // ─── SegmentedControl ─────────────────────────────────────────────────────────
@@ -260,13 +260,12 @@ export function FilterSheet({ navigation, route }: Props) {
         <SegmentedControl
           options={[
             { key: 'all',      label: 'All'       },
-            { key: 'expense',  label: 'Expenses'  },
-            { key: 'income',   label: 'Income'    },
-            { key: 'transfer', label: 'Transfers' },
+            { key: 'expense', label: 'Expenses' },
+            { key: 'income',  label: 'Income'   },
           ]}
           value={txType}
           onChange={setTxType}
-          activeColor={txType === 'expense' ? colors.expense : txType === 'income' ? colors.income : colors.accent.primary}
+          activeColor={txType === 'expense' ? colors.expense : txType === 'income' ? colors.income : undefined}
         />
 
         {/* ── Period ──────────────────────────────────────────────────────────── */}
