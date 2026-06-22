@@ -1269,6 +1269,81 @@ export async function deleteHolding(holdingId: string): Promise<void> {
   if (error) throw error;
 }
 
+// ── Other Assets ───────────────────────────────────────────────────────────────
+
+export interface OtherAsset {
+  id: string;
+  name: string;
+  category: string;
+  value: number;
+  purchaseValue: number | null;
+  purchaseDate: string | null;
+  notes: string | null;
+}
+
+export async function getOtherAssets(): Promise<OtherAsset[]> {
+  const userId = await uid();
+  const { data, error } = await supabase
+    .from('other_assets')
+    .select('id, name, category, value, purchase_value, purchase_date, notes')
+    .eq('user_id', userId)
+    .is('deleted_at', null)
+    .order('value', { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map(r => ({
+    id: r.id, name: r.name, category: r.category, value: r.value,
+    purchaseValue: r.purchase_value, purchaseDate: r.purchase_date, notes: r.notes,
+  }));
+}
+
+export async function addOtherAsset(params: {
+  name: string; category: string; value: number;
+  purchaseValue?: number; purchaseDate?: string; notes?: string;
+}): Promise<OtherAsset> {
+  const userId = await uid();
+  const { data, error } = await supabase
+    .from('other_assets')
+    .insert({
+      user_id:        userId,
+      name:           params.name,
+      category:       params.category,
+      value:          params.value,
+      purchase_value: params.purchaseValue ?? null,
+      purchase_date:  params.purchaseDate  ?? null,
+      notes:          params.notes         ?? null,
+    })
+    .select('id, name, category, value, purchase_value, purchase_date, notes')
+    .single();
+  if (error) throw error;
+  return {
+    id: data.id, name: data.name, category: data.category, value: data.value,
+    purchaseValue: data.purchase_value, purchaseDate: data.purchase_date, notes: data.notes,
+  };
+}
+
+export async function updateOtherAsset(id: string, params: {
+  name?: string; category?: string; value?: number;
+  purchaseValue?: number | null; purchaseDate?: string | null; notes?: string | null;
+}): Promise<void> {
+  const { error } = await supabase
+    .from('other_assets')
+    .update({
+      name:           params.name,
+      category:       params.category,
+      value:          params.value,
+      purchase_value: params.purchaseValue,
+      purchase_date:  params.purchaseDate,
+      notes:          params.notes,
+    })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteOtherAsset(assetId: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_other_asset', { p_asset_id: assetId });
+  if (error) throw error;
+}
+
 // ── Assets ─────────────────────────────────────────────────────────────────────
 
 const CATEGORY_TO_DB_TYPE: Record<string, string> = {

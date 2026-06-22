@@ -600,6 +600,45 @@ export type Database = {
           },
         ]
       }
+      other_assets: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          category: string
+          value: number
+          purchase_value: number | null
+          purchase_date: string | null
+          notes: string | null
+          created_at: string | null
+          updated_at: string | null
+          deleted_at: string | null
+        }
+        Insert: {
+          id?: string
+          user_id?: string
+          name: string
+          category: string
+          value: number
+          purchase_value?: number | null
+          purchase_date?: string | null
+          notes?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+          deleted_at?: string | null
+        }
+        Update: {
+          name?: string
+          category?: string
+          value?: number
+          purchase_value?: number | null
+          purchase_date?: string | null
+          notes?: string | null
+          updated_at?: string | null
+          deleted_at?: string | null
+        }
+        Relationships: []
+      }
       investment_holdings: {
         Row: {
           account_id: string
