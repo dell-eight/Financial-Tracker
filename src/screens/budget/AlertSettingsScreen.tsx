@@ -22,7 +22,7 @@ import type { BudgetStackParamList } from '../../navigation/types';
 import { useAppStore } from '../../store/app.store';
 import { useCurrency } from '../../utils/currency';
 import type { CategoryKey } from '../../theme';
-import { syncWeeklySummary } from '../../services/notifications.service';
+import { syncWeeklySummary, syncDailyReminder } from '../../services/notifications.service';
 
 type Props = StackScreenProps<BudgetStackParamList, 'AlertSettings'>;
 
@@ -118,11 +118,13 @@ export function AlertSettingsScreen({ navigation }: Props) {
   const alert80Enabled            = useAppStore(s => s.alert80Enabled);
   const alert100Enabled           = useAppStore(s => s.alert100Enabled);
   const weeklySummaryEnabled      = useAppStore(s => s.weeklySummaryEnabled);
+  const eveningReminderEnabled    = useAppStore(s => s.eveningReminderEnabled);
   const categoryAlertOverrides    = useAppStore(s => s.categoryAlertOverrides);
   const setNotificationsEnabled   = useAppStore(s => s.setNotificationsEnabled);
   const setAlert80Enabled         = useAppStore(s => s.setAlert80Enabled);
   const setAlert100Enabled        = useAppStore(s => s.setAlert100Enabled);
   const setWeeklySummaryEnabled   = useAppStore(s => s.setWeeklySummaryEnabled);
+  const setEveningReminderEnabled = useAppStore(s => s.setEveningReminderEnabled);
   const setCategoryAlertOverrides = useAppStore(s => s.setCategoryAlertOverrides);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
@@ -186,6 +188,13 @@ export function AlertSettingsScreen({ navigation }: Props) {
             subtitle="Receive a budget recap every Sunday morning"
             value={weeklySummaryEnabled}
             onChange={(v) => { setWeeklySummaryEnabled(v); syncWeeklySummary(v); }}
+          />
+          <SettingRow
+            icon="🌙"
+            title="Evening Reminder"
+            subtitle="Daily nudge at 8:30 PM to log your expenses"
+            value={eveningReminderEnabled}
+            onChange={(v) => { setEveningReminderEnabled(v); syncDailyReminder(v); }}
             isLast
           />
         </View>

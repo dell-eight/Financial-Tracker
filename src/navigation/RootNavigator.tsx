@@ -19,6 +19,7 @@ import {
   requestPermissionsAndGetToken,
   savePushToken,
   syncWeeklySummary,
+  syncDailyReminder,
   addResponseListener,
 } from '../services/notifications.service';
 import { migratePinIfNeeded } from '../utils/pin';
@@ -50,6 +51,7 @@ export function RootNavigator() {
   const setBiometricUnlocked     = useAppStore(s => s.setBiometricUnlocked);
   const notificationsEnabled     = useAppStore(s => s.notificationsEnabled);
   const weeklySummaryEnabled     = useAppStore(s => s.weeklySummaryEnabled);
+  const eveningReminderEnabled   = useAppStore(s => s.eveningReminderEnabled);
   const pinEnabled               = useAppStore(s => s.pinEnabled);
   const autoLockDuration         = useAppStore(s => s.autoLockDuration);
   const screenshotPrivacyEnabled = useAppStore(s => s.screenshotPrivacyEnabled);
@@ -205,6 +207,7 @@ export function RootNavigator() {
     });
 
     syncWeeklySummary(weeklySummaryEnabled);
+    syncDailyReminder(eveningReminderEnabled);
 
     // Handle taps on notifications (deep-link to BudgetAlerts or a specific screen)
     const sub = addResponseListener(_response => {
@@ -212,7 +215,7 @@ export function RootNavigator() {
     });
 
     return () => sub.remove();
-  }, [isAuthenticated, notificationsEnabled]);
+  }, [isAuthenticated, notificationsEnabled, weeklySummaryEnabled, eveningReminderEnabled]);
 
   const AuthScreen = useCallback(
     () => <AuthNavigator initialRoute={hasOnboarded ? 'Login' : 'Welcome'} />,

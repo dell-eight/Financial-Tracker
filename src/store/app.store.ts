@@ -44,6 +44,7 @@ interface AppState {
   alert80Enabled:          boolean;
   alert100Enabled:         boolean;
   weeklySummaryEnabled:    boolean;
+  eveningReminderEnabled:  boolean;
   categoryAlertOverrides:  Partial<Record<CategoryKey, boolean>>;
 
   // ── Device-level brute-force guard (persisted, never reset) ───────────
@@ -73,6 +74,7 @@ interface AppState {
   setAlert80Enabled:           (enabled: boolean) => void;
   setAlert100Enabled:          (enabled: boolean) => void;
   setWeeklySummaryEnabled:     (enabled: boolean) => void;
+  setEveningReminderEnabled:   (enabled: boolean) => void;
   setPinEnabled:               (enabled: boolean) => void;
   setAutoLockDuration:         (duration: AutoLockDuration) => void;
   setScreenshotPrivacyEnabled: (enabled: boolean) => void;
@@ -104,6 +106,7 @@ export const useAppStore = create<AppState>()(
       alert80Enabled:         true,
       alert100Enabled:        true,
       weeklySummaryEnabled:   true,
+      eveningReminderEnabled: true,
       categoryAlertOverrides: {},
       loginAttemptsByEmail: {},
       loginLockoutsByEmail: {},
@@ -122,6 +125,7 @@ export const useAppStore = create<AppState>()(
       setAlert80Enabled:           (alert80Enabled)           => set({ alert80Enabled }),
       setAlert100Enabled:          (alert100Enabled)          => set({ alert100Enabled }),
       setWeeklySummaryEnabled:     (weeklySummaryEnabled)     => set({ weeklySummaryEnabled }),
+      setEveningReminderEnabled:   (eveningReminderEnabled)   => set({ eveningReminderEnabled }),
       setBiometricUnlocked:        (isBiometricUnlocked)      => set({ isBiometricUnlocked }),
 
       // ── Security setters (optimistic local update; caller syncs to Supabase) ──
@@ -196,6 +200,7 @@ export const useAppStore = create<AppState>()(
         alert80Enabled:         true,
         alert100Enabled:        true,
         weeklySummaryEnabled:   true,
+        eveningReminderEnabled: true,
         categoryAlertOverrides: {},
         pendingMilestones:      [],
       }),
@@ -214,6 +219,7 @@ export const useAppStore = create<AppState>()(
         alert80Enabled:         state.alert80Enabled,
         alert100Enabled:        state.alert100Enabled,
         weeklySummaryEnabled:   state.weeklySummaryEnabled,
+        eveningReminderEnabled: state.eveningReminderEnabled,
         categoryAlertOverrides: state.categoryAlertOverrides,
         loginAttemptsByEmail: state.loginAttemptsByEmail,
         loginLockoutsByEmail: state.loginLockoutsByEmail,

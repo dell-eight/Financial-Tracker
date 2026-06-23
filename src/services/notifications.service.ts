@@ -58,6 +58,10 @@ export async function requestPermissionsAndGetToken(): Promise<string | null> {
       name:       'Weekly Summary',
       importance: N.AndroidImportance.DEFAULT,
     });
+    await N.setNotificationChannelAsync('daily-reminders', {
+      name:       'Daily Log Reminder',
+      importance: N.AndroidImportance.DEFAULT,
+    });
   }
 
   try {
@@ -313,6 +317,34 @@ export function addResponseListener(
   const N = getNotifs();
   if (!N) return { remove: () => {} };
   return N.addNotificationResponseReceivedListener(listener);
+}
+
+// ── Daily evening reminder ──────────────────────────────────────────────────────
+
+const DAILY_REMINDER_ID = 'daily-log-reminder';
+
+export async function syncDailyReminder(enabled: boolean, hour = 20, minute = 30): Promise<void> {
+  const N = getNotifs();
+  if (!N) return;
+
+  await N.cancelScheduledNotificationAsync(DAILY_REMINDER_ID);
+
+  if (!enabled) return;
+
+  await N.scheduleNotificationAsync({
+    identifier: DAILY_REMINDER_ID,
+    content: {
+      title:              "💰 Log today's expenses",
+      body:               'A quick check-in keeps your budget on track.',
+      data:               { type: 'daily_reminder' },
+      categoryIdentifier: 'daily-reminders',
+    },
+    trigger: {
+      type:   N.SchedulableTriggerInputTypes.DAILY,
+      hour,
+      minute,
+    },
+  });
 }
 
 // ── Weekly summary ──────────────────────────────────────────────────────────────

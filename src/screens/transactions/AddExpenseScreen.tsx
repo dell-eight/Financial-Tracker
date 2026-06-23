@@ -90,6 +90,7 @@ export function AddExpenseScreen({ navigation }: Props) {
   const [selectedDate,      setSelectedDate]      = useState(() => new Date());
   const [pickerMode,        setPickerMode]        = useState<'date' | 'time' | null>(null);
   const [tempDate,          setTempDate]          = useState(() => new Date());
+  const [insightBudget,     setInsightBudget]     = useState<{ label: string; icon: string; remaining: number } | null>(null);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -147,16 +148,25 @@ export function AddExpenseScreen({ navigation }: Props) {
       if (fromAccount) keys.push(queryClient.invalidateQueries({ queryKey: ASSETS_KEY }));
       await Promise.all(keys);
 
-      // Fire budget threshold notifications and persist them to the inbox
+      // Fetch fresh budgets for threshold checks and insight card
+      const now          = new Date();
+      const freshBudgets = await getBudgets(now.getFullYear(), now.getMonth() + 1);
+
       if (notificationsEnabled) {
-        const now = new Date();
-        const freshBudgets = await getBudgets(now.getFullYear(), now.getMonth() + 1);
         await checkBudgetThresholds(freshBudgets, alert80Enabled, alert100Enabled, categoryAlertOverrides);
         queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
         queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_COUNT_KEY });
       }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      // Show insight card if the category has a budget this month
+      const catBudget = freshBudgets.find(b => b.category === selectedCat);
+      if (catBudget && catBudget.limit > 0) {
+        setInsightBudget({ label: catBudget.label, icon: cat.icon, remaining: catBudget.limit - catBudget.spent });
+        await new Promise<void>(resolve => setTimeout(resolve, 2000));
+      }
+
       navigation.navigate('TransactionList', undefined);
     } catch (e: unknown) {
       setSaveError(e instanceof Error ? e.message : 'Failed to save. Please try again.');
@@ -440,6 +450,33 @@ export function AddExpenseScreen({ navigation }: Props) {
 
       {/* ── Save button ─────────────────────────────────────────────────────── */}
       <View style={[styles.saveWrap, { paddingHorizontal: H_PAD, paddingBottom: btmPad + spacing[3], paddingTop: spacing[3], borderTopColor: colors.border.subtle }]}>
+        {insightBudget && (
+          <View style={{
+            backgroundColor: insightBudget.remaining >= 0 ? `${colors.income}18` : `${colors.expense}18`,
+            borderRadius:    borderRadius.card,
+            borderWidth:     1,
+            borderColor:     insightBudget.remaining >= 0 ? colors.income : colors.expense,
+            padding:         spacing[3],
+            marginBottom:    spacing[3],
+            flexDirection:   'row',
+            alignItems:      'center',
+          }}>
+            <Text style={{ fontSize: 22, marginRight: spacing[3] }}>{insightBudget.icon}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.text.secondary }}>
+                {insightBudget.label} budget
+              </Text>
+              <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.bold, color: insightBudget.remaining >= 0 ? colors.income : colors.expense }}>
+                {insightBudget.remaining >= 0
+                  ? `${fmt(insightBudget.remaining)} remaining`
+                  : `${fmt(Math.abs(insightBudget.remaining))} over budget`}
+              </Text>
+            </View>
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted }}>
+              this month
+            </Text>
+          </View>
+        )}
         {saveError && (
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.expense, textAlign: 'center', marginBottom: spacing[2] }}>
             {saveError}
