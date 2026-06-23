@@ -23,6 +23,8 @@ import {
 } from '../services/notifications.service';
 import { migratePinIfNeeded } from '../utils/pin';
 import { fetchSecuritySettings, upsertSecuritySettings, fetchScoreMode } from '../services/security.service';
+import { trackAppOpened, identifyUser, resetAnalyticsUser } from '../services/analytics.service';
+import { setUserContext as setCrashUser, clearUserContext as clearCrashUser } from '../services/crash.service';
 
 const Root = createStackNavigator<RootStackParamList>();
 
@@ -90,6 +92,8 @@ export function RootNavigator() {
     // Restore session on cold start — use getUser() for server-fresh user_metadata.
     // Race against an 8 s timeout: a stalled SecureStore read or slow getUser() network
     // call should never leave the user stuck on the loading screen indefinitely.
+    trackAppOpened();
+
     const AUTH_TIMEOUT_MS = 8_000;
     let restoreCancelled = false;
     let restoreTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -132,6 +136,8 @@ export function RootNavigator() {
         clearUserSecurity();
         clearHealthScoreMode();
         resetAccountSettings();
+        resetAnalyticsUser();
+        clearCrashUser();
       }
 
       if (session) {
@@ -148,6 +154,8 @@ export function RootNavigator() {
           } catch {
             // DB query failed (e.g. RLS, network). App proceeds with store defaults.
           }
+          identifyUser(activeUser.id, { email: activeUser.email });
+          setCrashUser(activeUser.id);
           setHasOnboarded(true);
         }
         setSession(activeUser);
