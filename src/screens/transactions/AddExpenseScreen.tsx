@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Dimensions,
   Modal,
+  Switch,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { StatusBar } from 'expo-status-bar';
@@ -25,7 +26,7 @@ import { TRANSACTIONS_KEY } from '../../hooks/queries/useTransactions';
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
 import { BUDGETS_KEY } from '../../hooks/queries/useBudgets';
 import { NOTIFICATIONS_KEY, NOTIFICATIONS_COUNT_KEY } from '../../hooks/queries/useNotifications';
-import { addExpense, getBudgets } from '../../services/finance.service';
+import { addExpense, getBudgets, RECURRING_FREQUENCY_LABELS, type RecurringFrequency } from '../../services/finance.service';
 import { useAccounts } from '../../hooks/queries/useAccounts';
 import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { getCategoryBgColor } from '../../theme';
@@ -91,6 +92,8 @@ export function AddExpenseScreen({ navigation }: Props) {
   const [pickerMode,        setPickerMode]        = useState<'date' | 'time' | null>(null);
   const [tempDate,          setTempDate]          = useState(() => new Date());
   const [insightBudget,     setInsightBudget]     = useState<{ label: string; icon: string; remaining: number } | null>(null);
+  const [isRecurring,       setIsRecurring]       = useState(false);
+  const [recurringFreq,     setRecurringFreq]     = useState<RecurringFrequency>('monthly');
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -139,6 +142,8 @@ export function AddExpenseScreen({ navigation }: Props) {
         note:                note.trim() || undefined,
         fromAccountId:       fromAccount?.id,
         fromCurrentBalance:  fromAccount?.balance,
+        isRecurring:         isRecurring,
+        recurringFrequency:  isRecurring ? recurringFreq : undefined,
       });
       const keys: Promise<void>[] = [
         queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }),
@@ -443,6 +448,54 @@ export function AddExpenseScreen({ navigation }: Props) {
                 multiline
               />
             </View>
+          </View>
+        </View>
+
+        {/* ── Repeat ──────────────────────────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: H_PAD, marginBottom: spacing[5] }}>
+          <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[3] }}>
+            REPEAT
+          </Text>
+          <View style={[shadows.sm, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, overflow: 'hidden' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[4], paddingVertical: spacing[3] }}>
+              <Text style={{ fontSize: 16, marginRight: spacing[3] }}>🔁</Text>
+              <Text style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary }}>
+                Recurring expense
+              </Text>
+              <Switch
+                value={isRecurring}
+                onValueChange={(v) => { setIsRecurring(v); Haptics.selectionAsync(); }}
+                trackColor={{ false: colors.border.subtle, true: `${colors.accent.primary}80` }}
+                thumbColor={isRecurring ? colors.accent.primary : colors.bg.surfaceMuted}
+              />
+            </View>
+            {isRecurring && (
+              <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border.subtle, paddingHorizontal: spacing[4], paddingVertical: spacing[3] }}>
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: colors.text.muted, marginBottom: spacing[2] }}>
+                  Frequency
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+                  {(['daily', 'weekly', 'monthly', 'yearly'] as RecurringFrequency[]).map(freq => (
+                    <Pressable
+                      key={freq}
+                      onPress={() => { setRecurringFreq(freq); Haptics.selectionAsync(); }}
+                      style={{
+                        paddingHorizontal: spacing[3],
+                        paddingVertical:   spacing[1],
+                        borderRadius:      borderRadius.full,
+                        backgroundColor:   recurringFreq === freq ? colors.accent.primary : colors.bg.surfaceMuted,
+                        borderWidth:       1,
+                        borderColor:       recurringFreq === freq ? colors.accent.primary : colors.border.subtle,
+                      }}
+                    >
+                      <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.medium, color: recurringFreq === freq ? '#FFFFFF' : colors.text.secondary }}>
+                        {RECURRING_FREQUENCY_LABELS[freq]}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
           </View>
         </View>
         </Animated.View>

@@ -6,19 +6,21 @@ import { TransactionDetailScreen }  from '../../screens/transactions/Transaction
 import { AddExpenseScreen }         from '../../screens/transactions/AddExpenseScreen';
 import { AddIncomeScreen }          from '../../screens/transactions/AddIncomeScreen';
 import { FilterSheet }              from '../../screens/transactions/FilterSheet';
-import { BulkEditScreen }           from '../../screens/transactions/BulkEditScreen';
+import { BulkEditScreen }                from '../../screens/transactions/BulkEditScreen';
+import { RecurringTransactionsScreen }   from '../../screens/transactions/RecurringTransactionsScreen';
 
 const Stack = createStackNavigator<TransactionsStackParamList>();
 
 export function TransactionsStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="TransactionList"   component={ExpenseScreen} />
-      <Stack.Screen name="TransactionDetail" component={TransactionDetailScreen} />
-      <Stack.Screen name="AddExpense"        component={AddExpenseScreen} />
-      <Stack.Screen name="AddIncome"         component={AddIncomeScreen} />
-      <Stack.Screen name="Filter"            component={FilterSheet} />
-      <Stack.Screen name="BulkEdit"          component={BulkEditScreen} />
+      <Stack.Screen name="TransactionList"       component={ExpenseScreen} />
+      <Stack.Screen name="TransactionDetail"     component={TransactionDetailScreen} />
+      <Stack.Screen name="AddExpense"            component={AddExpenseScreen} />
+      <Stack.Screen name="AddIncome"             component={AddIncomeScreen} />
+      <Stack.Screen name="Filter"               component={FilterSheet} />
+      <Stack.Screen name="BulkEdit"             component={BulkEditScreen} />
+      <Stack.Screen name="RecurringTransactions" component={RecurringTransactionsScreen} />
     </Stack.Navigator>
   );
 }

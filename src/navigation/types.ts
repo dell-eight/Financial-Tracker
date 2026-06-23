@@ -42,12 +42,13 @@ export type HomeStackParamList = {
 
 // ── Transactions stack ─────────────────────────────────────────────────────────
 export type TransactionsStackParamList = {
-  TransactionList:   FilterState | undefined;
-  TransactionDetail: { id: string; type: 'expense' | 'income' | 'transfer' };
-  AddExpense:        undefined;
-  AddIncome:         undefined;
-  Filter:            { current?: FilterState } | undefined;
-  BulkEdit:          undefined;
+  TransactionList:         FilterState | undefined;
+  TransactionDetail:       { id: string; type: 'expense' | 'income' | 'transfer' };
+  AddExpense:              undefined;
+  AddIncome:               undefined;
+  Filter:                  { current?: FilterState } | undefined;
+  BulkEdit:                undefined;
+  RecurringTransactions:   undefined;
 };
 
 // ── Budget stack ───────────────────────────────────────────────────────────────

@@ -1303,30 +1303,49 @@ export function ExpenseScreen({ navigation, route }: Props) {
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing[3] }}>
                 <PeriodToggle value={period} onChange={setPeriod} />
 
-                <Pressable
-                  onPress={() => navigation.push('Filter', {
-                    current: {
-                      type:         typeFilter,
-                      period,
-                      selectedDate: localDateString(selectedDate),
-                      minAmount:    minAmount ?? undefined,
-                      maxAmount:    maxAmount ?? undefined,
-                    },
-                  })}
-                  style={[
-                    scr.iconBtn,
-                    {
-                      backgroundColor: hasActiveFilters ? colors.accent.muted : colors.bg.surface,
-                      borderRadius:    borderRadius.full,
-                      borderWidth:     1,
-                      borderColor:     hasActiveFilters ? colors.accent.primary : colors.border.subtle,
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Filter transactions"
-                >
-                  <Text style={{ fontSize: 16, color: hasActiveFilters ? colors.accent.primary : colors.text.secondary }}>≡</Text>
-                </Pressable>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+                  <Pressable
+                    onPress={() => navigation.push('RecurringTransactions')}
+                    style={[
+                      scr.iconBtn,
+                      {
+                        backgroundColor: colors.bg.surface,
+                        borderRadius:    borderRadius.full,
+                        borderWidth:     1,
+                        borderColor:     colors.border.subtle,
+                      },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Recurring transactions"
+                  >
+                    <Text style={{ fontSize: 14, color: colors.text.secondary }}>↻</Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={() => navigation.push('Filter', {
+                      current: {
+                        type:         typeFilter,
+                        period,
+                        selectedDate: localDateString(selectedDate),
+                        minAmount:    minAmount ?? undefined,
+                        maxAmount:    maxAmount ?? undefined,
+                      },
+                    })}
+                    style={[
+                      scr.iconBtn,
+                      {
+                        backgroundColor: hasActiveFilters ? colors.accent.muted : colors.bg.surface,
+                        borderRadius:    borderRadius.full,
+                        borderWidth:     1,
+                        borderColor:     hasActiveFilters ? colors.accent.primary : colors.border.subtle,
+                      },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Filter transactions"
+                  >
+                    <Text style={{ fontSize: 16, color: hasActiveFilters ? colors.accent.primary : colors.text.secondary }}>≡</Text>
+                  </Pressable>
+                </View>
               </View>
 
               <PeriodNavigator

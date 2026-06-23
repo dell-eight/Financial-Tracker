@@ -25,6 +25,7 @@ import {
 import { migratePinIfNeeded } from '../utils/pin';
 import { fetchSecuritySettings, upsertSecuritySettings, fetchScoreMode } from '../services/security.service';
 import { trackAppOpened, identifyUser, resetAnalyticsUser } from '../services/analytics.service';
+import { applyDueRecurringTransactions } from '../services/finance.service';
 import { setUserContext as setCrashUser, clearUserContext as clearCrashUser } from '../services/crash.service';
 
 const Root = createStackNavigator<RootStackParamList>();
@@ -109,7 +110,10 @@ export function RootNavigator() {
       const { data: { user } } = await supabase.auth.getUser();
       if (restoreCancelled) return;
       const activeUser = user ?? session.user ?? null;
-      if (activeUser) await loadSecurity(activeUser.id);
+      if (activeUser) {
+        await loadSecurity(activeUser.id);
+        applyDueRecurringTransactions().catch(() => {});
+      }
       if (restoreCancelled) return;
       setSession(activeUser);
     });
@@ -159,6 +163,7 @@ export function RootNavigator() {
           identifyUser(activeUser.id, { email: activeUser.email });
           setCrashUser(activeUser.id);
           setHasOnboarded(true);
+          applyDueRecurringTransactions().catch(() => {});
         }
         setSession(activeUser);
       } else {

@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import type {
   DashboardSummary, Transaction, Budget, SavingsGoal,
@@ -621,14 +622,17 @@ export async function deleteTransaction(id: string, type: 'expense' | 'income'):
 }
 
 export async function addExpense(params: {
-  merchant:           string;
-  categoryName:       string;
-  categoryIcon:       string;
-  amount:             number;
-  date:               string;
-  note?:              string;
-  fromAccountId?:     string;
+  merchant:            string;
+  categoryName:        string;
+  categoryIcon:        string;
+  amount:              number;
+  date:                string;
+  note?:               string;
+  fromAccountId?:      string;
   fromCurrentBalance?: number;
+  isRecurring?:        boolean;
+  recurringFrequency?: RecurringFrequency;
+  recurringEndDate?:   string;
 }): Promise<void> {
   const userId = await uid();
 
@@ -654,48 +658,50 @@ export async function addExpense(params: {
     categoryId = newCat.id;
   }
 
-  const insertExpense = async () => {
-    const { error } = await supabase
-      .from('expenses')
-      .insert({
-        user_id:     userId,
-        description: params.merchant,
-        amount:      params.amount,
-        date:        params.date,
-        category_id: categoryId,
-        notes:       params.note ?? null,
-        account_id:  params.fromAccountId ?? null,
-      });
-    if (error) throw error;
-  };
-
-  const ops: Promise<void>[] = [insertExpense()];
+  const { data: newExp, error: expErr } = await supabase
+    .from('expenses')
+    .insert({
+      user_id:             userId,
+      description:         params.merchant,
+      amount:              params.amount,
+      date:                params.date,
+      category_id:         categoryId,
+      notes:               params.note ?? null,
+      account_id:          params.fromAccountId ?? null,
+      is_recurring:        params.isRecurring ?? false,
+      recurring_frequency: params.recurringFrequency ?? null,
+      recurring_end_date:  params.recurringEndDate ?? null,
+    })
+    .select('id')
+    .single();
+  if (expErr) throw expErr;
 
   if (params.fromAccountId && params.fromCurrentBalance !== undefined) {
-    const debitAccount = async () => {
-      const { error } = await supabase
-        .from('asset_accounts')
-        .update({ balance: Math.max(0, params.fromCurrentBalance! - params.amount) })
-        .eq('id', params.fromAccountId!)
-        .eq('user_id', userId);
-      if (error) throw error;
-    };
-    ops.push(debitAccount());
+    const { error } = await supabase
+      .from('asset_accounts')
+      .update({ balance: Math.max(0, params.fromCurrentBalance - params.amount) })
+      .eq('id', params.fromAccountId)
+      .eq('user_id', userId);
+    if (error) throw error;
   }
 
-  await Promise.all(ops);
+  if (params.isRecurring && params.recurringFrequency) {
+    await AsyncStorage.setItem(RECURRING_EXP_KEY + newExp.id, params.date);
+  }
 }
 
 export async function addIncome(params: {
-  description:      string;
-  sourceName:       string;
-  sourceType:       string;
-  sourceIcon:       string;
-  amount:           number;
-  date:             string;
-  note?:            string;
-  toAccountId?:     string;
-  toCurrentBalance?: number;
+  description:         string;
+  sourceName:          string;
+  sourceType:          string;
+  sourceIcon:          string;
+  amount:              number;
+  date:                string;
+  note?:               string;
+  toAccountId?:        string;
+  toCurrentBalance?:   number;
+  isRecurring?:        boolean;
+  recurringFrequency?: RecurringFrequency;
 }): Promise<void> {
   const userId = await uid();
 
@@ -711,46 +717,58 @@ export async function addIncome(params: {
   let sourceId: string;
   if (existing) {
     sourceId = existing.id;
+    // Update recurring flag if changing
+    if (params.isRecurring !== undefined) {
+      await supabase
+        .from('income_sources')
+        .update({
+          is_recurring:        params.isRecurring,
+          recurring_frequency: params.isRecurring ? (params.recurringFrequency ?? null) : null,
+        })
+        .eq('id', sourceId);
+    }
   } else {
     const { data: newSrc, error: srcErr } = await supabase
       .from('income_sources')
-      .insert({ user_id: userId, name: params.sourceName, type: params.sourceType, icon: params.sourceIcon })
+      .insert({
+        user_id:             userId,
+        name:                params.sourceName,
+        type:                params.sourceType,
+        icon:                params.sourceIcon,
+        is_recurring:        params.isRecurring ?? false,
+        recurring_frequency: params.isRecurring ? (params.recurringFrequency ?? null) : null,
+      })
       .select('id')
       .single();
     if (srcErr) throw srcErr;
     sourceId = newSrc.id;
   }
 
-  const insertRecord = async () => {
-    const { error } = await supabase
-      .from('income_records')
-      .insert({
-        user_id:     userId,
-        source_id:   sourceId,
-        description: params.description || params.sourceName,
-        amount:      params.amount,
-        date:        params.date,
-        notes:       params.note ?? null,
-        account_id:  params.toAccountId ?? null,
-      });
-    if (error) throw error;
-  };
-
-  const ops: Promise<void>[] = [insertRecord()];
+  const { error: recErr } = await supabase
+    .from('income_records')
+    .insert({
+      user_id:     userId,
+      source_id:   sourceId,
+      description: params.description || params.sourceName,
+      amount:      params.amount,
+      date:        params.date,
+      notes:       params.note ?? null,
+      account_id:  params.toAccountId ?? null,
+    });
+  if (recErr) throw recErr;
 
   if (params.toAccountId && params.toCurrentBalance !== undefined) {
-    const creditAccount = async () => {
-      const { error } = await supabase
-        .from('asset_accounts')
-        .update({ balance: params.toCurrentBalance! + params.amount })
-        .eq('id', params.toAccountId!)
-        .eq('user_id', userId);
-      if (error) throw error;
-    };
-    ops.push(creditAccount());
+    const { error } = await supabase
+      .from('asset_accounts')
+      .update({ balance: params.toCurrentBalance + params.amount })
+      .eq('id', params.toAccountId)
+      .eq('user_id', userId);
+    if (error) throw error;
   }
 
-  await Promise.all(ops);
+  if (params.isRecurring && params.recurringFrequency) {
+    await AsyncStorage.setItem(RECURRING_INC_KEY + sourceId, params.date);
+  }
 }
 
 export async function addTransfer(params: {
@@ -1844,4 +1862,275 @@ export async function getTradeHistory(filters: {
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []) as InvestmentTransaction[];
+}
+
+// ── Recurring Transactions ─────────────────────────────────────────────────────
+
+const RECURRING_EXP_KEY = 'recurring_exp_last_';
+const RECURRING_INC_KEY = 'recurring_inc_last_';
+
+export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+export const RECURRING_FREQUENCY_LABELS: Record<RecurringFrequency, string> = {
+  daily:   'Daily',
+  weekly:  'Weekly',
+  monthly: 'Monthly',
+  yearly:  'Yearly',
+};
+
+export interface RecurringExpense {
+  id:           string;
+  description:  string;
+  amount:       number;
+  categoryName: string;
+  categoryIcon: string;
+  frequency:    RecurringFrequency;
+  endDate:      string | null;
+  startDate:    string;
+  nextDueDate:  string;
+}
+
+export interface RecurringIncomeSource {
+  id:           string;
+  name:         string;
+  icon:         string;
+  type:         string;
+  frequency:    RecurringFrequency;
+  latestAmount: number;
+  nextDueDate:  string;
+}
+
+function toISODateStr(d: Date): string {
+  const y   = d.getFullYear();
+  const m   = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function calcNextDue(lastDateStr: string, freq: RecurringFrequency): string {
+  // Use noon to avoid daylight-saving edge cases
+  const d = new Date(lastDateStr + 'T12:00:00');
+  switch (freq) {
+    case 'daily':   d.setDate(d.getDate() + 1);          break;
+    case 'weekly':  d.setDate(d.getDate() + 7);          break;
+    case 'monthly': d.setMonth(d.getMonth() + 1);        break;
+    case 'yearly':  d.setFullYear(d.getFullYear() + 1);  break;
+  }
+  return toISODateStr(d);
+}
+
+export async function getRecurringExpenses(): Promise<RecurringExpense[]> {
+  const userId = await uid();
+
+  type Row = {
+    id: string; description: string; amount: number; date: string;
+    recurring_frequency: string; recurring_end_date: string | null;
+    expense_categories: { name: string; icon: string | null }[] | null;
+  };
+
+  const { data, error } = await supabase
+    .from('expenses')
+    .select('id, description, amount, date, recurring_frequency, recurring_end_date, expense_categories(name, icon)')
+    .eq('user_id', userId)
+    .eq('is_recurring', true)
+    .is('deleted_at', null)
+    .order('date', { ascending: false });
+  if (error) throw error;
+
+  const results: RecurringExpense[] = [];
+  for (const row of ((data ?? []) as unknown as Row[])) {
+    const freq = row.recurring_frequency as RecurringFrequency | null;
+    if (!freq) continue;
+    const lastApplied = await AsyncStorage.getItem(RECURRING_EXP_KEY + row.id) ?? row.date;
+    const cat = Array.isArray(row.expense_categories) ? row.expense_categories[0] : row.expense_categories;
+    results.push({
+      id:           row.id,
+      description:  row.description,
+      amount:       row.amount,
+      categoryName: cat?.name ?? 'Expense',
+      categoryIcon: cat?.icon ?? '💸',
+      frequency:    freq,
+      endDate:      row.recurring_end_date,
+      startDate:    row.date,
+      nextDueDate:  calcNextDue(lastApplied, freq),
+    });
+  }
+  return results;
+}
+
+export async function getRecurringIncomeSources(): Promise<RecurringIncomeSource[]> {
+  const userId = await uid();
+
+  type SourceRow = { id: string; name: string; icon: string | null; type: string; recurring_frequency: string };
+  type RecordRow = { amount: number };
+
+  const { data: sources, error } = await supabase
+    .from('income_sources')
+    .select('id, name, icon, type, recurring_frequency')
+    .eq('user_id', userId)
+    .eq('is_recurring', true)
+    .is('deleted_at', null);
+  if (error) throw error;
+
+  const results: RecurringIncomeSource[] = [];
+  for (const src of ((sources ?? []) as SourceRow[])) {
+    const freq = src.recurring_frequency as RecurringFrequency | null;
+    if (!freq) continue;
+
+    const { data: latestRecord } = await supabase
+      .from('income_records')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('source_id', src.id)
+      .is('deleted_at', null)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const lastApplied = await AsyncStorage.getItem(RECURRING_INC_KEY + src.id)
+      ?? toISODateStr(new Date());
+
+    results.push({
+      id:           src.id,
+      name:         src.name,
+      icon:         src.icon ?? '💰',
+      type:         src.type,
+      frequency:    freq,
+      latestAmount: (latestRecord as RecordRow | null)?.amount ?? 0,
+      nextDueDate:  calcNextDue(lastApplied, freq),
+    });
+  }
+  return results;
+}
+
+export async function deleteRecurringExpense(id: string): Promise<void> {
+  const userId = await uid();
+  const { error } = await supabase
+    .from('expenses')
+    .update({ deleted_at: new Date().toISOString(), is_recurring: false })
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (error) throw error;
+  await AsyncStorage.removeItem(RECURRING_EXP_KEY + id);
+}
+
+export async function deleteRecurringIncomeSource(id: string): Promise<void> {
+  const userId = await uid();
+  const { error } = await supabase
+    .from('income_sources')
+    .update({ is_recurring: false, recurring_frequency: null })
+    .eq('id', id)
+    .eq('user_id', userId);
+  if (error) throw error;
+  await AsyncStorage.removeItem(RECURRING_INC_KEY + id);
+}
+
+export async function applyDueRecurringTransactions(): Promise<void> {
+  let userId: string;
+  try {
+    userId = await uid();
+  } catch {
+    return; // not authenticated
+  }
+
+  const today = toISODateStr(new Date());
+  const MAX_CATCH_UP = 60; // safety cap: never create more than 60 auto-instances per template
+
+  // ── Recurring expenses ────────────────────────────────────────────────────
+
+  type ExpRow = {
+    id: string; description: string; amount: number; date: string;
+    recurring_frequency: string; recurring_end_date: string | null;
+    category_id: string;
+  };
+
+  const { data: recurringExps } = await supabase
+    .from('expenses')
+    .select('id, description, amount, date, recurring_frequency, recurring_end_date, category_id')
+    .eq('user_id', userId)
+    .eq('is_recurring', true)
+    .is('deleted_at', null);
+
+  for (const exp of ((recurringExps ?? []) as ExpRow[])) {
+    const freq = exp.recurring_frequency as RecurringFrequency | null;
+    if (!freq) continue;
+    if (exp.recurring_end_date && exp.recurring_end_date < today) continue;
+
+    const lastApplied = await AsyncStorage.getItem(RECURRING_EXP_KEY + exp.id) ?? exp.date;
+    let nextDue = calcNextDue(lastApplied, freq);
+    let newLastApplied = lastApplied;
+    let count = 0;
+
+    while (nextDue <= today && count < MAX_CATCH_UP) {
+      if (exp.recurring_end_date && nextDue > exp.recurring_end_date) break;
+      await supabase.from('expenses').insert({
+        user_id:      userId,
+        description:  exp.description,
+        amount:       exp.amount,
+        date:         nextDue,
+        category_id:  exp.category_id,
+        is_recurring: false,
+      });
+      newLastApplied = nextDue;
+      nextDue = calcNextDue(nextDue, freq);
+      count++;
+    }
+
+    if (newLastApplied !== lastApplied) {
+      await AsyncStorage.setItem(RECURRING_EXP_KEY + exp.id, newLastApplied);
+    }
+  }
+
+  // ── Recurring income sources ──────────────────────────────────────────────
+
+  type SrcRow = { id: string; name: string; icon: string | null; type: string; recurring_frequency: string };
+  type RecRow = { amount: number; date: string };
+
+  const { data: recurringSrcs } = await supabase
+    .from('income_sources')
+    .select('id, name, icon, type, recurring_frequency')
+    .eq('user_id', userId)
+    .eq('is_recurring', true)
+    .is('deleted_at', null);
+
+  for (const src of ((recurringSrcs ?? []) as SrcRow[])) {
+    const freq = src.recurring_frequency as RecurringFrequency | null;
+    if (!freq) continue;
+
+    // Get latest income_record to use as the default amount
+    const { data: latestRec } = await supabase
+      .from('income_records')
+      .select('amount, date')
+      .eq('user_id', userId)
+      .eq('source_id', src.id)
+      .is('deleted_at', null)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const rec = latestRec as RecRow | null;
+    if (!rec) continue; // no income_record yet — skip
+
+    const lastApplied = await AsyncStorage.getItem(RECURRING_INC_KEY + src.id) ?? rec.date;
+    let nextDue = calcNextDue(lastApplied, freq);
+    let newLastApplied = lastApplied;
+    let count = 0;
+
+    while (nextDue <= today && count < MAX_CATCH_UP) {
+      await supabase.from('income_records').insert({
+        user_id:     userId,
+        source_id:   src.id,
+        description: src.name,
+        amount:      rec.amount,
+        date:        nextDue,
+      });
+      newLastApplied = nextDue;
+      nextDue = calcNextDue(nextDue, freq);
+      count++;
+    }
+
+    if (newLastApplied !== lastApplied) {
+      await AsyncStorage.setItem(RECURRING_INC_KEY + src.id, newLastApplied);
+    }
+  }
 }
