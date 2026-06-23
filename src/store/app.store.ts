@@ -33,9 +33,14 @@ const MAX_LOGIN_ATTEMPTS  = 5;
 const LOCKOUT_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 interface AppState {
-  // ── Device-level onboarding flag (persisted, never reset) ─────────────
+  // ── Device-level onboarding flags (persisted, never reset) ───────────
   hasOnboarded: boolean;
   setHasOnboarded: (value: boolean) => void;
+  // Tracks whether this device has seen the net worth reveal onboarding.
+  // Set to true on completion/skip, and also for returning users on sign-in
+  // (accounts older than 5 min) so they don't see onboarding unexpectedly.
+  hasSeenNetWorthOnboarding: boolean;
+  setHasSeenNetWorthOnboarding: (value: boolean) => void;
 
   // ── Account-level preferences (persisted, reset on sign-out) ──────────
   themePreference:      ThemePreference;
@@ -99,7 +104,8 @@ export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
       // ── Initial values ───────────────────────────────────────────────
-      hasOnboarded:         false,
+      hasOnboarded:              false,
+      hasSeenNetWorthOnboarding: false,
       themePreference:      'system',
       currency:             'PHP',
       notificationsEnabled:   true,
@@ -115,7 +121,8 @@ export const useAppStore = create<AppState>()(
       isBiometricUnlocked:  false,
       pendingMilestones:    [],
 
-      setHasOnboarded: (hasOnboarded) => set({ hasOnboarded }),
+      setHasOnboarded:              (hasOnboarded)              => set({ hasOnboarded }),
+      setHasSeenNetWorthOnboarding: (hasSeenNetWorthOnboarding) => set({ hasSeenNetWorthOnboarding }),
 
       // ── Account setters ──────────────────────────────────────────────
       setThemePreference:          (themePreference)          => set({ themePreference }),
@@ -212,7 +219,8 @@ export const useAppStore = create<AppState>()(
       // sign-in so they follow the account, not the device.
       // isBiometricUnlocked and pendingMilestones are session-only.
       partialize: (state) => ({
-        hasOnboarded:         state.hasOnboarded,
+        hasOnboarded:              state.hasOnboarded,
+        hasSeenNetWorthOnboarding: state.hasSeenNetWorthOnboarding,
         themePreference:      state.themePreference,
         currency:             state.currency,
         notificationsEnabled:   state.notificationsEnabled,

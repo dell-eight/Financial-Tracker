@@ -29,9 +29,12 @@ export interface Transaction {
   date: string;
   time: string;
   note?: string;
-  accountId?:      string;
-  accountName?:    string;
-  counterpartName?: string;
+  accountId?:          string;
+  accountName?:        string;
+  counterpartName?:    string;
+  isRecurring?:        boolean;
+  recurringFrequency?: string;
+  recurringSourceId?:  string;
 }
 
 export interface Budget {

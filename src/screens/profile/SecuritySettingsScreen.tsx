@@ -8,6 +8,7 @@ import {
   Switch,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +22,8 @@ import { useAuthStore } from '../../store/auth.store';
 import { isBiometricAvailable, authenticateWithBiometrics } from '../../utils/biometrics';
 import { clearPIN } from '../../utils/pin';
 import { upsertSecuritySettings } from '../../services/security.service';
+import { deleteAccount } from '../../services/auth.service';
+import { signOut } from '../../services/auth.service';
 import type { HomeStackParamList } from '../../navigation/types';
 import type { AutoLockDuration } from '../../store/app.store';
 
@@ -239,13 +242,30 @@ export function SecuritySettingsScreen({ navigation }: Props) {
     syncToSupabase({ screenshotPrivacyEnabled: value });
   }
 
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
   function handleDeleteAccount() {
     Alert.alert(
       'Delete Account',
-      'This will permanently delete all your data. This cannot be undone.',
+      'This will permanently delete your account and all your financial data. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete Forever', style: 'destructive', onPress: clearAuth },
+        {
+          text:  'Delete Forever',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingAccount(true);
+            const { error } = await deleteAccount();
+            setDeletingAccount(false);
+            if (error) {
+              Alert.alert('Error', `Could not delete account: ${error}`);
+              return;
+            }
+            // Auth user is gone — clear local state and sign out
+            await signOut();
+            clearAuth();
+          },
+        },
       ],
     );
   }
@@ -404,8 +424,10 @@ export function SecuritySettingsScreen({ navigation }: Props) {
               icon="🗑️"
               label="Delete Account"
               desc="Permanently removes all data"
-              right={<Text style={{ fontSize: 18, color: colors.expense, lineHeight: 24 }}>›</Text>}
-              onPress={handleDeleteAccount}
+              right={deletingAccount
+                ? <ActivityIndicator size="small" color={colors.expense} />
+                : <Text style={{ fontSize: 18, color: colors.expense, lineHeight: 24 }}>›</Text>}
+              onPress={deletingAccount ? undefined : handleDeleteAccount}
               danger
               theme={theme}
             />

@@ -23,7 +23,7 @@ import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
 import { BUDGETS_KEY } from '../../hooks/queries/useBudgets';
 import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { getCategoryBgColor } from '../../theme';
-import { deleteTransaction, updateExpense, updateIncome, getTransferById, deleteTransfer } from '../../services/finance.service';
+import { deleteTransaction, updateExpense, updateIncome, getTransferById, deleteTransfer, calcNextDue, RECURRING_FREQUENCY_LABELS, type RecurringFrequency } from '../../services/finance.service';
 import type { TransactionsStackParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
@@ -44,6 +44,12 @@ function formatTime(timeStr: string): string {
   const ampm = h >= 12 ? 'PM' : 'AM';
   const h12  = h % 12 || 12;
   return `${h12}:${mStr} ${ampm}`;
+}
+
+function formatNextOccurrence(dateStr: string, freq: string): string {
+  const next = calcNextDue(dateStr, freq as RecurringFrequency);
+  const d = new Date(next + 'T12:00:00');
+  return d.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
 }
 
 // ─── DetailRow ────────────────────────────────────────────────────────────────
@@ -421,8 +427,21 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
             label="Note"
             value={tx.note ?? '—'}
             valueColor={tx.note ? colors.text.primary : colors.text.muted}
-            isLast
+            isLast={!tx.isRecurring}
           />
+          {tx.isRecurring && tx.recurringFrequency && (
+            <>
+              <DetailRow
+                label="Repeats"
+                value={`🔁 ${RECURRING_FREQUENCY_LABELS[tx.recurringFrequency as RecurringFrequency] ?? tx.recurringFrequency}`}
+              />
+              <DetailRow
+                label="Next occurrence"
+                value={formatNextOccurrence(tx.date, tx.recurringFrequency)}
+                isLast
+              />
+            </>
+          )}
         </View>
         </Animated.View>
 

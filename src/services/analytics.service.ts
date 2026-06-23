@@ -16,7 +16,7 @@ export function initAnalytics(): PostHog {
     return _client!;
   }
   if (_client) return _client;
-  _client = new PostHog(apiKey, { host: 'https://us.i.posthog.com', flushAt: 1 });
+  _client = new PostHog(apiKey, { host: 'https://us.i.posthog.com', flushAt: 1, captureScreenViews: false });
   return _client;
 }
 

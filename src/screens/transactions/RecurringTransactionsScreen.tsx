@@ -37,18 +37,27 @@ function formatNextDue(dateStr: string): string {
   today.setHours(0, 0, 0, 0);
   const d = new Date(dateStr + 'T12:00:00');
   const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
-  if (diff === 0) return 'Due today';
-  if (diff === 1) return 'Tomorrow';
   if (diff < 0)  return 'Overdue';
-  if (diff < 7)  return `In ${diff} days`;
-  return d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+  if (diff === 0) return 'Next: Today';
+  if (diff === 1) return 'Next: Tomorrow';
+  const date = d.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' });
+  const day  = d.toLocaleDateString('en-PH', { weekday: 'short' });
+  return `Next: ${date}, ${day}`;
 }
 
-function isDueSoon(dateStr: string): boolean {
+type DueUrgency = 'soon' | 'medium' | 'far';
+
+function getDueUrgency(dateStr: string): DueUrgency {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const d = new Date(dateStr + 'T12:00:00');
-  return d.getTime() - today.getTime() <= 3 * 86_400_000;
+  const diff = Math.round((d.getTime() - today.getTime()) / 86_400_000);
+  // red  = overdue or due today (diff <= 0)
+  // amber = next 1–7 days
+  // green = 8+ days out
+  if (diff <= 0) return 'soon';
+  if (diff <= 7) return 'medium';
+  return 'far';
 }
 
 export function RecurringTransactionsScreen({ navigation }: Props) {
@@ -61,12 +70,12 @@ export function RecurringTransactionsScreen({ navigation }: Props) {
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
 
-  const { data: expenses = [], isLoading: loadingExp } = useQuery({
+  const { data: expenses = [], isLoading: loadingExp, isError: errorExp, error: expErr } = useQuery({
     queryKey: RECURRING_EXPENSES_KEY,
     queryFn:  getRecurringExpenses,
   });
 
-  const { data: income = [], isLoading: loadingInc } = useQuery({
+  const { data: income = [], isLoading: loadingInc, isError: errorInc, error: incErr } = useQuery({
     queryKey: RECURRING_INCOME_KEY,
     queryFn:  getRecurringIncomeSources,
   });
@@ -114,6 +123,7 @@ export function RecurringTransactionsScreen({ navigation }: Props) {
   }
 
   const isLoading = loadingExp || loadingInc;
+  const hasError  = errorExp || errorInc;
   const isEmpty   = expenses.length === 0 && income.length === 0;
 
   return (
@@ -121,28 +131,45 @@ export function RecurringTransactionsScreen({ navigation }: Props) {
       <StatusBar style={theme.statusBarStyle} />
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <View style={[styles.header, { paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }]}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
-          <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
-        </Pressable>
-        <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>
-          Recurring
+      <View style={{ paddingTop: topPad + spacing[1], paddingHorizontal: spacing[5], paddingBottom: spacing[3] }}>
+        <View style={styles.header}>
+          <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ minWidth: 60 }}>
+            <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
+          </Pressable>
+          <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>
+            Recurring
+          </Text>
+          <View style={{ minWidth: 60 }} />
+        </View>
+        <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', marginTop: spacing[1] }}>
+          Transactions that repeat automatically on a schedule
         </Text>
-        <View style={{ minWidth: 60 }} />
       </View>
 
       {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator color={colors.accent.primary} />
         </View>
+      ) : hasError ? (
+        <View style={styles.centered}>
+          <Text style={{ fontSize: 36, marginBottom: spacing[3] }}>⚠️</Text>
+          <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: colors.text.primary, textAlign: 'center' }}>
+            Couldn't load recurring transactions
+          </Text>
+          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', marginTop: spacing[2] }}>
+            {(expErr ?? incErr) instanceof Error
+              ? (expErr ?? incErr)!.message
+              : 'Please try again.'}
+          </Text>
+        </View>
       ) : isEmpty ? (
         <View style={styles.centered}>
           <Text style={{ fontSize: 40, marginBottom: spacing[4] }}>🔁</Text>
           <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: colors.text.primary, textAlign: 'center' }}>
-            No recurring transactions
+            No recurring transactions yet
           </Text>
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', marginTop: spacing[2], lineHeight: 20 }}>
-            Toggle "Repeat" when adding{'\n'}an expense or income to set one up.
+            When you add an expense or income,{'\n'}turn on <Text style={{ fontFamily: fontFamily.semiBold, color: colors.text.secondary }}>Repeat</Text> to schedule it automatically.
           </Text>
         </View>
       ) : (
@@ -167,7 +194,7 @@ export function RecurringTransactionsScreen({ navigation }: Props) {
                     amountColor={colors.expense}
                     frequency={RECURRING_FREQUENCY_LABELS[item.frequency]}
                     nextDue={formatNextDue(item.nextDueDate)}
-                    dueSoon={isDueSoon(item.nextDueDate)}
+                    urgency={getDueUrgency(item.nextDueDate)}
                     isLast={i === expenses.length - 1}
                     onDelete={() => confirmDeleteExpense(item)}
                     colors={colors}
@@ -198,7 +225,7 @@ export function RecurringTransactionsScreen({ navigation }: Props) {
                     amountColor={colors.income}
                     frequency={RECURRING_FREQUENCY_LABELS[item.frequency]}
                     nextDue={formatNextDue(item.nextDueDate)}
-                    dueSoon={isDueSoon(item.nextDueDate)}
+                    urgency={getDueUrgency(item.nextDueDate)}
                     isLast={i === income.length - 1}
                     onDelete={() => confirmDeleteIncome(item)}
                     colors={colors}
@@ -214,7 +241,7 @@ export function RecurringTransactionsScreen({ navigation }: Props) {
 
           {/* ── Help text ─────────────────────────────────────────────────── */}
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', marginTop: spacing[5], lineHeight: 20 }}>
-            Recurring transactions are auto-applied each time{'\n'}you open the app.
+            Transactions are automatically applied when due.
           </Text>
         </ScrollView>
       )}
@@ -227,7 +254,7 @@ export function RecurringTransactionsScreen({ navigation }: Props) {
 type RowProps = {
   icon: string; title: string; subtitle: string;
   amount: string; amountColor: string;
-  frequency: string; nextDue: string; dueSoon: boolean;
+  frequency: string; nextDue: string; urgency: DueUrgency;
   isLast: boolean; onDelete: () => void;
   colors: ReturnType<typeof useTheme>['colors'];
   spacing: ReturnType<typeof useTheme>['spacing'];
@@ -236,7 +263,12 @@ type RowProps = {
   borderRadius: ReturnType<typeof useTheme>['borderRadius'];
 };
 
-function RecurringRow({ icon, title, subtitle, amount, amountColor, frequency, nextDue, dueSoon, isLast, onDelete, colors, spacing, fontSize, fontFamily, borderRadius }: RowProps) {
+function RecurringRow({ icon, title, subtitle, amount, amountColor, frequency, nextDue, urgency, isLast, onDelete, colors, spacing, fontSize, fontFamily, borderRadius }: RowProps) {
+  const badgeColor = urgency === 'soon'
+    ? colors.expense
+    : urgency === 'medium'
+      ? '#F59E0B'
+      : colors.income;
   return (
     <View style={{
       flexDirection:   'row',
@@ -268,12 +300,12 @@ function RecurringRow({ icon, title, subtitle, amount, amountColor, frequency, n
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
           <View style={{
-            backgroundColor: dueSoon ? `${colors.expense}18` : `${colors.income}18`,
+            backgroundColor: `${badgeColor}18`,
             borderRadius:    borderRadius.full,
             paddingHorizontal: spacing[2],
             paddingVertical:   2,
           }}>
-            <Text style={{ fontSize: 11, fontFamily: fontFamily.medium, color: dueSoon ? colors.expense : colors.income }}>
+            <Text style={{ fontSize: 11, fontFamily: fontFamily.medium, color: badgeColor }}>
               {nextDue}
             </Text>
           </View>

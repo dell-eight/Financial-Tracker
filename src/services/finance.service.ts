@@ -1,5 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
+
+// ── Recurring transaction constants (used by addExpense, addIncome, and query helpers) ──
+const RECURRING_EXP_KEY = 'recurring_exp_last_';
+const RECURRING_INC_KEY = 'recurring_inc_last_';
+export type RecurringFrequency = 'daily' | 'weekly' | 'semimonthly' | 'monthly' | 'yearly';
+export const RECURRING_FREQUENCY_LABELS: Record<RecurringFrequency, string> = {
+  daily:       'Every day',
+  weekly:      'Every week',
+  semimonthly: 'Twice a month (1st & 15th)',
+  monthly:     'Every month',
+  yearly:      'Every year',
+};
 import type {
   DashboardSummary, Transaction, Budget, SavingsGoal,
   Account, AssetItem, DebtItem, InvestmentHolding,
@@ -14,8 +26,8 @@ type RawDashboardRow   = { total_debts: unknown; monthly_income: unknown; monthl
 type RawBalanceRow     = { balance: unknown };
 type RawSharesRow      = { shares: unknown; current_price: unknown };
 type RawGoalContribRow = { savings_goal_contributions: Array<{ amount: unknown }> };
-type RawExpenseRow     = { id: string; description: string; amount: unknown; date: string; created_at: string; notes: string | null; account_id: string | null; expense_categories: { name: string; icon: string | null; color: string } | null; asset_accounts: { name: string } | null };
-type RawIncomeRow      = { id: string; description: string | null; amount: unknown; date: string; created_at: string; notes: string | null; account_id: string | null; income_sources: { name: string; type: string; icon: string | null } | null; asset_accounts: { name: string } | null };
+type RawExpenseRow     = { id: string; description: string; amount: unknown; date: string; created_at: string; notes: string | null; account_id: string | null; is_recurring: boolean; recurring_frequency: string | null; expense_categories: { name: string; icon: string | null; color: string } | null; asset_accounts: { name: string } | null };
+type RawIncomeRow      = { id: string; description: string | null; amount: unknown; date: string; created_at: string; notes: string | null; account_id: string | null; income_sources: { id: string; name: string; type: string; icon: string | null; is_recurring: boolean; recurring_frequency: string | null } | null; asset_accounts: { name: string } | null };
 type RawTransferRow    = { id: string; amount: unknown; date: string; created_at: string; notes: string | null; from_account_id: string; to_account_id: string; from: { name: string } | null; to: { name: string } | null };
 type RawCategoryRow    = { id: string; name: string; icon: string | null; color: string | null; budget_limit: unknown };
 type RawGoalRow        = { id: string; name: string; category: string; icon: string | null; target_amount: unknown; color: string | null; priority: number | null; savings_goal_contributions: Array<{ amount: unknown }> };
@@ -274,8 +286,9 @@ export async function upsertMonthlySnapshot(): Promise<void> {
 }
 
 export async function checkAndRecordMilestones(
-  netWorth:   number,
-  totalDebts: number,
+  netWorth:        number,
+  totalDebts:      number,
+  hasDebtAccounts: boolean = false,
 ): Promise<NewMilestone[]> {
   const userId = await uid();
 
@@ -289,7 +302,9 @@ export async function checkAndRecordMilestones(
 
   const toInsert = MILESTONE_DEFS.filter(m => {
     if (existingTypes.has(m.type)) return false;
-    if (m.type === 'debt_free') return totalDebts === 0 && netWorth > 0;
+    if (m.type === 'debt_free') return hasDebtAccounts && totalDebts === 0 && netWorth > 0;
+    // positive_nw uses threshold 0 but must be strictly positive — ₱0 is not a milestone
+    if (m.type === 'positive_nw') return netWorth > 0;
     return netWorth >= (m.threshold ?? 0);
   });
 
@@ -370,10 +385,11 @@ export async function syncWealthProgression(): Promise<void> {
     const inv   = (holdingRes.data as RawSharesRow[]      ?? []).reduce((s, h) => s + Number(h.shares ?? 0) * Number(h.current_price ?? 0), 0);
     const sav   = (goalRes.data    as RawGoalContribRow[] ?? []).reduce((s, g) =>
       s + (g.savings_goal_contributions ?? []).reduce((gs, c) => gs + Number(c.amount ?? 0), 0), 0);
-    const debts = (debtRes.data    as RawBalanceRow[]     ?? []).reduce((s, d) => s + Number(d.balance ?? 0), 0);
-    const nw    = bank + inv + sav - debts;
+    const debtRows = (debtRes.data as RawBalanceRow[] ?? []);
+    const debts    = debtRows.reduce((s, d) => s + Number(d.balance ?? 0), 0);
+    const nw       = bank + inv + sav - debts;
 
-    const newMilestones = await checkAndRecordMilestones(nw, debts);
+    const newMilestones = await checkAndRecordMilestones(nw, debts, debtRows.length > 0);
     if (newMilestones.length > 0) {
       // Import lazily to avoid circular dep with store
       const { useAppStore } = await import('../store/app.store');
@@ -392,7 +408,7 @@ export async function getTransactions(opts?: { from?: string; to?: string }): Pr
 
   let expQ = supabase
     .from('expenses')
-    .select('id, description, amount, date, created_at, notes, account_id, expense_categories(name, icon, color), asset_accounts(name)')
+    .select('id, description, amount, date, created_at, notes, account_id, is_recurring, recurring_frequency, expense_categories(name, icon, color), asset_accounts(name)')
     .eq('user_id', userId)
     .is('deleted_at', null);
   if (opts?.from) expQ = expQ.gte('date', opts.from);
@@ -401,7 +417,7 @@ export async function getTransactions(opts?: { from?: string; to?: string }): Pr
 
   let incQ = supabase
     .from('income_records')
-    .select('id, description, amount, date, created_at, notes, account_id, income_sources(name, type, icon), asset_accounts(name)')
+    .select('id, description, amount, date, created_at, notes, account_id, income_sources(id, name, type, icon, is_recurring, recurring_frequency), asset_accounts(name)')
     .eq('user_id', userId)
     .is('deleted_at', null);
   if (opts?.from) incQ = incQ.gte('date', opts.from);
@@ -424,18 +440,20 @@ export async function getTransactions(opts?: { from?: string; to?: string }): Pr
     const name = e.expense_categories?.name ?? 'Other';
     const time = e.created_at ? new Date(e.created_at).toTimeString().slice(0, 5) : '00:00';
     return {
-      id:            e.id,
-      merchant:      e.description,
-      category:      categoryKey(name, false),
-      categoryLabel: name,
-      categoryIcon:  expenseIcon(name, e.expense_categories?.icon),
-      amount:        Number(e.amount),
-      type:          'expense',
-      date:          e.date,
+      id:                 e.id,
+      merchant:           e.description,
+      category:           categoryKey(name, false),
+      categoryLabel:      name,
+      categoryIcon:       expenseIcon(name, e.expense_categories?.icon),
+      amount:             Number(e.amount),
+      type:               'expense',
+      date:               e.date,
       time,
-      note:          e.notes ?? undefined,
-      accountId:     e.account_id ?? undefined,
-      accountName:   e.asset_accounts?.name ?? undefined,
+      note:               e.notes ?? undefined,
+      accountId:          e.account_id ?? undefined,
+      accountName:        e.asset_accounts?.name ?? undefined,
+      isRecurring:        e.is_recurring ?? false,
+      recurringFrequency: e.recurring_frequency ?? undefined,
     };
   });
 
@@ -443,18 +461,21 @@ export async function getTransactions(opts?: { from?: string; to?: string }): Pr
     const name = r.income_sources?.name ?? 'Income';
     const time = r.created_at ? new Date(r.created_at).toTimeString().slice(0, 5) : '00:00';
     return {
-      id:            r.id,
-      merchant:      r.description ?? name,
-      category:      categoryKey(name, true),
-      categoryLabel: name,
-      categoryIcon:  expenseIcon(name, r.income_sources?.icon),
-      amount:        Number(r.amount),
-      type:          'income',
-      date:          r.date,
+      id:                 r.id,
+      merchant:           r.description ?? name,
+      category:           categoryKey(name, true),
+      categoryLabel:      name,
+      categoryIcon:       expenseIcon(name, r.income_sources?.icon),
+      amount:             Number(r.amount),
+      type:               'income',
+      date:               r.date,
       time,
-      note:          r.notes ?? undefined,
-      accountId:     r.account_id ?? undefined,
-      accountName:   r.asset_accounts?.name ?? undefined,
+      note:               r.notes ?? undefined,
+      accountId:          r.account_id ?? undefined,
+      accountName:        r.asset_accounts?.name ?? undefined,
+      isRecurring:        r.income_sources?.is_recurring ?? false,
+      recurringFrequency: r.income_sources?.recurring_frequency ?? undefined,
+      recurringSourceId:  r.income_sources?.id ?? undefined,
     };
   });
 
@@ -717,15 +738,15 @@ export async function addIncome(params: {
   let sourceId: string;
   if (existing) {
     sourceId = existing.id;
-    // Update recurring flag if changing
     if (params.isRecurring !== undefined) {
-      await supabase
+      const { error: updateErr } = await supabase
         .from('income_sources')
         .update({
           is_recurring:        params.isRecurring,
           recurring_frequency: params.isRecurring ? (params.recurringFrequency ?? null) : null,
         })
         .eq('id', sourceId);
+      if (updateErr) throw updateErr;
     }
   } else {
     const { data: newSrc, error: srcErr } = await supabase
@@ -1866,18 +1887,6 @@ export async function getTradeHistory(filters: {
 
 // ── Recurring Transactions ─────────────────────────────────────────────────────
 
-const RECURRING_EXP_KEY = 'recurring_exp_last_';
-const RECURRING_INC_KEY = 'recurring_inc_last_';
-
-export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
-
-export const RECURRING_FREQUENCY_LABELS: Record<RecurringFrequency, string> = {
-  daily:   'Daily',
-  weekly:  'Weekly',
-  monthly: 'Monthly',
-  yearly:  'Yearly',
-};
-
 export interface RecurringExpense {
   id:           string;
   description:  string;
@@ -1907,14 +1916,32 @@ function toISODateStr(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function calcNextDue(lastDateStr: string, freq: RecurringFrequency): string {
+/**
+ * Calculates the next scheduled occurrence from a given anchor date.
+ * Used for recurring schedule generation and UI previews.
+ *
+ * Note: this is not guaranteed to be the actual next pending occurrence
+ * if multiple recurrences have already been auto-generated. Use AsyncStorage
+ * lastApplied keys for authoritative schedule state.
+ */
+export function calcNextDue(lastDateStr: string, freq: RecurringFrequency): string {
   // Use noon to avoid daylight-saving edge cases
   const d = new Date(lastDateStr + 'T12:00:00');
   switch (freq) {
-    case 'daily':   d.setDate(d.getDate() + 1);          break;
-    case 'weekly':  d.setDate(d.getDate() + 7);          break;
-    case 'monthly': d.setMonth(d.getMonth() + 1);        break;
-    case 'yearly':  d.setFullYear(d.getFullYear() + 1);  break;
+    case 'daily':       d.setDate(d.getDate() + 1);          break;
+    case 'weekly':      d.setDate(d.getDate() + 7);          break;
+    case 'monthly':     d.setMonth(d.getMonth() + 1);        break;
+    case 'yearly':      d.setFullYear(d.getFullYear() + 1);  break;
+    case 'semimonthly':
+      // Anchored to the 1st and 15th of each month — NOT a 15-day interval.
+      // day < 15 → advance to the 15th of the same month
+      // day ≥ 15 → advance to the 1st of the next month
+      if (d.getDate() < 15) {
+        d.setDate(15);
+      } else {
+        d.setMonth(d.getMonth() + 1, 1);
+      }
+      break;
   }
   return toISODateStr(d);
 }
@@ -2025,6 +2052,12 @@ export async function deleteRecurringIncomeSource(id: string): Promise<void> {
   await AsyncStorage.removeItem(RECURRING_INC_KEY + id);
 }
 
+// Performance cache — not a correctness lock. Correctness is guaranteed by
+// per-template lastApplied boundaries. If this key is missing or stale the
+// function re-runs safely; the while-loop simply won't fire for already-advanced
+// templates.
+const RECURRING_LAST_RUN_KEY = 'recurring_last_run_date';
+
 export async function applyDueRecurringTransactions(): Promise<void> {
   let userId: string;
   try {
@@ -2034,6 +2067,15 @@ export async function applyDueRecurringTransactions(): Promise<void> {
   }
 
   const today = toISODateStr(new Date());
+
+  // Performance gate: skip if already ran today.
+  // Correctness invariant: per-template lastApplied is the generation boundary.
+  // It is always written immediately after each insert batch, so the while-loop
+  // condition (nextDue <= today) will never re-fire for an already-generated date —
+  // even if this gate is absent or bypassed.
+  const lastRun = await AsyncStorage.getItem(RECURRING_LAST_RUN_KEY);
+  if (lastRun === today) return;
+
   const MAX_CATCH_UP = 60; // safety cap: never create more than 60 auto-instances per template
 
   // ── Recurring expenses ────────────────────────────────────────────────────
@@ -2133,4 +2175,7 @@ export async function applyDueRecurringTransactions(): Promise<void> {
       await AsyncStorage.setItem(RECURRING_INC_KEY + src.id, newLastApplied);
     }
   }
+
+  // Mark today as processed — must be last so a mid-run crash forces a retry
+  await AsyncStorage.setItem(RECURRING_LAST_RUN_KEY, today);
 }

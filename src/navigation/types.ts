@@ -106,6 +106,7 @@ export type MainTabParamList = {
 // ── Root ───────────────────────────────────────────────────────────────────────
 export type RootStackParamList = {
   Auth:          NavigatorScreenParams<AuthStackParamList>;
+  Onboarding:    undefined;
   Main:          NavigatorScreenParams<MainTabParamList>;
   QuickAddSheet: undefined;
 };

@@ -26,6 +26,8 @@ import { migratePinIfNeeded } from '../utils/pin';
 import { fetchSecuritySettings, upsertSecuritySettings, fetchScoreMode } from '../services/security.service';
 import { trackAppOpened, identifyUser, resetAnalyticsUser } from '../services/analytics.service';
 import { applyDueRecurringTransactions } from '../services/finance.service';
+import { TRANSACTIONS_KEY } from '../hooks/queries/useTransactions';
+import { OnboardingScreen } from '../screens/onboarding/OnboardingScreen';
 import { setUserContext as setCrashUser, clearUserContext as clearCrashUser } from '../services/crash.service';
 
 const Root = createStackNavigator<RootStackParamList>();
@@ -61,8 +63,10 @@ export function RootNavigator() {
   const resetAccountSettings     = useAppStore(s => s.resetAccountSettings);
   const setHealthScoreMode       = useAppStore(s => s.setHealthScoreMode);
   const clearHealthScoreMode     = useAppStore(s => s.clearHealthScoreMode);
-  const hasOnboarded             = useAppStore(s => s.hasOnboarded);
-  const setHasOnboarded          = useAppStore(s => s.setHasOnboarded);
+  const hasOnboarded                   = useAppStore(s => s.hasOnboarded);
+  const setHasOnboarded                = useAppStore(s => s.setHasOnboarded);
+  const hasSeenNetWorthOnboarding      = useAppStore(s => s.hasSeenNetWorthOnboarding);
+  const setHasSeenNetWorthOnboarding   = useAppStore(s => s.setHasSeenNetWorthOnboarding);
 
   useEffect(() => {
     // Loads this user's security settings from Supabase and hydrates the store.
@@ -112,7 +116,13 @@ export function RootNavigator() {
       const activeUser = user ?? session.user ?? null;
       if (activeUser) {
         await loadSecurity(activeUser.id);
-        applyDueRecurringTransactions().catch(() => {});
+        applyDueRecurringTransactions()
+          .then(() => queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }))
+          .catch(() => {});
+        // Do NOT re-evaluate account age here. The SIGNED_IN handler already
+        // persisted the correct value on login. Overriding it here would break
+        // resumability — a new user who force-closes and reopens after 5 min
+        // would have their onboarding skipped permanently.
       }
       if (restoreCancelled) return;
       setSession(activeUser);
@@ -163,7 +173,13 @@ export function RootNavigator() {
           identifyUser(activeUser.id, { email: activeUser.email });
           setCrashUser(activeUser.id);
           setHasOnboarded(true);
-          applyDueRecurringTransactions().catch(() => {});
+          applyDueRecurringTransactions()
+          .then(() => queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }))
+          .catch(() => {});
+          // Returning users skip onboarding; new accounts reset the flag in case
+          // a prior account on this device had left it as true in AsyncStorage.
+          const ageMs = Date.now() - new Date(activeUser.created_at ?? 0).getTime();
+          setHasSeenNetWorthOnboarding(ageMs > 5 * 60 * 1000);
         }
         setSession(activeUser);
       } else {
@@ -237,6 +253,8 @@ export function RootNavigator() {
       <Root.Navigator screenOptions={{ headerShown: false }}>
         {showBiometricLock ? (
           <Root.Screen name="Main" component={BiometricLockScreen} />
+        ) : isAuthenticated && !hasSeenNetWorthOnboarding ? (
+          <Root.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
         ) : isAuthenticated ? (
           <Root.Screen name="Main" component={MainNavigator} />
         ) : (

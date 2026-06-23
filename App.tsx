@@ -14,10 +14,9 @@ import {
   Urbanist_700Bold,
   Urbanist_800ExtraBold,
 } from '@expo-google-fonts/urbanist';
-import { PostHogProvider } from 'posthog-react-native';
 import { queryClient } from './src/lib/queryClient';
 import { RootNavigator } from './src/navigation/RootNavigator';
-import { initAnalytics, getAnalytics } from './src/services/analytics.service';
+import { initAnalytics } from './src/services/analytics.service';
 import { initCrashReporting } from './src/services/crash.service';
 
 // Initialise at module load so the first app_opened event isn't missed
@@ -45,9 +44,7 @@ export default function App() {
     return null;
   }
 
-  const posthog = getAnalytics();
-
-  const inner = (
+  return (
     <View style={styles.root} onLayout={onLayoutRootView}>
       <GestureHandlerRootView style={styles.root}>
         <SafeAreaProvider>
@@ -60,12 +57,6 @@ export default function App() {
       </GestureHandlerRootView>
     </View>
   );
-
-  // Wrap with PostHogProvider only when a real client exists (key is configured).
-  // During development with a placeholder key the app renders without the provider.
-  return posthog ? (
-    <PostHogProvider client={posthog}>{inner}</PostHogProvider>
-  ) : inner;
 }
 
 const styles = StyleSheet.create({

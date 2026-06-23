@@ -359,6 +359,37 @@ export async function getUserProfile(userId: string) {
 }
 
 /**
+ * Permanently deletes the current user's account and all associated data.
+ * Calls the delete-account Edge Function which handles deletion in the
+ * correct order to satisfy FK constraints, then removes the auth user.
+ * The caller should sign out after this resolves.
+ */
+export async function deleteAccount(): Promise<{ error: string | null }> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return { error: 'Not authenticated' };
+
+    const url = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/delete-account`;
+    const response = await fetch(url, {
+      method:  'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type':  'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      return { error: (body as { error?: string }).error ?? `Server error ${response.status}` };
+    }
+
+    return { error: null };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
+/**
  * Subscribe to auth state changes
  */
 export function onAuthStateChange(callback: (event: string, session: Session | null) => void) {

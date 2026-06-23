@@ -475,7 +475,7 @@ export function AddExpenseScreen({ navigation }: Props) {
                   Frequency
                 </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-                  {(['daily', 'weekly', 'monthly', 'yearly'] as RecurringFrequency[]).map(freq => (
+                  {(['daily', 'weekly', 'semimonthly', 'monthly', 'yearly'] as RecurringFrequency[]).map(freq => (
                     <Pressable
                       key={freq}
                       onPress={() => { setRecurringFreq(freq); Haptics.selectionAsync(); }}
