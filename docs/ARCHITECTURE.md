@@ -1,4 +1,4 @@
-# ARCHITECTURE.md — Financial Tracker App
+# ARCHITECTURE.md — Networthy App
 > React Native · Expo · TypeScript · Zustand · React Query · React Navigation
 > Companion to DESIGN_SPEC.md and PRODUCT_REQUIREMENTS.md
 
@@ -59,7 +59,7 @@ Every architectural decision follows these rules, derived from the product requi
 ## 3. Full Folder Structure
 
 ```
-financial-tracker/
+networthy/
 │
 ├── app.json                          # Expo app configuration
 ├── App.tsx                           # Root component — providers only, no logic

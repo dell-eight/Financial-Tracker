@@ -1,4 +1,4 @@
-appId: com.financialtracker.app
+appId: com.networthy.app
 ---
 # Critical flow 3: set a Food budget below current spending and verify the over-budget indicator
 # Depends on: 01_login.yaml (auth) and 02_add-expense.yaml (₱250 Food expense exists)

@@ -1,5 +1,5 @@
 /**
- * colors.ts — Financial Tracker Design System
+ * colors.ts — Networthy Design System
  *
  * Source of truth for every color token in the application.
  * Extracted from the Urbanist / lavender design reference.

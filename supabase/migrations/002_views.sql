@@ -1,5 +1,5 @@
 -- ============================================================================
--- 002_views.sql - Financial Tracker Views
+-- 002_views.sql - Networthy Views
 -- ============================================================================
 -- SQL views for common queries and dashboard data aggregation
 

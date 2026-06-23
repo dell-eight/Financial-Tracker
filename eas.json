@@ -48,7 +48,7 @@
         "ascAppId": "YOUR_APP_STORE_CONNECT_APP_ID",
         "appleTeamId": "YOUR_APPLE_TEAM_ID",
         "language": "en-US",
-        "sku": "com.financialtracker.app"
+        "sku": "com.networthy.app"
       },
       "android": {
         "serviceAccountKeyPath": "./google-service-account.json",

@@ -550,7 +550,7 @@ export function ProfileScreen({ navigation }: Props) {
               marginTop:  spacing[8],
             }}
           >
-            Financial Tracker v1.0.0
+            Networthy v1.0.0
           </Text>
         </Animated.View>
       </ScrollView>

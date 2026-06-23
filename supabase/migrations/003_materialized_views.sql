@@ -1,5 +1,5 @@
 -- ============================================================================
--- 003_materialized_views.sql - Financial Tracker Materialized Views
+-- 003_materialized_views.sql - Networthy Materialized Views
 -- ============================================================================
 -- Materialized views for complex aggregations and analytics
 -- Refresh schedule: Daily at 2 AM UTC

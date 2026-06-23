@@ -1,4 +1,4 @@
-# PRODUCT_REQUIREMENTS.md — Financial Tracker App
+# PRODUCT_REQUIREMENTS.md — Networthy App
 > Version 1.0 | Status: Draft | Platform: iOS & Android (React Native)
 > Companion document to DESIGN_SPEC.md
 

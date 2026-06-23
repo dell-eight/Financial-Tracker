@@ -1,5 +1,5 @@
 -- ============================================================================
--- 004_rls_policies.sql - Financial Tracker Row Level Security Policies
+-- 004_rls_policies.sql - Networthy Row Level Security Policies
 -- ============================================================================
 -- RLS policies ensure users can only access their own financial data
 

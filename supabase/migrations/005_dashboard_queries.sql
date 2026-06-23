@@ -1,5 +1,5 @@
 -- ============================================================================
--- 005_dashboard_queries.sql - Financial Tracker Dashboard Queries
+-- 005_dashboard_queries.sql - Networthy Dashboard Queries
 -- ============================================================================
 -- Pre-built queries and functions for dashboard analytics
 

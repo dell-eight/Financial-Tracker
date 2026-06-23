@@ -1,5 +1,5 @@
 /**
- * borderRadius.ts — Financial Tracker Design System
+ * borderRadius.ts — Networthy Design System
  *
  * Generous border radii for a modern, friendly fintech aesthetic.
  * Inspired by Revolut, Monzo, and Wealthfront visual language.

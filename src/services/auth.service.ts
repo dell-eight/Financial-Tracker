@@ -225,7 +225,7 @@ export async function signInWithGoogle(): Promise<{ error: string | null }> {
 /**
  * Reset password with email
  */
-const RESET_PASSWORD_REDIRECT = process.env.EXPO_PUBLIC_RESET_PASSWORD_URL ?? 'financialtracker://reset-password';
+const RESET_PASSWORD_REDIRECT = process.env.EXPO_PUBLIC_RESET_PASSWORD_URL ?? 'networthy://reset-password';
 
 export async function resetPassword(email: string) {
   try {

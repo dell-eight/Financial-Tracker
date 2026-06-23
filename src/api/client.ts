@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/auth.store';
 
 export const apiClient = axios.create({
-  baseURL: 'https://api.financialtracker.dev/v1',
+  baseURL: 'https://api.networthy.dev/v1',
   timeout: 10_000,
   headers: { 'Content-Type': 'application/json' },
 });

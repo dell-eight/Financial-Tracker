@@ -1,5 +1,5 @@
 /**
- * typography.ts — Financial Tracker Design System
+ * typography.ts — Networthy Design System
  *
  * Urbanist type scale — the expressive, geometric sans-serif chosen for its
  * legibility at small sizes, personality at display sizes, and excellent

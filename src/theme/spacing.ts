@@ -1,5 +1,5 @@
 /**
- * spacing.ts — Financial Tracker Design System
+ * spacing.ts — Networthy Design System
  *
  * 4-point base grid. Every value is a multiple of 4.
  * Use named constants (spacing[4] = 16dp) rather than hardcoded numbers.

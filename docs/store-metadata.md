@@ -1,4 +1,4 @@
-# Store Metadata — Financial Tracker
+# Store Metadata — Networthy
 
 Use this document when filling in App Store Connect and Google Play Console fields.
 
@@ -8,15 +8,15 @@ Use this document when filling in App Store Connect and Google Play Console fiel
 
 | Field | Value |
 |---|---|
-| **Name** | Financial Tracker |
+| **Name** | Networthy |
 | **Subtitle** | Budget, Wealth & Expenses |
-| **Bundle ID** | com.financialtracker.app |
-| **SKU** | com.financialtracker.app |
+| **Bundle ID** | com.networthy.app |
+| **SKU** | com.networthy.app |
 | **Primary Category** | Finance |
 | **Secondary Category** | Productivity |
 | **Age Rating** | 4+ |
-| **Privacy Policy URL** | https://financialtracker.app/privacy |
-| **Support URL** | https://financialtracker.app/support |
+| **Privacy Policy URL** | https://networthy.app/privacy |
+| **Support URL** | https://networthy.app/support |
 
 ### Keywords (max 100 chars)
 ```
@@ -25,7 +25,7 @@ budget,expense tracker,money manager,savings goals,net worth,wealth,personal fin
 
 ### Description (max 4 000 chars)
 ```
-Financial Tracker is a beautiful, privacy-first personal finance app that gives you a complete picture of your money — all in one place.
+Networthy is a beautiful, privacy-first personal finance app that gives you a complete picture of your money — all in one place.
 
 TRACK EVERY PESO (OR DOLLAR)
 Log income and expenses in seconds. Categorise transactions automatically, add notes, and attach them to any account. A real-time dashboard shows your cash flow at a glance.
@@ -62,11 +62,11 @@ Initial release — budget tracking, expense logging, savings goals, net worth d
 
 | Field | Value |
 |---|---|
-| **Title** | Financial Tracker — Budget & Wealth |
-| **Package** | com.financialtracker.app |
+| **Title** | Networthy — Budget & Wealth |
+| **Package** | com.networthy.app |
 | **Category** | Finance |
 | **Content Rating** | Everyone |
-| **Privacy Policy URL** | https://financialtracker.app/privacy |
+| **Privacy Policy URL** | https://networthy.app/privacy |
 
 ### Short Description (max 80 chars)
 ```
@@ -112,7 +112,7 @@ Capture screenshots on the following device sizes before submitting:
 - [ ] Run `eas credentials --platform ios` to generate / import:
   - Distribution certificate (`.p12`)
   - App Store provisioning profile
-- [ ] App created in App Store Connect with bundle ID `com.financialtracker.app`
+- [ ] App created in App Store Connect with bundle ID `com.networthy.app`
 - [ ] Fill in `eas.json` → `submit.production.ios`:
   - `appleId`: your Apple ID email
   - `ascAppId`: the numeric App Store Connect App ID (found in App Information)
@@ -123,7 +123,7 @@ Capture screenshots on the following device sizes before submitting:
 - [ ] Run `eas credentials --platform android` to generate the upload keystore
 - [ ] Create a Google Cloud service account with Play Developer API access and download JSON key
 - [ ] Save the key as `google-service-account.json` (gitignored) in the project root
-- [ ] App created in Google Play Console with package `com.financialtracker.app`
+- [ ] App created in Google Play Console with package `com.networthy.app`
 - [ ] Fill in `eas.json` → `submit.production.android`:
   - `serviceAccountKeyPath`: `./google-service-account.json`
 

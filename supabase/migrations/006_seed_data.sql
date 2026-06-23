@@ -1,5 +1,5 @@
 -- ============================================================================
--- 006_seed_data.sql - Financial Tracker Seed Data
+-- 006_seed_data.sql - Networthy Seed Data
 -- ============================================================================
 -- Sample data for development and testing
 -- This data includes 2+ years of financial history

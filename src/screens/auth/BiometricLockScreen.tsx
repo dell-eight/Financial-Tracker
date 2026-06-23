@@ -70,7 +70,7 @@ export function BiometricLockScreen() {
         setBiometricUnlocked(true);
         return;
       }
-      const success = await authenticateWithBiometrics('Unlock Financial Tracker');
+      const success = await authenticateWithBiometrics('Unlock Networthy');
       if (success) {
         setBiometricUnlocked(true);
       } else {

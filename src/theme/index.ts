@@ -1,5 +1,5 @@
 /**
- * theme/index.ts — Financial Tracker Design System
+ * theme/index.ts — Networthy Design System
  *
  * Assembly point. Imports from token files and composes:
  *   - Component variant configurations

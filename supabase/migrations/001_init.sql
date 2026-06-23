@@ -1,5 +1,5 @@
 -- ============================================================================
--- 001_init.sql - Financial Tracker Core Schema
+-- 001_init.sql - Networthy Core Schema
 -- ============================================================================
 -- Core tables for user data, expenses, income, savings goals, and investments
 -- Supports 10+ years of financial records with proper indexing and partitioning

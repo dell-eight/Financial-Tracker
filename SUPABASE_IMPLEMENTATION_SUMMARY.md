@@ -1,6 +1,6 @@
 # Supabase Implementation Summary
 
-Complete Supabase integration for Financial Tracker with schema, services, and React hooks.
+Complete Supabase integration for Networthy with schema, services, and React hooks.
 
 ## 📦 What's Included
 

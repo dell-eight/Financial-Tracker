@@ -1,4 +1,4 @@
-# Financial Tracker Database Schema
+# Networthy Database Schema
 
 Complete Supabase schema for a multi-feature financial tracking application supporting 10+ years of historical data.
 
@@ -98,7 +98,7 @@ Run migrations in order to set up the complete schema:
 
 ### 1. Create a new Supabase project
 ```bash
-supabase projects create --name financial-tracker
+supabase projects create --name networthy
 ```
 
 ### 2. Apply migrations

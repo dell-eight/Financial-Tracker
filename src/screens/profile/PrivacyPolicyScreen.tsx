@@ -152,7 +152,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
           />
 
           <PolicySection title="Introduction" theme={theme}>
-            {`This Privacy Policy describes how FinTrack collects, uses, and protects your personal information when you use our mobile application. By using FinTrack, you agree to the collection and use of information in accordance with this policy.`}
+            {`This Privacy Policy describes how Networthy collects, uses, and protects your personal information when you use our mobile application. By using Networthy, you agree to the collection and use of information in accordance with this policy.`}
           </PolicySection>
 
           <PolicySection title="Information We Collect" theme={theme}>
@@ -168,7 +168,7 @@ export function PrivacyPolicyScreen({ navigation }: Props) {
           </PolicySection>
 
           <PolicySection title="Third-Party Services" theme={theme}>
-            {`FinTrack uses the following third-party services to deliver its functionality:\n\n(a) Supabase — database hosting, user authentication, and file storage. Supabase processes data in accordance with their own privacy policy.\n\n(b) Expo — the application framework powering device APIs, push notifications, and app delivery.\n\n(c) Google — optional sign-in via Google OAuth, available if you choose to use it. Google's privacy policy governs any data they process during authentication.\n\nEach provider has its own privacy policy. We encourage you to review them.`}
+            {`Networthy uses the following third-party services to deliver its functionality:\n\n(a) Supabase — database hosting, user authentication, and file storage. Supabase processes data in accordance with their own privacy policy.\n\n(b) Expo — the application framework powering device APIs, push notifications, and app delivery.\n\n(c) Google — optional sign-in via Google OAuth, available if you choose to use it. Google's privacy policy governs any data they process during authentication.\n\nEach provider has its own privacy policy. We encourage you to review them.`}
           </PolicySection>
 
           <PolicySection title="Your Rights" theme={theme}>

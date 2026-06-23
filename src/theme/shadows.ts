@@ -1,5 +1,5 @@
 /**
- * shadows.ts — Financial Tracker Design System
+ * shadows.ts — Networthy Design System
  *
  * Light mode: soft purple-tinted shadows — premium, airy.
  * Dark mode:  subtle dark shadows — depth without heaviness.

@@ -1,4 +1,4 @@
-# Product Architecture — Financial Tracker Wealth Platform
+# Product Architecture — Networthy Wealth Platform
 
 **Version:** 1.0  
 **Date:** June 2026  
@@ -9,7 +9,7 @@
 
 ## Overview
 
-This document defines the complete product architecture for transforming the Financial Tracker from a simple expense tracker into a full-featured personal wealth management platform. The redesign is built around a single governing principle:
+This document defines the complete product architecture for transforming the Networthy from a simple expense tracker into a full-featured personal wealth management platform. The redesign is built around a single governing principle:
 
 > **One number rules everything — Net Worth. Every module feeds that number.**
 

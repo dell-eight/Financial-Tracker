@@ -1,6 +1,6 @@
 # Supabase Integration Setup Guide
 
-Complete guide to set up and use Supabase with your Financial Tracker app.
+Complete guide to set up and use Supabase with your Networthy app.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ Complete guide to set up and use Supabase with your Financial Tracker app.
 2. Sign up or log in
 3. Click "New Project"
 4. Fill in:
-   - **Project Name**: `financial-tracker`
+   - **Project Name**: `networthy`
    - **Database Password**: Generate strong password (save it)
    - **Region**: Choose closest to you
    - **Pricing Plan**: Free tier is fine to start

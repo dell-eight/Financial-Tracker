@@ -11,12 +11,12 @@ jest.mock('expo-web-browser', () => ({
 
 // expo-auth-session — makeRedirectUri used in signInWithGoogle
 jest.mock('expo-auth-session', () => ({
-  makeRedirectUri: jest.fn(() => 'financialtracker://auth/callback'),
+  makeRedirectUri: jest.fn(() => 'networthy://auth/callback'),
 }));
 
 // expo-linking — Linking.createURL used in signInWithGoogle
 jest.mock('expo-linking', () => ({
-  createURL: jest.fn(() => 'financialtracker://auth/callback'),
+  createURL: jest.fn(() => 'networthy://auth/callback'),
 }));
 
 // Supabase — comprehensive mock with chainable, thenable builder

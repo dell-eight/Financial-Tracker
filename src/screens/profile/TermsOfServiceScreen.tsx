@@ -152,7 +152,7 @@ export function TermsOfServiceScreen({ navigation }: Props) {
           />
 
           <PolicySection title="1. Acceptance of Terms" theme={theme}>
-            {`By downloading, installing, or using FinTrack, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the application. Your continued use of the app constitutes ongoing acceptance of these terms.`}
+            {`By downloading, installing, or using Networthy, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use the application. Your continued use of the app constitutes ongoing acceptance of these terms.`}
           </PolicySection>
 
           <PolicySection title="2. User Responsibilities" theme={theme}>
@@ -160,23 +160,23 @@ export function TermsOfServiceScreen({ navigation }: Props) {
           </PolicySection>
 
           <PolicySection title="3. Account Usage" theme={theme}>
-            {`FinTrack accounts are for personal use only. You may not:\n\n• Use the app for any illegal or unauthorized purpose\n• Attempt to reverse-engineer, decompile, or compromise the security of the application\n• Create multiple accounts to circumvent usage restrictions\n• Use automated tools to access the app or its data\n• Interfere with or disrupt the integrity of the service`}
+            {`Networthy accounts are for personal use only. You may not:\n\n• Use the app for any illegal or unauthorized purpose\n• Attempt to reverse-engineer, decompile, or compromise the security of the application\n• Create multiple accounts to circumvent usage restrictions\n• Use automated tools to access the app or its data\n• Interfere with or disrupt the integrity of the service`}
           </PolicySection>
 
           <PolicySection title="4. Financial Information Disclaimer" theme={theme}>
-            {`FinTrack is a personal finance tracking and planning tool designed to help you organize and visualize your financial data.\n\nIMPORTANT: FinTrack does not provide professional financial, investment, tax, or legal advice. The summaries, calculations, health scores, and insights shown in the app are for informational and organizational purposes only. They do not constitute financial advice.\n\nAlways consult a qualified financial professional, investment advisor, or tax expert before making significant financial decisions. Past performance and app projections are not guarantees of future results.`}
+            {`Networthy is a personal finance tracking and planning tool designed to help you organize and visualize your financial data.\n\nIMPORTANT: Networthy does not provide professional financial, investment, tax, or legal advice. The summaries, calculations, health scores, and insights shown in the app are for informational and organizational purposes only. They do not constitute financial advice.\n\nAlways consult a qualified financial professional, investment advisor, or tax expert before making significant financial decisions. Past performance and app projections are not guarantees of future results.`}
           </PolicySection>
 
           <PolicySection title="5. Data Accuracy" theme={theme}>
-            {`You are solely responsible for the accuracy and completeness of all financial data you enter into FinTrack. The app calculates summaries including net worth, savings rates, and budget progress based entirely on the data you provide.\n\nFinTrack is not responsible for errors in calculations resulting from incorrect, incomplete, or outdated information entered by the user. Please review your data regularly to ensure accuracy.`}
+            {`You are solely responsible for the accuracy and completeness of all financial data you enter into Networthy. The app calculates summaries including net worth, savings rates, and budget progress based entirely on the data you provide.\n\nNetworthy is not responsible for errors in calculations resulting from incorrect, incomplete, or outdated information entered by the user. Please review your data regularly to ensure accuracy.`}
           </PolicySection>
 
           <PolicySection title="6. Limitation of Liability" theme={theme}>
-            {`To the maximum extent permitted by applicable law, FinTrack and its developers, officers, employees, and affiliates shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to:\n\n• Financial losses resulting from decisions made based on app data\n• Loss of data due to device failure or app errors\n• Interruption of service or loss of access\n• Any other damages arising from your use of or inability to use the app\n\nOur total liability to you for any claim shall not exceed the amount you paid for the app in the twelve months preceding the claim.`}
+            {`To the maximum extent permitted by applicable law, Networthy and its developers, officers, employees, and affiliates shall not be liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to:\n\n• Financial losses resulting from decisions made based on app data\n• Loss of data due to device failure or app errors\n• Interruption of service or loss of access\n• Any other damages arising from your use of or inability to use the app\n\nOur total liability to you for any claim shall not exceed the amount you paid for the app in the twelve months preceding the claim.`}
           </PolicySection>
 
           <PolicySection title="7. Service Availability" theme={theme}>
-            {`We strive to keep FinTrack available at all times, but we cannot guarantee uninterrupted or error-free service. The app may be temporarily unavailable due to scheduled maintenance, updates, or circumstances beyond our control.\n\nWe reserve the right to modify, suspend, or discontinue any feature or aspect of the service at any time, with reasonable notice to users where practicable. We are not liable to you or any third party for any modification, suspension, or discontinuation of the service.`}
+            {`We strive to keep Networthy available at all times, but we cannot guarantee uninterrupted or error-free service. The app may be temporarily unavailable due to scheduled maintenance, updates, or circumstances beyond our control.\n\nWe reserve the right to modify, suspend, or discontinue any feature or aspect of the service at any time, with reasonable notice to users where practicable. We are not liable to you or any third party for any modification, suspension, or discontinuation of the service.`}
           </PolicySection>
 
           <PolicySection title="8. Account Termination" theme={theme}>
@@ -184,7 +184,7 @@ export function TermsOfServiceScreen({ navigation }: Props) {
           </PolicySection>
 
           <PolicySection title="9. Changes to Terms" theme={theme}>
-            {`We may update these Terms of Service from time to time to reflect changes in the law, our practices, or the features of the app. When we make material changes, we will update the "Last Updated" date at the top of this document.\n\nYour continued use of FinTrack after changes are posted constitutes your acceptance of the revised terms. If you do not agree to the updated terms, please discontinue use of the app.`}
+            {`We may update these Terms of Service from time to time to reflect changes in the law, our practices, or the features of the app. When we make material changes, we will update the "Last Updated" date at the top of this document.\n\nYour continued use of Networthy after changes are posted constitutes your acceptance of the revised terms. If you do not agree to the updated terms, please discontinue use of the app.`}
           </PolicySection>
 
           <PolicySection title="10. Contact Us" theme={theme}>

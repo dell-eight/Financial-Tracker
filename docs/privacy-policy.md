@@ -1,4 +1,4 @@
-# Privacy Policy — Financial Tracker
+# Privacy Policy — Networthy
 
 **Last updated: 2026-06-18**
 
@@ -54,4 +54,4 @@ We will notify you of material changes via an in-app banner or push notification
 
 ## 9. Contact
 
-Questions about this policy: **support@financialtracker.app**
+Questions about this policy: **support@networthy.app**

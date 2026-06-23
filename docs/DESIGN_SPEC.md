@@ -1,4 +1,4 @@
-# DESIGN_SPEC.md — Financial Tracker App
+# DESIGN_SPEC.md — Networthy App
 > Derived from high-fidelity mobile UI design reference. Platform: iOS/Android (React Native).
 
 ---
