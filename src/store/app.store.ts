@@ -42,6 +42,17 @@ interface AppState {
   hasSeenNetWorthOnboarding: boolean;
   setHasSeenNetWorthOnboarding: (value: boolean) => void;
 
+  // ── Tutorial system (persisted) ───────────────────────────────────────
+  // tutorialVersion: bump this integer to invalidate old completion records
+  // and re-show all tutorials for existing users (e.g. after a major redesign).
+  // Keys are namespaced with the version: "tutorial_dashboard_v1".
+  tutorialVersion:        number;
+  tutorialsCompleted:     Record<string, boolean>;
+  lastSignedInUserId:     string | null;
+  setTutorialCompleted:   (key: string) => void;
+  resetAllTutorials:      () => void;
+  setLastSignedInUserId:  (id: string) => void;
+
   // ── Account-level preferences (persisted, reset on sign-out) ──────────
   themePreference:      ThemePreference;
   currency:             string;
@@ -68,6 +79,8 @@ interface AppState {
   // ── Session-only (never persisted) ────────────────────────────────────
   isBiometricUnlocked: boolean;
   pendingMilestones:   PendingMilestone[];
+  fabBounds: { x: number; y: number; width: number; height: number } | null;
+  setFabBounds: (b: { x: number; y: number; width: number; height: number }) => void;
 
   // ── Setters ────────────────────────────────────────────────────────────
   setThemePreference:          (pref: ThemePreference) => void;
@@ -120,9 +133,24 @@ export const useAppStore = create<AppState>()(
       healthScoreMode:      'balanced' as ScoreMode,
       isBiometricUnlocked:  false,
       pendingMilestones:    [],
+      fabBounds:            null,
+      setFabBounds: (fabBounds) => set({ fabBounds }),
 
       setHasOnboarded:              (hasOnboarded)              => set({ hasOnboarded }),
       setHasSeenNetWorthOnboarding: (hasSeenNetWorthOnboarding) => set({ hasSeenNetWorthOnboarding }),
+
+      tutorialVersion:    1,
+      tutorialsCompleted: {},
+      lastSignedInUserId: null,
+      setTutorialCompleted: (key) => set((s) => ({
+        tutorialsCompleted: { ...s.tutorialsCompleted, [key]: true },
+      })),
+      resetAllTutorials: () => set({ tutorialsCompleted: {} }),
+      setLastSignedInUserId: (id) => set((s) => {
+        if (s.lastSignedInUserId === id) return {};
+        // Different user signed in — reset tutorials so they see fresh coachmarks.
+        return { lastSignedInUserId: id, tutorialsCompleted: {} };
+      }),
 
       // ── Account setters ──────────────────────────────────────────────
       setThemePreference:          (themePreference)          => set({ themePreference }),
@@ -221,6 +249,9 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         hasOnboarded:              state.hasOnboarded,
         hasSeenNetWorthOnboarding: state.hasSeenNetWorthOnboarding,
+        tutorialVersion:           state.tutorialVersion,
+        tutorialsCompleted:        state.tutorialsCompleted,
+        lastSignedInUserId:        state.lastSignedInUserId,
         themePreference:      state.themePreference,
         currency:             state.currency,
         notificationsEnabled:   state.notificationsEnabled,

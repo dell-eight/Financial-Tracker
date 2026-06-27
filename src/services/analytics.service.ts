@@ -87,3 +87,21 @@ export function trackSubscriptionConverted(plan: 'monthly' | 'annual') {
 export function trackScreen(screenName: string) {
   _client?.screen(screenName);
 }
+
+// ─── Tutorial events ──────────────────────────────────────────────────────────
+
+export function trackTutorialStarted(tutorial: string) {
+  _client?.capture('tutorial_started', { tutorial });
+}
+
+export function trackTutorialCompleted(tutorial: string) {
+  _client?.capture('tutorial_completed', { tutorial });
+}
+
+export function trackTutorialSkipped(tutorial: string) {
+  _client?.capture('tutorial_skipped', { tutorial });
+}
+
+export function trackTutorialStepViewed(tutorial: string, step: number) {
+  _client?.capture('tutorial_step_viewed', { tutorial, step });
+}

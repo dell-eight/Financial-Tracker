@@ -67,6 +67,7 @@ export function RootNavigator() {
   const setHasOnboarded                = useAppStore(s => s.setHasOnboarded);
   const hasSeenNetWorthOnboarding      = useAppStore(s => s.hasSeenNetWorthOnboarding);
   const setHasSeenNetWorthOnboarding   = useAppStore(s => s.setHasSeenNetWorthOnboarding);
+  const setLastSignedInUserId          = useAppStore(s => s.setLastSignedInUserId);
 
   useEffect(() => {
     // Loads this user's security settings from Supabase and hydrates the store.
@@ -95,6 +96,12 @@ export function RootNavigator() {
       // Migrate old global PIN SecureStore key → per-user key (one-time, no-op after)
       migratePinIfNeeded(userId);
     }
+
+    // Pre-warm the Supabase HTTP connection. For new users getSession() resolves
+    // from SecureStore only (no network), leaving TLS unestablished until the first
+    // sign-in/sign-up tap. This fire-and-forget call ensures the connection is ready
+    // before the user reaches the auth form.
+    void fetch(`${process.env.EXPO_PUBLIC_SUPABASE_URL}/auth/v1/health`).catch(() => {});
 
     // Restore session on cold start — use getUser() for server-fresh user_metadata.
     // Race against an 8 s timeout: a stalled SecureStore read or slow getUser() network
@@ -176,6 +183,9 @@ export function RootNavigator() {
           applyDueRecurringTransactions()
           .then(() => queryClient.invalidateQueries({ queryKey: TRANSACTIONS_KEY }))
           .catch(() => {});
+          // Reset tutorial completion when a different user signs in, so they
+          // see fresh coachmarks instead of inheriting the previous user's state.
+          setLastSignedInUserId(activeUser.id);
           // Returning users skip onboarding; new accounts reset the flag in case
           // a prior account on this device had left it as true in AsyncStorage.
           const ageMs = Date.now() - new Date(activeUser.created_at ?? 0).getTime();

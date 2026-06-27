@@ -38,6 +38,8 @@ import { useCurrency } from '../../utils/currency';
 import type { CategoryKey } from '../../theme';
 import type { Account } from '../../types/models';
 import { EXPENSE_CATEGORIES } from '../../constants/categories';
+import { SuccessToast } from '../../components/tutorial';
+import { WIN } from '../../constants/tutorials';
 
 type Props = StackScreenProps<TransactionsStackParamList, 'AddExpense'>;
 
@@ -77,6 +79,8 @@ export function AddExpenseScreen({ navigation }: Props) {
   const alert80Enabled          = useAppStore(s => s.alert80Enabled);
   const alert100Enabled         = useAppStore(s => s.alert100Enabled);
   const categoryAlertOverrides  = useAppStore(s => s.categoryAlertOverrides);
+  const tutorialsCompleted      = useAppStore(s => s.tutorialsCompleted);
+  const setTutorialCompleted    = useAppStore(s => s.setTutorialCompleted);
 
   const { data: accounts = [] } = useAccounts();
 
@@ -94,6 +98,7 @@ export function AddExpenseScreen({ navigation }: Props) {
   const [insightBudget,     setInsightBudget]     = useState<{ label: string; icon: string; remaining: number } | null>(null);
   const [isRecurring,       setIsRecurring]       = useState(false);
   const [recurringFreq,     setRecurringFreq]     = useState<RecurringFrequency>('monthly');
+  const [showToast,         setShowToast]         = useState(false);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -165,11 +170,20 @@ export function AddExpenseScreen({ navigation }: Props) {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
+      // First transaction win
+      const isFirstTransaction = !tutorialsCompleted[WIN.TRANSACTION_LOGGED];
+      if (isFirstTransaction) {
+        setTutorialCompleted(WIN.TRANSACTION_LOGGED);
+        setShowToast(true);
+      }
+
       // Show insight card if the category has a budget this month
       const catBudget = freshBudgets.find(b => b.category === selectedCat);
       if (catBudget && catBudget.limit > 0) {
         setInsightBudget({ label: catBudget.label, icon: cat.icon, remaining: catBudget.limit - catBudget.spent });
-        await new Promise<void>(resolve => setTimeout(resolve, 2000));
+        await new Promise<void>(resolve => setTimeout(resolve, isFirstTransaction ? 1800 : 2000));
+      } else if (isFirstTransaction) {
+        await new Promise<void>(resolve => setTimeout(resolve, 1800));
       }
 
       navigation.navigate('TransactionList', undefined);
@@ -638,6 +652,15 @@ export function AddExpenseScreen({ navigation }: Props) {
           </View>
         </Modal>
       )}
+
+      <SuccessToast
+        confetti
+        visible={showToast}
+        emoji="💸"
+        headline="Transaction logged!"
+        followUp="Your budget is now tracking automatically."
+        onDismiss={() => setShowToast(false)}
+      />
     </KeyboardAvoidingView>
   );
 }

@@ -36,15 +36,34 @@ import { useBudgets }                 from '../../hooks/queries/useBudgets';
 import { useSavingsGoals }            from '../../hooks/queries/useSavingsGoals';
 import { useUserProfile }             from '../../hooks/queries/useAuth';
 import { useAuthStore }               from '../../store/auth.store';
+import { useAppStore }                from '../../store/app.store';
 import { ProgressBar, SectionHeader, ExpenseItem } from '../../components';
 import type { HomeStackParamList, MainTabParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
 import { computeHealthScore } from '../../utils/healthScore';
 import { useUnreadNotificationCount } from '../../hooks/queries/useNotifications';
+import { useTutorialTour } from '../../hooks/ui/useTutorialTour';
+import { CoachmarkOverlay } from '../../components/tutorial';
+import { TUTORIAL } from '../../constants/tutorials';
+import type { TutorialStep } from '../../hooks/ui/useTutorialTour';
 
 type Props = StackScreenProps<HomeStackParamList, 'HomeMain'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
+
+const DASHBOARD_STEPS: TutorialStep[] = [
+  {
+    emoji: '📊',
+    title: 'Welcome to your dashboard',
+    body: 'Your net worth, Health Score, budgets, and transactions are all here. The score in the top band updates every time you log a transaction.',
+  },
+  {
+    emoji: '⚡',
+    title: 'Tap + and add an expense',
+    body: 'The fastest way to see an accurate picture is to log every day. Tap + now — it takes 10 seconds.',
+    requiredAction: 'tap_add_expense',
+  },
+];
 
 function formatDateLabel(dateStr: string): string {
   const today    = new Date();
@@ -441,6 +460,10 @@ export function DashboardScreen({ navigation }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows } = theme;
   const { fmt: fmtPh } = useCurrency();
 
+  // Tutorial tour
+  const tour = useTutorialTour(TUTORIAL.DASHBOARD, DASHBOARD_STEPS);
+  const setTutorialCompleted = useAppStore(s => s.setTutorialCompleted);
+  const fabBounds = useAppStore(s => s.fabBounds);
   const user    = useAuthStore(s => s.user);
   const { data: userProfile } = useUserProfile();
 
@@ -811,6 +834,18 @@ export function DashboardScreen({ navigation }: Props) {
           )}
         </Animated.View>
       </ScrollView>
+
+      {/* Dashboard tutorial overlay */}
+      <CoachmarkOverlay
+        steps={DASHBOARD_STEPS}
+        visible={tour.visible}
+        stepIndex={tour.stepIndex}
+        total={tour.total}
+        stepRefs={[null, null]}
+        fixedTargets={[null, fabBounds]}
+        onNext={tour.next}
+        onSkip={tour.skip}
+      />
     </View>
   );
 }

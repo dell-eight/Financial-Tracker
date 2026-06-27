@@ -33,6 +33,35 @@ import { getCategoryBgColor } from '../../theme';
 import type { TransactionsStackParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
 import type { CategoryKey } from '../../theme';
+import { useTutorialTour } from '../../hooks/ui/useTutorialTour';
+import { CoachmarkOverlay } from '../../components/tutorial';
+import { TUTORIAL } from '../../constants/tutorials';
+import { useAppStore } from '../../store/app.store';
+import type { TutorialStep } from '../../hooks/ui/useTutorialTour';
+
+const TRANSACTIONS_STEPS: TutorialStep[] = [
+  {
+    emoji: '📋',
+    title: 'Your spending history',
+    body: 'Every expense and income you log appears here, sorted by date. This is your financial memory — the more complete it is, the more accurate your Health Score.',
+  },
+  {
+    emoji: '🏷️',
+    title: 'Spot patterns fast',
+    body: 'Filter by category to see exactly where your money goes. Most people are surprised by food and subscriptions.',
+  },
+  {
+    emoji: '➕',
+    title: 'Log your first transaction',
+    body: 'People who log daily spend less — not because of willpower, but because seeing the number creates friction. Tap + now. Takes 10 seconds.',
+    requiredAction: 'tap_add_transaction',
+  },
+  {
+    emoji: '🎉',
+    title: "That's how it works",
+    body: 'Your transaction is in your history and already counting toward your budget. The more you log, the clearer your picture.',
+  },
+];
 
 type Props = StackScreenProps<TransactionsStackParamList, 'TransactionList'>;
 
@@ -1083,6 +1112,9 @@ export function ExpenseScreen({ navigation, route }: Props) {
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
 
+  const tour      = useTutorialTour(TUTORIAL.TRANSACTIONS, TRANSACTIONS_STEPS);
+  const fabBounds = useAppStore(s => s.fabBounds);
+
   // ── Date range for server-side filtering ────────────────────────────────────
   const { from, to } = useMemo(() => {
     if (period === 'week') {
@@ -1430,6 +1462,17 @@ export function ExpenseScreen({ navigation, route }: Props) {
         maxToRenderPerBatch={5}
         windowSize={5}
         removeClippedSubviews={Platform.OS === 'android'}
+      />
+
+      <CoachmarkOverlay
+        steps={TRANSACTIONS_STEPS}
+        visible={tour.visible}
+        stepIndex={tour.stepIndex}
+        total={tour.total}
+        stepRefs={[null, null, null, null]}
+        fixedTargets={[null, null, fabBounds, null]}
+        onNext={tour.next}
+        onSkip={tour.skip}
       />
     </View>
   );

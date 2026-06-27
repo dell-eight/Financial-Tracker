@@ -19,7 +19,7 @@ import { useAppStore } from '../../store/app.store';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useCurrency } from '../../utils/currency';
 import { createAsset, updateBudgetLimit } from '../../services/finance.service';
-import { syncDailyReminder } from '../../services/notifications.service';
+import { syncDailyReminder, requestPermissionsAndGetToken } from '../../services/notifications.service';
 import {
   trackOnboardingStepCompleted,
   trackOnboardingAbandoned,
@@ -70,6 +70,7 @@ export function OnboardingScreen() {
 
   const setHasSeenNetWorthOnboarding = useAppStore(s => s.setHasSeenNetWorthOnboarding);
   const setEveningReminderEnabled    = useAppStore(s => s.setEveningReminderEnabled);
+  const resetAllTutorials            = useAppStore(s => s.resetAllTutorials);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -115,6 +116,7 @@ export function OnboardingScreen() {
 
   function finish() {
     trackOnboardingCompleted();
+    resetAllTutorials();
     setHasSeenNetWorthOnboarding(true);
   }
 
@@ -126,8 +128,13 @@ export function OnboardingScreen() {
   function advance() {
     const labels = ['accounts', 'networth', 'budget', 'notifications'] as const;
     trackOnboardingStepCompleted(labels[step]);
-    if (step < 3) setStep((step + 1) as Step);
-    else finish();
+    if (step === 0 && accounts.length === 0) {
+      setStep(2); // skip net worth reveal when no accounts added
+    } else if (step < 3) {
+      setStep((step + 1) as Step);
+    } else {
+      finish();
+    }
   }
 
   // ── Step 0 helpers ──────────────────────────────────────────────────────────
@@ -185,6 +192,9 @@ export function OnboardingScreen() {
   // ── Step 3 helpers ──────────────────────────────────────────────────────────
 
   async function handleEnableReminders() {
+    // Request OS permission first — this shows the system dialog.
+    // syncDailyReminder silently fails without granted permission.
+    await requestPermissionsAndGetToken();
     setEveningReminderEnabled(true);
     try { await syncDailyReminder(true); } catch { /* best-effort */ }
     finish();
@@ -384,6 +394,12 @@ export function OnboardingScreen() {
                   ? "Every peso saved is progress. You've got this."
                   : "Add accounts to start tracking your net worth."}
             </Text>
+
+            {netWorth !== 0 && (
+              <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: colors.text.primary, textAlign: 'center', marginTop: spacing[5] }}>
+                "Your net worth is your financial scoreboard."
+              </Text>
+            )}
           </View>
 
           <View style={{ position: 'absolute', bottom: btmPad + spacing[5], left: spacing[5], right: spacing[5] }}>

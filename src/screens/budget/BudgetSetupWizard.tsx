@@ -27,6 +27,8 @@ import type { BudgetStackParamList } from '../../navigation/types';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import { useCurrency, formatFull } from '../../utils/currency';
 import { useAppStore } from '../../store/app.store';
+import { SuccessToast } from '../../components/tutorial';
+import { WIN } from '../../constants/tutorials';
 
 type Props = StackScreenProps<BudgetStackParamList, 'BudgetSetupWizard'>;
 
@@ -147,8 +149,12 @@ export function BudgetSetupWizard({ navigation }: Props) {
   const [income,   setIncome]   = useState('');
   // allocMap key = category key (e.g. 'food', 'transport')
   const [allocMap, setAllocMap] = useState<Record<string, string>>({});
-  const [saving,   setSaving]   = useState(false);
+  const [saving,    setSaving]    = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
+
+  const tutorialsCompleted   = useAppStore(s => s.tutorialsCompleted);
+  const setTutorialCompleted = useAppStore(s => s.setTutorialCompleted);
 
   // Pre-fill income from dashboard monthly income (runs once when data arrives)
   useEffect(() => {
@@ -194,7 +200,13 @@ export function BudgetSetupWizard({ navigation }: Props) {
       }
       await queryClient.invalidateQueries({ queryKey: [...BUDGETS_KEY] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      navigation.goBack();
+      if (!tutorialsCompleted[WIN.BUDGET_CREATED]) {
+        setTutorialCompleted(WIN.BUDGET_CREATED);
+        setShowToast(true);
+        setTimeout(() => navigation.goBack(), 1800);
+      } else {
+        navigation.goBack();
+      }
     } catch (e: unknown) {
       setSaveError(e instanceof Error ? e.message : 'Failed to save. Please try again.');
       setSaving(false);
@@ -469,6 +481,15 @@ export function BudgetSetupWizard({ navigation }: Props) {
           </Text>
         </Pressable>
       </Animated.View>
+
+      <SuccessToast
+        confetti
+        visible={showToast}
+        emoji="🎯"
+        headline="Budget created!"
+        followUp="You'll get an alert before you go over."
+        onDismiss={() => setShowToast(false)}
+      />
     </KeyboardAvoidingView>
   );
 }

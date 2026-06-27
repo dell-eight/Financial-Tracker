@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react';
+﻿import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,30 @@ import { useCurrency } from '../../../utils/currency';
 import { createAsset, deleteAsset, hasTransactionsForAccount } from '../../../services/finance.service';
 import type { AssetCategory, AssetItem, AssetType } from '../../../types/models';
 import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
+import { useAppStore } from '../../../store/app.store';
+import { useTutorialTour } from '../../../hooks/ui/useTutorialTour';
+import { CoachmarkOverlay, SuccessToast } from '../../../components/tutorial';
+import { TUTORIAL, WIN } from '../../../constants/tutorials';
+import type { TutorialStep } from '../../../hooks/ui/useTutorialTour';
+
+const ACCOUNTS_STEPS: TutorialStep[] = [
+  {
+    emoji: '🏦',
+    title: 'Accounts hold your money',
+    body: "Most people underestimate their net worth because they track accounts in their head. Add them all here — Networthy does the math.",
+  },
+  {
+    emoji: '📊',
+    title: 'Accuracy = better decisions',
+    body: 'Every peso you add here makes your Health Score more accurate. Incomplete accounts give you an incomplete picture.',
+  },
+  {
+    emoji: '➕',
+    title: 'Add your first account',
+    body: "Tap '+ Add' now. Enter your bank balance. 15 seconds and your net worth becomes real.",
+    requiredAction: 'add_account',
+  },
+];
 
 type Props = StackScreenProps<WealthStackParamList, 'AssetsDetail'>;
 
@@ -172,9 +196,15 @@ export function AssetsDetailScreen({ navigation }: Props) {
   const { data: savingsGoals = [] }  = useSavingsGoals();
   const { data: holdings = [] }      = useInvestments();
 
-  const [formVisible, setFormVisible] = useState(false);
-  const [mutating,    setMutating]    = useState(false);
+  const [formVisible,     setFormVisible]     = useState(false);
+  const [mutating,        setMutating]        = useState(false);
+  const [showAccountToast, setShowAccountToast] = useState(false);
+  const addBtnRef = useRef<View>(null);
   const [headerStyle, listStyle] = useScreenAnimation(2);
+
+  const tutorialsCompleted = useAppStore(s => s.tutorialsCompleted);
+  const setTutorialCompleted = useAppStore(s => s.setTutorialCompleted);
+  const tour = useTutorialTour(TUTORIAL.ACCOUNTS, ACCOUNTS_STEPS);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
@@ -216,6 +246,10 @@ export function AssetsDetailScreen({ navigation }: Props) {
       queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY }),
     ]);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (!tutorialsCompleted[WIN.ACCOUNT_ADDED]) {
+      setTutorialCompleted(WIN.ACCOUNT_ADDED);
+      setShowAccountToast(true);
+    }
   }
 
   async function handleLongPress(item: AssetItem) {
@@ -284,7 +318,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>Assets</Text>
-        <Pressable onPress={() => setFormVisible(true)} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
+        <Pressable ref={addBtnRef} onPress={() => setFormVisible(true)} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
           <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: colors.accent.primary }}>+ Add</Text>
         </Pressable>
       </Animated.View>
@@ -535,6 +569,25 @@ export function AssetsDetailScreen({ navigation }: Props) {
         visible={formVisible}
         onSave={handleAdd}
         onClose={() => setFormVisible(false)}
+      />
+
+      <CoachmarkOverlay
+        steps={ACCOUNTS_STEPS}
+        visible={tour.visible}
+        stepIndex={tour.stepIndex}
+        total={tour.total}
+        stepRefs={[null, null, addBtnRef]}
+        onNext={tour.next}
+        onSkip={tour.skip}
+      />
+
+      <SuccessToast
+        confetti
+        visible={showAccountToast}
+        emoji="🏦"
+        headline="Account added!"
+        followUp="Your net worth just got more accurate."
+        onDismiss={() => setShowAccountToast(false)}
       />
     </View>
   );

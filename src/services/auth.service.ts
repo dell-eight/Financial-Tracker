@@ -193,27 +193,41 @@ export async function signInWithGoogle(): Promise<{ error: string | null }> {
       return { error: error?.message ?? 'Could not start Google sign-in' };
     }
 
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    // On Android the deep link intent brings the app to the foreground and fires
+    // onAuthStateChange, but the Chrome Custom Tab never closes on its own so
+    // openAuthSessionAsync hangs forever. Race the browser against an auth state
+    // listener — whichever wins, we dismiss the tab and move on.
+    let unsubscribe: (() => void) | null = null;
 
-    if (result.type === 'success' && result.url) {
-      const fragment = result.url.split('#')[1] ?? '';
-      const params   = new URLSearchParams(fragment);
-      const accessToken  = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
+    const authStatePromise = new Promise<void>(resolve => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(event => {
+        if (event === 'SIGNED_IN') {
+          subscription.unsubscribe();
+          unsubscribe = null;
+          WebBrowser.dismissAuthSession();
+          resolve();
+        }
+      });
+      unsubscribe = () => subscription.unsubscribe();
+    });
 
-      if (accessToken && refreshToken) {
-        // Implicit flow — tokens already present in URL hash
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token:  accessToken,
-          refresh_token: refreshToken,
-        });
-        if (sessionError) return { error: sessionError.message };
-      } else {
-        // PKCE flow — exchange authorization code for session
-        const { error: sessionError } = await supabase.auth.exchangeCodeForSession(result.url);
-        if (sessionError) return { error: sessionError.message };
+    const browserPromise = WebBrowser.openAuthSessionAsync(data.url, redirectTo).then(async result => {
+      unsubscribe?.();
+      if (result.type === 'success' && result.url) {
+        const fragment      = result.url.split('#')[1] ?? '';
+        const params        = new URLSearchParams(fragment);
+        const accessToken   = params.get('access_token');
+        const refreshToken  = params.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        } else {
+          await supabase.auth.exchangeCodeForSession(result.url);
+        }
       }
-    }
+    });
+
+    await Promise.race([browserPromise, authStatePromise]);
 
     return { error: null };
   } catch (error) {

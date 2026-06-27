@@ -25,6 +25,7 @@ import { healthBand, SCORE_BANDS, SCORE_PRESETS } from '../../utils/healthScore'
 import type { ScoreFactor, FactorId } from '../../utils/healthScore';
 import { useAppStore } from '../../store/app.store';
 import type { HomeStackParamList } from '../../navigation/types';
+import { WIN, TUTORIAL } from '../../constants/tutorials';
 
 type Props = StackScreenProps<HomeStackParamList, 'HealthScoreDetail'>;
 
@@ -164,6 +165,30 @@ export function HealthScoreDetailScreen({ navigation }: Props) {
   const { result, factors, isLoading }    = useHealthScore(healthScoreMode);
   const hasGoals                          = factors?.goalProgress !== null && factors?.goalProgress !== undefined;
 
+  const tutorialVersion      = useAppStore(s => s.tutorialVersion);
+  const tutorialsCompleted   = useAppStore(s => s.tutorialsCompleted);
+  const setTutorialCompleted = useAppStore(s => s.setTutorialCompleted);
+
+  const tooltipKey = `${TUTORIAL.HEALTH_SCORE}_v${tutorialVersion}`;
+  const [tooltipVisible, setTooltipVisible] = React.useState(!tutorialsCompleted[tooltipKey]);
+
+  // Set WIN flag the moment score data loads
+  useEffect(() => {
+    if (result && !tutorialsCompleted[WIN.HEALTH_SCORE_VIEWED]) {
+      setTutorialCompleted(WIN.HEALTH_SCORE_VIEWED);
+    }
+  }, [!!result]);
+
+  // Auto-dismiss tooltip after 5 seconds
+  useEffect(() => {
+    if (!tooltipVisible) return;
+    const t = setTimeout(() => {
+      setTooltipVisible(false);
+      setTutorialCompleted(tooltipKey);
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [tooltipVisible]);
+
   const topPad             = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const band               = result ? healthBand(result.total) : null;
   const activeResultFactors = result
@@ -221,6 +246,36 @@ export function HealthScoreDetailScreen({ navigation }: Props) {
               out of 100 · updated just now
             </Text>
           </View>
+
+          {/* One-time tooltip: appears below score ring on first visit */}
+          {tooltipVisible && (
+            <Pressable
+              onPress={() => { setTooltipVisible(false); setTutorialCompleted(tooltipKey); }}
+              style={{
+                marginHorizontal: spacing[5],
+                marginBottom:     spacing[4],
+                backgroundColor:  colors.bg.surface,
+                borderRadius:     borderRadius.card,
+                padding:          spacing[4],
+                flexDirection:    'row',
+                alignItems:       'center',
+                gap:              spacing[3],
+                borderLeftWidth:  3,
+                borderLeftColor:  colors.accent.primary,
+              }}
+            >
+              <Text style={{ fontSize: 20 }}>💚</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.text.primary, marginBottom: 2 }}>
+                  Health Score
+                </Text>
+                <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.regular, color: colors.text.secondary }}>
+                  Your financial fitness score. Tap any section to see how it's calculated.
+                </Text>
+              </View>
+              <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted }}>✕</Text>
+            </Pressable>
+          )}
 
           {/* Biggest opportunity */}
           {worstFactor && worstFactor.factor < 1 && (

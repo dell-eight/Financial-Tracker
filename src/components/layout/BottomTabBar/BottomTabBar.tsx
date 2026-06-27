@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import type { NavigationProp } from '@react-navigation/native';
 import { useTheme } from '../../../hooks/ui/useTheme';
+import { useAppStore } from '../../../store/app.store';
 import type { RootStackParamList } from '../../../navigation/types';
 
 // ── Tab configuration ──────────────────────────────────────────────────────────
@@ -113,9 +114,11 @@ function TabItem({
 // ── FAB ────────────────────────────────────────────────────────────────────────
 
 function FABButton() {
-  const theme   = useTheme();
-  const rootNav = useNavigation<NavigationProp<RootStackParamList>>();
+  const theme        = useTheme();
+  const rootNav      = useNavigation<NavigationProp<RootStackParamList>>();
   const { colors, borderRadius, shadows } = theme;
+  const setFabBounds = useAppStore(s => s.setFabBounds);
+  const wrapRef      = useRef<View>(null);
 
   const scale    = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({
@@ -128,7 +131,23 @@ function FABButton() {
   }
 
   return (
-    <View style={styles.fabWrap} pointerEvents="box-none">
+    <View
+      ref={wrapRef}
+      style={styles.fabWrap}
+      pointerEvents="box-none"
+      onLayout={() => {
+        requestAnimationFrame(() => {
+          wrapRef.current?.measureInWindow((x, y, w, h) => {
+            if (w > 0) setFabBounds({
+              x:      x + (w - FAB_SIZE) / 2,
+              y,
+              width:  FAB_SIZE,
+              height: FAB_SIZE,
+            });
+          });
+        });
+      }}
+    >
       <Animated.View style={animStyle}>
         <Pressable
           onPress={handlePress}

@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react';
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,34 @@ import { BudgetCard, SectionHeader } from '../../components';
 import type { BudgetStackParamList } from '../../navigation/types';
 import type { CategoryKey } from '../../theme';
 import { useCurrency } from '../../utils/currency';
+import { useTutorialTour } from '../../hooks/ui/useTutorialTour';
+import { CoachmarkOverlay } from '../../components/tutorial';
+import { TUTORIAL } from '../../constants/tutorials';
+import type { TutorialStep } from '../../hooks/ui/useTutorialTour';
+
+const BUDGET_STEPS: TutorialStep[] = [
+  {
+    emoji: '🎯',
+    title: 'Budgets change behavior',
+    body: "People who set spending limits usually spend less — not because of discipline, but because seeing a progress bar creates awareness. This is how it works.",
+  },
+  {
+    emoji: '🚦',
+    title: 'Real-time progress tracking',
+    body: "Green = on track. Orange = 80%+ used. Red = over limit. You'll get a notification before you overspend — not after.",
+  },
+  {
+    emoji: '⚙️',
+    title: 'Create your first budget',
+    body: "Tap 'Edit Budgets' and set a limit for Food or Transport. One budget is enough to start. 30 seconds.",
+    requiredAction: 'create_budget',
+  },
+  {
+    emoji: '📅',
+    title: 'Your whole history, always',
+    body: 'Use the month arrows to see how you performed in any past month. Budget history is one of the most valuable things you will build over time.',
+  },
+];
 
 type Props = StackScreenProps<BudgetStackParamList, 'BudgetOverview'>;
 
@@ -798,6 +826,8 @@ export function BudgetScreen({ navigation }: Props) {
   const [period, setPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() });
 
   const { data: budgetsData, isLoading: budgetsLoading } = useBudgets(period.year, period.month + 1);
+  const tour        = useTutorialTour(TUTORIAL.BUDGET, BUDGET_STEPS);
+  const setupBtnRef = useRef<View>(null);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
@@ -1013,14 +1043,15 @@ export function BudgetScreen({ navigation }: Props) {
         ) : budgetItems.length === 0 ? (
           /* ── Empty state ─────────────────────────────────────────────────── */
           <Animated.View style={[{ paddingHorizontal: spacing[5], marginTop: spacing[8], alignItems: 'center' }, heroStyle]}>
-            <Text style={{ fontSize: 56, marginBottom: spacing[4] }}>📊</Text>
+            <Text style={{ fontSize: 56, marginBottom: spacing[4] }}>🎯</Text>
             <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary, textAlign: 'center', marginBottom: spacing[2] }}>
-              No Budget Set Up
+              Spend with intention
             </Text>
             <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', lineHeight: 22, marginBottom: spacing[6] }}>
-              Create spending categories with limits to track your monthly budget.
+              People who budget usually spend less — not because of willpower, but because seeing a limit creates awareness. Set one limit to start.
             </Text>
             <Pressable
+              ref={setupBtnRef}
               onPress={() => navigation.push('BudgetSetupWizard')}
               style={({ pressed }) => [{
                 backgroundColor: pressed ? colors.accent.pressed : colors.accent.primary,
@@ -1100,6 +1131,17 @@ export function BudgetScreen({ navigation }: Props) {
           </>
         )}
       </ScrollView>
+
+      {/* Budget tutorial — only shown when user has no budgets yet */}
+      <CoachmarkOverlay
+        steps={BUDGET_STEPS}
+        visible={tour.visible && !budgetsLoading && budgetItems.length === 0}
+        stepIndex={tour.stepIndex}
+        total={tour.total}
+        stepRefs={[null, null, setupBtnRef, null]}
+        onNext={tour.next}
+        onSkip={tour.skip}
+      />
     </View>
   );
 }
