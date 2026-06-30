@@ -25,10 +25,13 @@ import { useTransactions }   from '../../hooks/queries/useTransactions';
 import { useBudgets }        from '../../hooks/queries/useBudgets';
 import { useMonthlyHistory, useWeeklyHistory } from '../../hooks/queries/useAnalytics';
 import { AnalyticsCard, ChartCard, SectionHeader } from '../../components';
+import { QueryError } from '../../components/common/QueryError';
 import { getCategoryBgColor } from '../../theme';
 import type { AnalyticsStackParamList } from '../../navigation/types';
 import type { CategoryKey } from '../../theme';
 import { useCurrency } from '../../utils/currency';
+import { useStaggeredAnimation } from '../../hooks/ui/useStaggeredAnimation';
+import { computePeriodMeta, type PeriodMeta } from '../../utils/analyticsDateRanges';
 import { GroupedBarChart } from '../../components/charts/GroupedBarChart';
 import { SpendingLineChart } from '../../components/charts/SpendingLineChart';
 import { CategoryDonut } from '../../components/charts/CategoryDonut';
@@ -57,21 +60,6 @@ interface CatStat {
   icon:   string;
   amount: number;
   color:  string;
-}
-
-interface PeriodMeta {
-  total:             string;
-  income:            string;
-  net:               string;
-  delta:             string;
-  vsLabel:           string;
-  savingsRate:       number;
-  // null = no prior-period income data; suppress the delta badge
-  prevSavingsRate:   number | null;
-  hasIncome:         boolean;
-  thisMonthSavings:  number;
-  ytdSavings:        number;
-  avgSavings:        number;
 }
 
 // ─── TopCategoriesCard ──────────────────────────────────────────────────────────
@@ -572,9 +560,9 @@ export function AnalyticsScreen({ navigation }: Props) {
   const { colors, spacing, fontSize, fontFamily, borderRadius, shadows, categoryColors } = theme;
   const { fmt: fmtFull } = useCurrency();
 
-  const { data: txns }          = useTransactions();
-  const { data: budgets }       = useBudgets();
-  const { data: monthlyHistory } = useMonthlyHistory(6);
+  const { data: txns,           isError: txErr,   refetch: refetchTxns }    = useTransactions();
+  const { data: budgets,        isError: budgErr, refetch: refetchBudgets } = useBudgets();
+  const { data: monthlyHistory, isError: histErr, refetch: refetchHistory } = useMonthlyHistory(6);
   const { data: weeklyHistory }  = useWeeklyHistory();
 
   const [period, setPeriod] = useState<Period>('monthly');
@@ -622,62 +610,10 @@ export function AnalyticsScreen({ navigation }: Props) {
     return [...quarters.values()];
   }, [monthlyHistory]);
 
-  const meta = useMemo<PeriodMeta>(() => {
-    if (period === 'weekly') {
-      const wk = weeklyHistory ?? [];
-      const income  = wk.reduce((s, d) => s + d.income,  0);
-      const expense = wk.reduce((s, d) => s + d.expense, 0);
-      const net     = income - expense;
-      const sr      = income > 0 ? Math.round((net / income) * 1000) / 10 : 0;
-      const mhW     = monthlyHistory ?? [];
-      const ytdW    = mhW.reduce((s, h) => s + h.savings, 0);
-      const avgW    = mhW.length > 0 ? Math.round(ytdW / mhW.length) : 0;
-      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'this week', savingsRate: sr, prevSavingsRate: null, hasIncome: income > 0, thisMonthSavings: mhW[mhW.length - 1]?.savings ?? 0, ytdSavings: ytdW, avgSavings: avgW };
-    }
-    if (period === 'yearly') {
-      const hist    = monthlyHistory ?? [];
-      const income  = hist.reduce((s, d) => s + d.income,  0);
-      const expense = hist.reduce((s, d) => s + d.expense, 0);
-      const net     = income - expense;
-      const sr      = income > 0 ? Math.round((net / income) * 1000) / 10 : 0;
-      const ytdY    = hist.reduce((s, h) => s + h.savings, 0);
-      const avgY    = hist.length > 0 ? Math.round(ytdY / hist.length) : 0;
-      return { total: fmtFull(expense), income: fmtFull(income), net: fmtFull(Math.max(0, net)), delta: '—', vsLabel: 'last 6 months', savingsRate: sr, prevSavingsRate: null, hasIncome: income > 0, thisMonthSavings: hist[hist.length - 1]?.savings ?? 0, ytdSavings: ytdY, avgSavings: avgY };
-    }
-    // monthly
-    const monthExpense = (txns ?? [])
-      .filter(t => t.type === 'expense' && t.date.startsWith(_CURRENT_MONTH))
-      .reduce((s, t) => s + t.amount, 0);
-    const monthIncome = (txns ?? [])
-      .filter(t => t.type === 'income' && t.date.startsWith(_CURRENT_MONTH))
-      .reduce((s, t) => s + t.amount, 0);
-    const net             = monthIncome - monthExpense;
-    const savingsRate     = monthIncome > 0 ? Math.round((net / monthIncome) * 1000) / 10 : 0;
-    const hist            = monthlyHistory ?? [];
-    const prev            = hist.length >= 2 ? hist[hist.length - 2] : null;
-    const prevExp         = prev?.expense ?? 0;
-    const deltaVal        = prevExp > 0 ? ((monthExpense - prevExp) / prevExp) * 100 : 0;
-    const deltaStr        = prevExp > 0 ? `${Math.abs(deltaVal).toFixed(1)}% ${deltaVal <= 0 ? 'less' : 'more'}` : '—';
-    // null when no prior-period income — suppresses the savings delta badge
-    const prevSR          = prev && prev.income > 0 ? Math.round(((prev.income - prev.expense) / prev.income) * 1000) / 10 : null;
-    // Use live net for current month; exclude the current-month DB entry (partial/stale) when summing completed months
-    const completedMonths = hist.filter(h => !h.month.startsWith(_CURRENT_MONTH));
-    const ytdM            = completedMonths.reduce((s, h) => s + h.savings, 0) + net;
-    const avgM            = Math.round(ytdM / (completedMonths.length + 1));
-    return {
-      total:            fmtFull(monthExpense),
-      income:           fmtFull(monthIncome),
-      net:              fmtFull(Math.max(0, net)),
-      delta:            deltaStr,
-      vsLabel:          prev ? `vs ${prev.label}` : '',
-      savingsRate,
-      prevSavingsRate:  prevSR,
-      hasIncome:        monthIncome > 0,
-      thisMonthSavings: net,
-      ytdSavings:       ytdM,
-      avgSavings:       avgM,
-    };
-  }, [period, txns, monthlyHistory, weeklyHistory]);
+  const meta = useMemo<PeriodMeta>(
+    () => computePeriodMeta(period, txns, monthlyHistory, weeklyHistory, fmtFull, _CURRENT_MONTH),
+    [period, txns, monthlyHistory, weeklyHistory],
+  );
 
   const PAD = spacing[5];
 
@@ -694,26 +630,10 @@ export function AnalyticsScreen({ navigation }: Props) {
   }, [period, weeklyHistory, monthlyHistory, yearlyHistory]);
 
   // ── Entrance animations ────────────────────────────────────────────────────
-  const a0 = useSharedValue(0);
-  const a1 = useSharedValue(0);
-  const a2 = useSharedValue(0);
-  const a3 = useSharedValue(0);
-  const a4 = useSharedValue(0);
-  const a5 = useSharedValue(0);
-  const a6 = useSharedValue(0);
-  const a7 = useSharedValue(0);
-
-  useEffect(() => {
-    const e = Easing.out(Easing.cubic);
-    a0.value = withDelay(0,   withTiming(1, { duration: 400, easing: e }));
-    a1.value = withDelay(60,  withTiming(1, { duration: 440, easing: e }));
-    a2.value = withDelay(120, withTiming(1, { duration: 440, easing: e }));
-    a3.value = withDelay(180, withTiming(1, { duration: 440, easing: e }));
-    a4.value = withDelay(240, withTiming(1, { duration: 440, easing: e }));
-    a5.value = withDelay(300, withTiming(1, { duration: 440, easing: e }));
-    a6.value = withDelay(360, withTiming(1, { duration: 440, easing: e }));
-    a7.value = withDelay(420, withTiming(1, { duration: 440, easing: e }));
-  }, []);
+  const [a0, a1, a2, a3, a4, a5, a6, a7] = useStaggeredAnimation(8, {
+    stepMs:   60,
+    duration: [400, 440, 440, 440, 440, 440, 440, 440],
+  });
 
   const s0 = useAnimatedStyle(() => ({ opacity: a0.value, transform: [{ translateY: interpolate(a0.value, [0, 1], [12, 0]) }] }));
   const s1 = useAnimatedStyle(() => ({ opacity: a1.value, transform: [{ translateY: interpolate(a1.value, [0, 1], [20, 0]) }] }));
@@ -723,6 +643,11 @@ export function AnalyticsScreen({ navigation }: Props) {
   const s5 = useAnimatedStyle(() => ({ opacity: a5.value, transform: [{ translateY: interpolate(a5.value, [0, 1], [20, 0]) }] }));
   const s6 = useAnimatedStyle(() => ({ opacity: a6.value, transform: [{ translateY: interpolate(a6.value, [0, 1], [20, 0]) }] }));
   const s7 = useAnimatedStyle(() => ({ opacity: a7.value, transform: [{ translateY: interpolate(a7.value, [0, 1], [20, 0]) }] }));
+
+  if (txErr || budgErr || histErr) {
+    const retryAll = () => { void refetchTxns(); void refetchBudgets(); void refetchHistory(); };
+    return <QueryError onRetry={retryAll} />;
+  }
 
   return (
     <View style={[sc.root, { backgroundColor: colors.bg.base }]}>

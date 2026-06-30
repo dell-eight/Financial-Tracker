@@ -7,11 +7,13 @@ import { TransactionsStack } from './stacks/TransactionsStack';
 import { BudgetStack }       from './stacks/BudgetStack';
 import { WealthStack }       from './stacks/WealthStack';
 import { AnalyticsStack }    from './stacks/AnalyticsStack';
+import { ErrorBoundary }     from '../components/common/ErrorBoundary';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 export function MainNavigator() {
   return (
+    <ErrorBoundary>
     <Tab.Navigator
       tabBar={props => <BottomTabBar {...props} />}
       screenOptions={{ headerShown: false }}
@@ -67,5 +69,6 @@ export function MainNavigator() {
         })}
       />
     </Tab.Navigator>
+    </ErrorBoundary>
   );
 }
