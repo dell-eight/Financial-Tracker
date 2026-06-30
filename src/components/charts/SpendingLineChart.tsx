@@ -40,7 +40,7 @@ function smoothPath(pts: { x: number; y: number }[]): string {
   return d;
 }
 
-export function SpendingLineChart({
+export const SpendingLineChart = React.memo(function SpendingLineChart({
   data, chartW, chartH = 220, animDelay = 0,
 }: {
   data:       LinePoint[];
@@ -252,4 +252,4 @@ export function SpendingLineChart({
       )}
     </View>
   );
-}
+});

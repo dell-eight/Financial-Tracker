@@ -35,7 +35,7 @@ function AnimatedBar({
   );
 }
 
-export function GroupedBarChart({
+export const GroupedBarChart = React.memo(function GroupedBarChart({
   data, chartW, chartH = 200, animDelay = 0,
 }: {
   data:       BarPoint[];
@@ -180,4 +180,4 @@ export function GroupedBarChart({
       </View>
     </Pressable>
   );
-}
+});

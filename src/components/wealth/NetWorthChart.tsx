@@ -65,7 +65,7 @@ interface Props {
   height?: number;
 }
 
-export function NetWorthChart({ data, width, height = CHART_H }: Props) {
+export const NetWorthChart = React.memo(function NetWorthChart({ data, width, height = CHART_H }: Props) {
   const theme = useTheme();
   const { colors, fontFamily } = theme;
   const { fmtCompact, fmt } = useCurrency();
@@ -298,4 +298,4 @@ export function NetWorthChart({ data, width, height = CHART_H }: Props) {
       </Svg>
     </View>
   );
-}
+});

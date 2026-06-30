@@ -47,7 +47,7 @@ function buildArc(cx: number, cy: number, outerR: number, innerR: number, a1: nu
   ].join(' ');
 }
 
-export function CategoryDonut({
+export const CategoryDonut = React.memo(function CategoryDonut({
   data, animDelay = 0,
 }: {
   data:       CatStat[];
@@ -162,4 +162,4 @@ export function CategoryDonut({
       </Text>
     </View>
   );
-}
+});
