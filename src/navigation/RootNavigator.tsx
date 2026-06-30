@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
 import { View, StyleSheet } from 'react-native';
 import * as ScreenCapture from 'expo-screen-capture';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -31,6 +33,31 @@ import { OnboardingScreen } from '../screens/onboarding/OnboardingScreen';
 import { setUserContext as setCrashUser, clearUserContext as clearCrashUser } from '../services/crash.service';
 
 const Root = createStackNavigator<RootStackParamList>();
+
+// Rendered inside the Root stack so useNavigation() resolves to the root navigator.
+function QuickAddBridge() {
+  const rootNav            = useNavigation<NavigationProp<RootStackParamList>>();
+  const quickAddVisible    = useAppStore(s => s.quickAddVisible);
+  const setQuickAddVisible = useAppStore(s => s.setQuickAddVisible);
+
+  useEffect(() => {
+    if (quickAddVisible) {
+      rootNav.navigate('QuickAddSheet');
+      setQuickAddVisible(false);
+    }
+  }, [quickAddVisible, rootNav, setQuickAddVisible]);
+
+  return null;
+}
+
+function MainNavigatorWithBridge() {
+  return (
+    <>
+      <QuickAddBridge />
+      <MainNavigator />
+    </>
+  );
+}
 
 const THRESHOLDS: Record<string, number> = {
   '1min':  60_000,
@@ -266,7 +293,7 @@ export function RootNavigator() {
         ) : isAuthenticated && !hasSeenNetWorthOnboarding ? (
           <Root.Screen name="Onboarding" component={OnboardingScreen} options={{ headerShown: false }} />
         ) : isAuthenticated ? (
-          <Root.Screen name="Main" component={MainNavigator} />
+          <Root.Screen name="Main" component={MainNavigatorWithBridge} />
         ) : (
           <Root.Screen name="Auth" component={AuthScreen} />
         )}

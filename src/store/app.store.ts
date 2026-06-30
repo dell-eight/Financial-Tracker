@@ -81,6 +81,8 @@ interface AppState {
   pendingMilestones:   PendingMilestone[];
   fabBounds: { x: number; y: number; width: number; height: number } | null;
   setFabBounds: (b: { x: number; y: number; width: number; height: number }) => void;
+  quickAddVisible: boolean;
+  setQuickAddVisible: (visible: boolean) => void;
 
   // ── Setters ────────────────────────────────────────────────────────────
   setThemePreference:          (pref: ThemePreference) => void;
@@ -135,6 +137,8 @@ export const useAppStore = create<AppState>()(
       pendingMilestones:    [],
       fabBounds:            null,
       setFabBounds: (fabBounds) => set({ fabBounds }),
+      quickAddVisible:      false,
+      setQuickAddVisible:   (quickAddVisible) => set({ quickAddVisible }),
 
       setHasOnboarded:              (hasOnboarded)              => set({ hasOnboarded }),
       setHasSeenNetWorthOnboarding: (hasSeenNetWorthOnboarding) => set({ hasSeenNetWorthOnboarding }),
