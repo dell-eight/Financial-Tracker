@@ -208,6 +208,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
         navigation.goBack();
       }
     } catch (e: unknown) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setSaveError(e instanceof Error ? e.message : 'Failed to save. Please try again.');
       setSaving(false);
     }
