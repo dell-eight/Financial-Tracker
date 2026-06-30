@@ -48,8 +48,9 @@ const BUDGET_STEPS: TutorialStep[] = [
   {
     emoji: '⚙️',
     title: 'Create your first budget',
-    body: "Tap 'Edit Budgets' and set a limit for Food or Transport. One budget is enough to start. 30 seconds.",
+    body: "Tap 'Setup Budgets' and set a limit for Food or Transport. One budget is enough to start. 30 seconds.",
     requiredAction: 'create_budget',
+    inlineButton: 'Setup Budgets',
   },
   {
     emoji: '📅',
@@ -826,8 +827,7 @@ export function BudgetScreen({ navigation }: Props) {
   const [period, setPeriod] = useState({ year: now.getFullYear(), month: now.getMonth() });
 
   const { data: budgetsData, isLoading: budgetsLoading } = useBudgets(period.year, period.month + 1);
-  const tour        = useTutorialTour(TUTORIAL.BUDGET, BUDGET_STEPS);
-  const setupBtnRef = useRef<View>(null);
+  const tour = useTutorialTour(TUTORIAL.BUDGET, BUDGET_STEPS);
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
@@ -962,13 +962,13 @@ export function BudgetScreen({ navigation }: Props) {
                 },
               ]}
               accessibilityRole="button"
-              accessibilityLabel="Edit budgets"
+              accessibilityLabel={budgetItems.length === 0 ? 'Setup budgets' : 'Edit budgets'}
             >
               {({ pressed }) => (
                 <>
                   <Text style={{ fontSize: 12, color: pressed ? '#FFFFFF' : colors.accent.primary, lineHeight: 16 }}>✎</Text>
                   <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: pressed ? '#FFFFFF' : colors.accent.primary, marginLeft: 5 }}>
-                    Edit Budgets
+                    {budgetItems.length === 0 ? 'Setup Budgets' : 'Edit Budgets'}
                   </Text>
                 </>
               )}
@@ -1051,7 +1051,6 @@ export function BudgetScreen({ navigation }: Props) {
               People who budget usually spend less — not because of willpower, but because seeing a limit creates awareness. Set one limit to start.
             </Text>
             <Pressable
-              ref={setupBtnRef}
               onPress={() => navigation.push('BudgetSetupWizard')}
               style={({ pressed }) => [{
                 backgroundColor: pressed ? colors.accent.pressed : colors.accent.primary,
@@ -1138,7 +1137,7 @@ export function BudgetScreen({ navigation }: Props) {
         visible={tour.visible && !budgetsLoading && budgetItems.length === 0}
         stepIndex={tour.stepIndex}
         total={tour.total}
-        stepRefs={[null, null, setupBtnRef, null]}
+        stepRefs={[null, null, null, null]}
         onNext={tour.next}
         onSkip={tour.skip}
       />

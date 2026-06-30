@@ -62,6 +62,7 @@ const DASHBOARD_STEPS: TutorialStep[] = [
     title: 'Tap + and add an expense',
     body: 'The fastest way to see an accurate picture is to log every day. Tap + now — it takes 10 seconds.',
     requiredAction: 'tap_add_expense',
+    inlineFab: true,
   },
 ];
 
@@ -463,7 +464,6 @@ export function DashboardScreen({ navigation }: Props) {
   // Tutorial tour
   const tour = useTutorialTour(TUTORIAL.DASHBOARD, DASHBOARD_STEPS);
   const setTutorialCompleted = useAppStore(s => s.setTutorialCompleted);
-  const fabBounds = useAppStore(s => s.fabBounds);
   const user    = useAuthStore(s => s.user);
   const { data: userProfile } = useUserProfile();
 
@@ -842,7 +842,6 @@ export function DashboardScreen({ navigation }: Props) {
         stepIndex={tour.stepIndex}
         total={tour.total}
         stepRefs={[null, null]}
-        fixedTargets={[null, fabBounds]}
         onNext={tour.next}
         onSkip={tour.skip}
       />

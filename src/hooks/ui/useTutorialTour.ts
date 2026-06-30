@@ -22,6 +22,10 @@ export interface TutorialStep {
   title: string;
   body: string;
   requiredAction?: TutorialAction;
+  // When set: no spotlight, no arrow — show an inline illustration instead.
+  // inlineFab renders the purple + FAB; inlineButton renders a labelled pill button.
+  inlineFab?: boolean;
+  inlineButton?: string;
 }
 
 export interface TutorialTourResult {

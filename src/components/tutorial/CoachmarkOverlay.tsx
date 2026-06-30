@@ -132,10 +132,12 @@ export function CoachmarkOverlay({
 
   const tooltipWidth = screenW - spacing[5] * 2;
   const tooltipX     = spacing[5];
+  // Arrows are in-flow (not absolute), so tooltipHeight already includes them.
+  // No ARROW_SIZE offset needed — the arrow sits flush between target and card.
   const tooltipY     = target
     ? tooltipBelow
-      ? target.y + target.height + ARROW_SIZE + 4
-      : target.y - tooltipHeight - ARROW_SIZE - 4
+      ? target.y + target.height + 4
+      : target.y - tooltipHeight - 4
     : screenH / 2 - tooltipHeight / 2;
 
   // Arrow horizontal center: align with target center, clamped within tooltip
@@ -209,9 +211,9 @@ export function CoachmarkOverlay({
           setTooltipReady(true);
         }}
       >
-        {/* Arrow pointing DOWN (tooltip above target) */}
-        {target && !tooltipBelow && (
-          <View style={[styles.arrow, styles.arrowDown, { left: arrowX, borderTopColor: colors.bg.surface }]} />
+        {/* Arrow pointing UP — in flow above card (tooltip is below the target) */}
+        {target && tooltipBelow && !step.inlineFab && !step.inlineButton && (
+          <View style={[styles.arrow, styles.arrowUp, { marginLeft: arrowX, borderBottomColor: colors.bg.surface }]} />
         )}
 
         {/* Card */}
@@ -245,6 +247,48 @@ export function CoachmarkOverlay({
             </Text>
           </View>
 
+          {/* Inline FAB illustration — steps that highlight the + button */}
+          {step.inlineFab && (
+            <View style={{ alignItems: 'center', marginVertical: spacing[3] }}>
+              <View style={{
+                width:           52,
+                height:          52,
+                borderRadius:    26,
+                backgroundColor: colors.accent.primary,
+                alignItems:      'center',
+                justifyContent:  'center',
+                elevation:       4,
+                shadowColor:     '#000',
+                shadowOffset:    { width: 0, height: 2 },
+                shadowOpacity:   0.3,
+                shadowRadius:    6,
+              }}>
+                <Text style={{ fontSize: 28, color: '#FFFFFF', lineHeight: 32, marginTop: -2 }}>+</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Inline button illustration — steps that highlight a named button */}
+          {step.inlineButton && (
+            <View style={{ alignItems: 'center', marginVertical: spacing[3] }}>
+              <View style={{
+                paddingHorizontal: spacing[5],
+                paddingVertical:   spacing[2],
+                borderRadius:      borderRadius.button,
+                backgroundColor:   colors.accent.primary,
+                elevation:         2,
+                shadowColor:       '#000',
+                shadowOffset:      { width: 0, height: 1 },
+                shadowOpacity:     0.2,
+                shadowRadius:      4,
+              }}>
+                <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: '#FFFFFF' }}>
+                  {step.inlineButton}
+                </Text>
+              </View>
+            </View>
+          )}
+
           {/* Body */}
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary, lineHeight: 20, marginBottom: spacing[4] }}>
             {step.body}
@@ -267,9 +311,9 @@ export function CoachmarkOverlay({
           </Pressable>
         </View>
 
-        {/* Arrow pointing UP (tooltip below target) */}
-        {target && tooltipBelow && (
-          <View style={[styles.arrow, styles.arrowUp, { left: arrowX, borderBottomColor: colors.bg.surface }]} />
+        {/* Arrow pointing DOWN — in flow below card (tooltip is above the target) */}
+        {target && !tooltipBelow && !step.inlineFab && !step.inlineButton && (
+          <View style={[styles.arrow, styles.arrowDown, { marginLeft: arrowX, borderTopColor: colors.bg.surface }]} />
         )}
       </Animated.View>
     </Modal>
@@ -290,21 +334,19 @@ const styles = StyleSheet.create({
     alignItems:     'center',
   },
   arrow: {
-    position:  'absolute',
-    width:     0,
-    height:    0,
+    alignSelf:        'flex-start',   // prevent column-stretch from overriding width:0
+    width:            0,
+    height:           0,
     borderLeftWidth:  ARROW_SIZE,
     borderRightWidth: ARROW_SIZE,
     borderLeftColor:  'transparent',
     borderRightColor: 'transparent',
   },
   arrowDown: {
-    bottom:          -ARROW_SIZE,
     borderTopWidth:  ARROW_SIZE,
     borderTopColor:  'transparent',
   },
   arrowUp: {
-    top:              -ARROW_SIZE,
     borderBottomWidth: ARROW_SIZE,
     borderBottomColor: 'transparent',
   },

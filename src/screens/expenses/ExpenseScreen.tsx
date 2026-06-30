@@ -55,6 +55,7 @@ const TRANSACTIONS_STEPS: TutorialStep[] = [
     title: 'Log your first transaction',
     body: 'People who log daily spend less — not because of willpower, but because seeing the number creates friction. Tap + now. Takes 10 seconds.',
     requiredAction: 'tap_add_transaction',
+    inlineFab: true,
   },
   {
     emoji: '🎉',
@@ -1112,8 +1113,7 @@ export function ExpenseScreen({ navigation, route }: Props) {
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
   const btmPad = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'ios' ? 34 : 24);
 
-  const tour      = useTutorialTour(TUTORIAL.TRANSACTIONS, TRANSACTIONS_STEPS);
-  const fabBounds = useAppStore(s => s.fabBounds);
+  const tour = useTutorialTour(TUTORIAL.TRANSACTIONS, TRANSACTIONS_STEPS);
 
   // ── Date range for server-side filtering ────────────────────────────────────
   const { from, to } = useMemo(() => {
@@ -1470,7 +1470,6 @@ export function ExpenseScreen({ navigation, route }: Props) {
         stepIndex={tour.stepIndex}
         total={tour.total}
         stepRefs={[null, null, null, null]}
-        fixedTargets={[null, null, fabBounds, null]}
         onNext={tour.next}
         onSkip={tour.skip}
       />

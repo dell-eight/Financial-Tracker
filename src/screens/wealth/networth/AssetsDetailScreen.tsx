@@ -50,6 +50,7 @@ const ACCOUNTS_STEPS: TutorialStep[] = [
     title: 'Add your first account',
     body: "Tap '+ Add' now. Enter your bank balance. 15 seconds and your net worth becomes real.",
     requiredAction: 'add_account',
+    inlineButton: '+ Add',
   },
 ];
 
@@ -199,7 +200,6 @@ export function AssetsDetailScreen({ navigation }: Props) {
   const [formVisible,     setFormVisible]     = useState(false);
   const [mutating,        setMutating]        = useState(false);
   const [showAccountToast, setShowAccountToast] = useState(false);
-  const addBtnRef = useRef<View>(null);
   const [headerStyle, listStyle] = useScreenAnimation(2);
 
   const tutorialsCompleted = useAppStore(s => s.tutorialsCompleted);
@@ -318,7 +318,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
           <Text style={{ fontSize: fontSize.bodyLg, color: colors.accent.primary, fontFamily: fontFamily.medium }}>← Back</Text>
         </Pressable>
         <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.primary }}>Assets</Text>
-        <Pressable ref={addBtnRef} onPress={() => setFormVisible(true)} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
+        <Pressable onPress={() => setFormVisible(true)} hitSlop={12} style={{ minWidth: 60, alignItems: 'flex-end' }}>
           <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: colors.accent.primary }}>+ Add</Text>
         </Pressable>
       </Animated.View>
@@ -576,7 +576,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
         visible={tour.visible}
         stepIndex={tour.stepIndex}
         total={tour.total}
-        stepRefs={[null, null, addBtnRef]}
+        stepRefs={[null, null, null]}
         onNext={tour.next}
         onSkip={tour.skip}
       />
