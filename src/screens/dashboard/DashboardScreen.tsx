@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -17,19 +17,14 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withDelay,
-  withRepeat,
-  withSequence,
-  Easing,
   interpolate,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle } from 'react-native-svg';
 import { useQueryClient } from '@tanstack/react-query';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { NavigationProp } from '@react-navigation/native';
 
+import * as Haptics from 'expo-haptics';
 import { useTheme }                   from '../../hooks/ui/useTheme';
-import type { ThemeColors }           from '../../theme';
 import { useDashboard }               from '../../hooks/queries/useDashboard';
 import { useTransactions }            from '../../hooks/queries/useTransactions';
 import { useBudgets }                 from '../../hooks/queries/useBudgets';
@@ -38,11 +33,17 @@ import { useUserProfile }             from '../../hooks/queries/useAuth';
 import { useAuthStore }               from '../../store/auth.store';
 import { useAppStore }                from '../../store/app.store';
 import { ProgressBar, SectionHeader, ExpenseItem } from '../../components';
+import { QueryError } from '../../components/common/QueryError';
 import type { HomeStackParamList, MainTabParamList } from '../../navigation/types';
 import { useCurrency } from '../../utils/currency';
 import { computeHealthScore } from '../../utils/healthScore';
 import { useUnreadNotificationCount } from '../../hooks/queries/useNotifications';
+import { SkeletonBox }      from '../../components/common/SkeletonBox';
+import { NetWorthCard }     from '../../components/dashboard/NetWorthCard';
+import { HealthScoreBand, getHealthBand } from '../../components/dashboard/HealthScoreBand';
+import { CashFlowStrip }   from '../../components/dashboard/CashFlowStrip';
 import { useTutorialTour } from '../../hooks/ui/useTutorialTour';
+import { useStaggeredAnimation } from '../../hooks/ui/useStaggeredAnimation';
 import { CoachmarkOverlay } from '../../components/tutorial';
 import { TUTORIAL } from '../../constants/tutorials';
 import type { TutorialStep } from '../../hooks/ui/useTutorialTour';
@@ -50,6 +51,13 @@ import type { TutorialStep } from '../../hooks/ui/useTutorialTour';
 type Props = StackScreenProps<HomeStackParamList, 'HomeMain'>;
 
 const { width: SCREEN_W } = Dimensions.get('window');
+
+// Skeleton heights must match the real card heights to avoid layout shift on load
+const SK_H = {
+  recentTx:  60,
+  budgetRow: 56,
+  goalChip:  108,
+} as const;
 
 const DASHBOARD_STEPS: TutorialStep[] = [
   {
@@ -88,283 +96,6 @@ function getGreeting(): string {
 
   return 'Hello';
 }
-
-function getHealthBand(score: number, colors: ThemeColors): { label: string; color: string } {
-  if (score >= 80) return { label: 'Excellent',       color: colors.income };
-  if (score >= 60) return { label: 'Good',            color: colors.accent.primary };
-  if (score >= 40) return { label: 'Fair',            color: colors.warning };
-  return               { label: 'Needs Attention', color: colors.expense };
-}
-
-// ── SkeletonBox ────────────────────────────────────────────────────────────────
-
-function SkeletonBox({ width, height, borderRadius = 8, style }: {
-  width?: number | string; height: number; borderRadius?: number; style?: object;
-}) {
-  const theme   = useTheme();
-  const opacity = useSharedValue(0.06);
-
-  useEffect(() => {
-    opacity.value = withRepeat(
-      withSequence(
-        withTiming(0.14, { duration: 700, easing: Easing.inOut(Easing.ease) }),
-        withTiming(0.06, { duration: 700, easing: Easing.inOut(Easing.ease) }),
-      ),
-      -1,
-    );
-  }, []);
-
-  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
-
-  return (
-    <Animated.View
-      style={[
-        {
-          width:           width ?? '100%',
-          height,
-          borderRadius,
-          backgroundColor: theme.colors.text.primary,
-        },
-        animStyle,
-        style,
-      ]}
-    />
-  );
-}
-
-// ── Zone 1: NetWorthCard ───────────────────────────────────────────────────────
-
-interface NetWorthCardProps {
-  netWorth:        number;
-  delta:           number;
-  deltaPct:        number;
-  totalAssets:     number;
-  totalDebts:      number;
-  investmentValue: number;
-  onPress:         () => void;
-  loading:         boolean;
-}
-
-function NetWorthCard({
-  netWorth, delta, deltaPct,
-  totalAssets, totalDebts, investmentValue,
-  onPress, loading,
-}: NetWorthCardProps) {
-  const theme = useTheme();
-  const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
-  const { fmt: fmtPh, fmtCompact: fmtK } = useCurrency();
-
-  if (loading) {
-    return (
-      <View style={{ borderRadius: borderRadius.cardLg, overflow: 'hidden' }}>
-        <SkeletonBox height={188} borderRadius={borderRadius.cardLg} />
-      </View>
-    );
-  }
-
-  const isPositive = delta >= 0;
-
-  const chipBg  = isPositive ? 'rgba(52,211,153,0.15)'  : 'rgba(248,113,113,0.15)';
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        { borderRadius: borderRadius.cardLg, overflow: 'hidden' },
-        Platform.OS === 'ios'
-          ? { shadowColor: '#0A0720', shadowOffset: { width: 0, height: 14 }, shadowOpacity: 0.45, shadowRadius: 28 }
-          : { elevation: 16 },
-      ]}
-    >
-      <LinearGradient
-        colors={['#2A1168', '#17094A', '#0C0828']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0, y: 1 }}
-        style={[nwStyles.card, { borderRadius: borderRadius.cardLg, padding: spacing[5] }]}
-      >
-        {/* Decorative glows */}
-        <Svg width="100%" height="100%" style={StyleSheet.absoluteFillObject} pointerEvents="none">
-          <Circle cx="92%" cy="10%" r={80}  fill="rgba(140,100,255,0.12)" />
-          <Circle cx="-5%" cy="90%" r={90}  fill="rgba(100,70,230,0.10)"  />
-        </Svg>
-
-        {/* Top highlight shimmer */}
-        <View style={nwStyles.topShimmer} />
-
-        {/* Label */}
-        <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.semiBold, color: 'rgba(255,255,255,0.5)', letterSpacing: 1.4, textTransform: 'uppercase' }}>
-          Total Net Worth
-        </Text>
-
-        {/* Primary number */}
-        <Text style={{ fontSize: fontSize.displayXl, fontFamily: fontFamily.bold, color: '#FFFFFF', letterSpacing: -1, marginTop: spacing[1], lineHeight: 50 }}>
-          {fmtPh(netWorth)}
-        </Text>
-
-        {/* Delta chip */}
-        <View style={nwStyles.deltaRow}>
-          <View style={[nwStyles.deltaChip, { backgroundColor: chipBg }]}>
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: isPositive ? colors.income : colors.expense }}>
-              {isPositive ? '↑' : '↓'} {fmtPh(Math.abs(delta))} ({isPositive ? '+' : ''}{deltaPct.toFixed(2)}%)
-            </Text>
-            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: 'rgba(255,255,255,0.5)', marginLeft: 6 }}>
-              this month
-            </Text>
-          </View>
-        </View>
-
-        {/* 3-col breakdown strip */}
-        <View style={[nwStyles.strip, { marginTop: spacing[4], borderTopColor: 'rgba(255,255,255,0.12)', borderTopWidth: 1, paddingTop: spacing[3] }]}>
-          {[
-            { label: 'Assets',      value: fmtK(totalAssets),     color: colors.income },
-            { label: 'Debts',       value: fmtK(totalDebts),      color: colors.expense },
-            { label: 'Investments', value: fmtK(investmentValue), color: colors.accent.secondary },
-          ].map((item, i) => (
-            <View key={item.label} style={[nwStyles.stripCol, i > 0 && { borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.12)' }]}>
-              <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: item.color, letterSpacing: -0.2 }}>{item.value}</Text>
-              <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.regular, color: 'rgba(255,255,255,0.45)', marginTop: 3 }}>{item.label}</Text>
-            </View>
-          ))}
-        </View>
-      </LinearGradient>
-    </Pressable>
-  );
-}
-
-const nwStyles = StyleSheet.create({
-  card:      { overflow: 'hidden', justifyContent: 'space-between' },
-  topShimmer: {
-    position:            'absolute',
-    top:                 0,
-    left:                0,
-    right:               0,
-    height:              1,
-    backgroundColor:     'rgba(200,170,255,0.35)',
-  },
-  deltaRow:  { flexDirection: 'row', marginTop: 8 },
-  deltaChip: {
-    flexDirection: 'row', alignItems: 'center',
-    borderRadius: 99, paddingHorizontal: 12, paddingVertical: 5,
-  },
-  strip:     { flexDirection: 'row' },
-  stripCol:  { flex: 1, alignItems: 'center', paddingHorizontal: 4 },
-});
-
-// ── Zone 2: HealthScoreBand ────────────────────────────────────────────────────
-
-function HealthScoreBand({ score, onPress, loading }: {
-  score: number | null; onPress: () => void; loading: boolean;
-}) {
-  const theme = useTheme();
-  const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
-
-  if (loading || score === null) {
-    return <SkeletonBox height={72} borderRadius={borderRadius.card} />;
-  }
-
-  const band = getHealthBand(score, colors);
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        hsStyles.band,
-        shadows.card,
-        {
-          backgroundColor:  colors.bg.surface,
-          borderRadius:     borderRadius.card,
-          padding:          spacing[4],
-          borderLeftWidth:  3,
-          borderLeftColor:  band.color,
-        },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={`Financial Health Score: ${score} — ${band.label}`}
-    >
-      {/* Score circle */}
-      <View style={[hsStyles.scoreCircle, { backgroundColor: `${band.color}20`, borderRadius: borderRadius.full, borderWidth: 2, borderColor: band.color }]}>
-        <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: band.color, lineHeight: 20 }}>{score}</Text>
-      </View>
-
-      {/* Text */}
-      <View style={{ flex: 1, marginLeft: spacing[3] }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
-          <Text style={{ fontSize: fontSize.bodyLg, fontFamily: fontFamily.semiBold, color: colors.text.primary }}>
-            Financial Health Score
-          </Text>
-          <View style={{ backgroundColor: `${band.color}20`, borderRadius: borderRadius.full, paddingHorizontal: 8, paddingVertical: 2 }}>
-            <Text style={{ fontSize: fontSize.micro, fontFamily: fontFamily.semiBold, color: band.color }}>{band.label}</Text>
-          </View>
-        </View>
-        <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 2 }}>
-          Tap for per-factor breakdown and tips
-        </Text>
-      </View>
-
-      <Text style={{ fontSize: 16, color: colors.text.muted }}>›</Text>
-    </Pressable>
-  );
-}
-
-const hsStyles = StyleSheet.create({
-  band:        { flexDirection: 'row', alignItems: 'center' },
-  scoreCircle: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-});
-
-// ── Zone 3: CashFlowStrip ─────────────────────────────────────────────────────
-
-function CashFlowStrip({ income, expenses, saved, onPress, loading }: {
-  income: number; expenses: number; saved: number;
-  onPress: () => void; loading: boolean;
-}) {
-  const theme = useTheme();
-  const { colors, spacing, borderRadius, fontSize, fontFamily, shadows } = theme;
-  const { fmt: fmtPh } = useCurrency();
-
-  if (loading) {
-    return <SkeletonBox height={70} borderRadius={borderRadius.card} />;
-  }
-
-  const cols = [
-    { label: 'Income',   value: fmtPh(income),   color: colors.income },
-    { label: 'Expenses', value: fmtPh(expenses),  color: colors.expense },
-    { label: 'Saved',    value: fmtPh(saved),     color: saved >= 0 ? colors.text.primary : colors.expense },
-  ];
-
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        cfStyles.strip,
-        shadows.card,
-        { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card },
-      ]}
-    >
-      {cols.map((col, i) => (
-        <View
-          key={col.label}
-          style={[
-            cfStyles.col,
-            { paddingVertical: spacing[4] },
-            i > 0 && { borderLeftWidth: 1, borderLeftColor: colors.border.subtle },
-          ]}
-        >
-          <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: col.color, letterSpacing: -0.3 }} numberOfLines={1} adjustsFontSizeToFit>
-            {col.value}
-          </Text>
-          <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, marginTop: 3 }}>
-            {col.label}
-          </Text>
-        </View>
-      ))}
-    </Pressable>
-  );
-}
-
-const cfStyles = StyleSheet.create({
-  strip: { flexDirection: 'row' },
-  col:   { flex: 1, alignItems: 'center' },
-});
 
 // ── Zone 4: BudgetProgressRow ─────────────────────────────────────────────────
 
@@ -467,10 +198,10 @@ export function DashboardScreen({ navigation }: Props) {
   const user    = useAuthStore(s => s.user);
   const { data: userProfile } = useUserProfile();
 
-  const { data: dashboard, isLoading: dashLoading, refetch: refetchDash }  = useDashboard();
-  const { data: txns,      isLoading: txLoading,   refetch: refetchTxns }  = useTransactions();
-  const { data: budgets,   isLoading: budgLoading,  refetch: refetchBudg }  = useBudgets();
-  const { data: goals,     isLoading: goalLoading,  refetch: refetchGoals } = useSavingsGoals();
+  const { data: dashboard, isLoading: dashLoading, isError: dashErr,  refetch: refetchDash }  = useDashboard();
+  const { data: txns,      isLoading: txLoading,   isError: txErr,    refetch: refetchTxns }  = useTransactions();
+  const { data: budgets,   isLoading: budgLoading,  isError: budgErr,  refetch: refetchBudg }  = useBudgets();
+  const { data: goals,     isLoading: goalLoading,  isError: goalErr,  refetch: refetchGoals } = useSavingsGoals();
   const { data: unreadCount = 0 } = useUnreadNotificationCount();
 
   const topPad = insets.top > 0 ? insets.top : (Platform.OS === 'ios' ? 44 : 24);
@@ -530,24 +261,10 @@ export function DashboardScreen({ navigation }: Props) {
 
   // ── Stagger animations ─────────────────────────────────────────────────────
 
-  const aHeader = useSharedValue(0);
-  const aZ1     = useSharedValue(0);
-  const aZ2     = useSharedValue(0);
-  const aZ3     = useSharedValue(0);
-  const aZ4     = useSharedValue(0);
-  const aZ5     = useSharedValue(0);
-  const aZ6     = useSharedValue(0);
-
-  useEffect(() => {
-    const e = Easing.out(Easing.cubic);
-    aHeader.value = withDelay(0,   withTiming(1, { duration: 380, easing: e }));
-    aZ1.value     = withDelay(60,  withTiming(1, { duration: 420, easing: e }));
-    aZ2.value     = withDelay(140, withTiming(1, { duration: 420, easing: e }));
-    aZ3.value     = withDelay(200, withTiming(1, { duration: 400, easing: e }));
-    aZ4.value     = withDelay(260, withTiming(1, { duration: 400, easing: e }));
-    aZ5.value     = withDelay(320, withTiming(1, { duration: 400, easing: e }));
-    aZ6.value     = withDelay(380, withTiming(1, { duration: 400, easing: e }));
-  }, []);
+  const [aHeader, aZ1, aZ2, aZ3, aZ4, aZ5, aZ6] = useStaggeredAnimation(7, {
+    delays:   [0, 60, 140, 200, 260, 320, 380],
+    duration: [380, 420, 420, 400, 400, 400, 400],
+  });
 
   const sHeader = useAnimatedStyle(() => ({
     opacity:   aHeader.value,
@@ -596,6 +313,11 @@ export function DashboardScreen({ navigation }: Props) {
     p?.navigate(tab as never);
   }
 
+  // Show error state if any critical query fails (network down, Supabase unreachable, etc.)
+  if (dashErr || txErr || budgErr || goalErr) {
+    return <QueryError onRetry={onRefresh} />;
+  }
+
   return (
     <View style={[styles.screen, { backgroundColor: colors.bg.base }]}>
       <StatusBar style={theme.statusBarStyle} />
@@ -627,6 +349,7 @@ export function DashboardScreen({ navigation }: Props) {
             <Pressable
               onPress={() => navigation.push('Notifications')}
               style={[styles.iconBtn, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.full }]}
+              accessibilityRole="button"
               accessibilityLabel={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
             >
               <Text style={{ fontSize: 18, lineHeight: 24 }}>🔔</Text>
@@ -654,6 +377,7 @@ export function DashboardScreen({ navigation }: Props) {
             <Pressable
               onPress={() => navigation.push('Profile')}
               style={[styles.avatar, { backgroundColor: colors.accent.primary, borderRadius: borderRadius.full, overflow: 'hidden' }]}
+              accessibilityRole="button"
               accessibilityLabel="Profile"
             >
               {avatarUrl ? (
@@ -711,9 +435,9 @@ export function DashboardScreen({ navigation }: Props) {
           />
           {budgLoading ? (
             <View style={{ paddingHorizontal: spacing[5], gap: spacing[2] }}>
-              <SkeletonBox height={56} />
-              <SkeletonBox height={56} />
-              <SkeletonBox height={56} />
+              <SkeletonBox height={SK_H.budgetRow} />
+              <SkeletonBox height={SK_H.budgetRow} />
+              <SkeletonBox height={SK_H.budgetRow} />
             </View>
           ) : topBudgets.length === 0 ? (
             <Pressable
@@ -755,8 +479,8 @@ export function DashboardScreen({ navigation }: Props) {
           />
           {goalLoading ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing[5], gap: spacing[3] }}>
-              <SkeletonBox width={SCREEN_W * 0.44} height={108} borderRadius={borderRadius.card} />
-              <SkeletonBox width={SCREEN_W * 0.44} height={108} borderRadius={borderRadius.card} />
+              <SkeletonBox width={SCREEN_W * 0.44} height={SK_H.goalChip} borderRadius={borderRadius.card} />
+              <SkeletonBox width={SCREEN_W * 0.44} height={SK_H.goalChip} borderRadius={borderRadius.card} />
             </ScrollView>
           ) : (goals ?? []).length === 0 ? (
             <Pressable
@@ -801,12 +525,17 @@ export function DashboardScreen({ navigation }: Props) {
           />
           {txLoading ? (
             <View style={{ paddingHorizontal: spacing[5], gap: spacing[2] }}>
-              {[1, 2, 3].map(i => <SkeletonBox key={i} height={60} />)}
+              {[1, 2, 3].map(i => <SkeletonBox key={i} height={SK_H.recentTx} />)}
             </View>
           ) : recentTxns.length === 0 ? (
             <Pressable
-              onPress={() => navigation.getParent()?.getParent()?.navigate('QuickAddSheet' as never)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                useAppStore.getState().setQuickAddVisible(true);
+              }}
               style={[styles.emptyCard, shadows.card, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.card, marginHorizontal: spacing[5], padding: spacing[5] }]}
+              accessibilityRole="button"
+              accessibilityLabel="No transactions yet — tap to add your first one"
             >
               <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center' }}>
                 No transactions yet — add your first one
