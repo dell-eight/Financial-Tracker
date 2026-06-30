@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Networthy",
-    "slug": "networthy",
+    "slug": "financial-tracker",
     "scheme": "networthy",
     "version": "1.0.0",
     "orientation": "portrait",
