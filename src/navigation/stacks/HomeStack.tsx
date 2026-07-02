@@ -17,7 +17,8 @@ import { TermsOfServiceScreen }     from '../../screens/profile/TermsOfServiceSc
 import { SetupPINScreen }              from '../../screens/profile/SetupPINScreen';
 import { ChangePINScreen }             from '../../screens/profile/ChangePINScreen';
 import { ChangePasswordScreen }        from '../../screens/profile/ChangePasswordScreen';
-import { HealthScoreSettingsScreen }   from '../../screens/home/HealthScoreSettingsScreen';
+import { HealthScoreSettingsScreen }    from '../../screens/home/HealthScoreSettingsScreen';
+import { DeleteAccountConfirmScreen }   from '../../screens/profile/DeleteAccountConfirmScreen';
 
 const Stack = createStackNavigator<HomeStackParamList>();
 
@@ -40,7 +41,8 @@ export function HomeStack() {
       <Stack.Screen name="SetupPIN"             component={SetupPINScreen} />
       <Stack.Screen name="ChangePIN"            component={ChangePINScreen} />
       <Stack.Screen name="ChangePassword"       component={ChangePasswordScreen} />
-      <Stack.Screen name="HealthScoreSettings"  component={HealthScoreSettingsScreen} />
+      <Stack.Screen name="HealthScoreSettings"    component={HealthScoreSettingsScreen} />
+      <Stack.Screen name="DeleteAccountConfirm"   component={DeleteAccountConfirmScreen} />
     </Stack.Navigator>
   );
 }
