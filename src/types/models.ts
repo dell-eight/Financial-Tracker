@@ -75,7 +75,7 @@ export interface SavingsGoal {
   priority: number;
 }
 
-export type AssetCategory = 'cash' | 'investment' | 'real_estate' | 'vehicle' | 'other';
+export type AssetCategory = 'cash' | 'bank' | 'investment' | 'real_estate' | 'vehicle' | 'other';
 
 export interface AssetItem {
   id:       string;

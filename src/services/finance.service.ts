@@ -52,7 +52,8 @@ async function uid(): Promise<string> {
 // ── Type mappers ───────────────────────────────────────────────────────────────
 
 function mapAssetType(t: string): AssetCategory {
-  if (['checking', 'savings', 'money_market', 'cash'].includes(t)) return 'cash';
+  if (t === 'cash') return 'cash';
+  if (['checking', 'savings', 'money_market'].includes(t)) return 'bank';
   if (t === 'property') return 'real_estate';
   if (t === 'vehicle')  return 'vehicle';
   if (t === 'investment') return 'investment';
@@ -1386,19 +1387,25 @@ export async function deleteOtherAsset(assetId: string): Promise<void> {
 // ── Assets ─────────────────────────────────────────────────────────────────────
 
 const CATEGORY_TO_DB_TYPE: Record<string, string> = {
-  cash:        'savings',
+  cash:        'cash',
+  bank:        'savings',
   real_estate: 'property',
   vehicle:     'vehicle',
   other:       'other',
 };
 
+export type AssetDbType =
+  | 'cash' | 'savings' | 'checking' | 'money_market'
+  | 'property' | 'vehicle' | 'other';
+
 export async function createAsset(params: {
-  name:     string;
-  category: string;
-  balance:  number;
+  name:       string;
+  category:   string;
+  balance:    number;
+  assetType?: AssetDbType;
 }): Promise<AssetItem> {
   const userId  = await uid();
-  const dbType  = CATEGORY_TO_DB_TYPE[params.category] ?? 'other';
+  const dbType  = params.assetType ?? CATEGORY_TO_DB_TYPE[params.category] ?? 'other';
   const { data, error } = await supabase
     .from('asset_accounts')
     .insert({

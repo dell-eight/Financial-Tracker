@@ -65,20 +65,21 @@ type AddAssetOption = {
 
 const ADD_ASSET_OPTIONS: AddAssetOption[] = [
   { label: 'Cash', icon: '💵', category: 'cash', assetType: 'cash',    placeholder: 'e.g. Wallet, Cash on Hand'  },
-  { label: 'Bank', icon: '🏦', category: 'cash', assetType: 'savings', placeholder: 'e.g. BDO Savings Account'   },
+  { label: 'Bank', icon: '🏦', category: 'bank', assetType: 'savings', placeholder: 'e.g. BDO Savings Account'   },
 ];
 
 type Props = StackScreenProps<WealthStackParamList, 'AssetsDetail'>;
 
 const CATEGORY_LABELS: Record<AssetCategory, string> = {
-  cash:        'Banks',
+  cash:        'Cash',
+  bank:        'Banks',
   investment:  'Investments',
   real_estate: 'Real Estate',
   vehicle:     'Vehicles',
   other:       'Other Assets',
 };
 
-const CATEGORY_ORDER: AssetCategory[] = ['cash', 'investment', 'real_estate', 'vehicle', 'other'];
+const CATEGORY_ORDER: AssetCategory[] = ['cash', 'bank', 'investment', 'real_estate', 'vehicle', 'other'];
 
 const TYPE_LABELS: Record<AssetType, string> = {
   stock: 'Stock', etf: 'ETF', fund: 'Mutual Fund', bond: 'Bond', crypto: 'Crypto',
