@@ -85,7 +85,7 @@ export function AddIncomeScreen({ navigation }: Props) {
   const btmPad = insets.bottom > 0 ? insets.bottom : 24;
 
   const parsedAmount = parseFloat(amountStr);
-  const canSave      = amountStr.length > 0 && !isNaN(parsedAmount) && parsedAmount > 0 && selectedCat !== null;
+  const canSave      = amountStr.length > 0 && !isNaN(parsedAmount) && parsedAmount > 0 && selectedCat !== null && toAccount !== null;
 
   function handleAmountChange(text: string) {
     const cleaned = text.replace(/[^0-9.]/g, '');
@@ -294,7 +294,7 @@ export function AddIncomeScreen({ navigation }: Props) {
                 </>
               ) : (
                 <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted }}>
-                  Select account (optional)
+                  Select account
                 </Text>
               )}
             </View>
@@ -315,23 +315,6 @@ export function AddIncomeScreen({ navigation }: Props) {
               },
               shadows.card,
             ]}>
-              {/* None option */}
-              <Pressable
-                onPress={() => { setToAccount(null); setAccountPickerOpen(false); Haptics.selectionAsync(); }}
-                style={({ pressed }) => ({
-                  flexDirection:    'row',
-                  alignItems:       'center',
-                  padding:          spacing[4],
-                  backgroundColor:  pressed ? colors.bg.surfaceMuted : 'transparent',
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                  borderBottomColor: colors.border.subtle,
-                })}
-              >
-                <Text style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: toAccount === null ? fontFamily.semiBold : fontFamily.regular, color: toAccount === null ? colors.income : colors.text.muted }}>
-                  None
-                </Text>
-                {toAccount === null && <Text style={{ fontSize: 14, color: colors.income }}>✓</Text>}
-              </Pressable>
               {accounts.map((acc, i) => (
                 <Pressable
                   key={acc.id}
