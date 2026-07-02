@@ -768,8 +768,8 @@ export function DebtsDetailScreen({ navigation }: Props) {
 
         {/* ── Avalanche strategy tip ── */}
         {(debts ?? []).length > 1 && (
-          <View style={{ marginHorizontal: spacing[5], marginBottom: spacing[5] }}>
-            <View style={[shadows.sm, { backgroundColor: colors.accent.primary + '15', borderRadius: borderRadius.card, padding: spacing[4], borderWidth: 1, borderColor: colors.accent.primary + '30' }]}>
+          <View style={{ marginHorizontal: spacing[5], marginTop: spacing[3], marginBottom: spacing[5] }}>
+            <View style={[shadows.sm, { backgroundColor: colors.accent.primary + '15', borderRadius: borderRadius.card, padding: spacing[5], borderWidth: 1, borderColor: colors.accent.primary + '30' }]}>
               <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.accent.primary, marginBottom: spacing[2] }}>
                 💡 Debt Avalanche Strategy
               </Text>
