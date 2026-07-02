@@ -26,6 +26,7 @@ import { DASHBOARD_KEY } from '../../../hooks/queries/useDashboard';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { useCurrency } from '../../../utils/currency';
 import { createAsset, deleteAsset, hasTransactionsForAccount } from '../../../services/finance.service';
+import type { AssetDbType } from '../../../services/finance.service';
 import type { AssetCategory, AssetItem, AssetType } from '../../../types/models';
 import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 import { useAppStore } from '../../../store/app.store';
@@ -47,11 +48,24 @@ const ACCOUNTS_STEPS: TutorialStep[] = [
   },
   {
     emoji: '➕',
-    title: 'Add your first account',
-    body: "Tap '+ Add' now. Enter your bank balance. 15 seconds and your net worth becomes real.",
+    title: 'Add your first asset',
+    body: "Tap + Add to record your first asset. It only takes a few seconds and brings your net worth to life.",
     requiredAction: 'add_account',
     inlineButton: '+ Add',
   },
+];
+
+type AddAssetOption = {
+  label:       string;
+  icon:        string;
+  category:    AssetCategory;
+  assetType:   AssetDbType;
+  placeholder: string;
+};
+
+const ADD_ASSET_OPTIONS: AddAssetOption[] = [
+  { label: 'Cash', icon: '💵', category: 'cash', assetType: 'cash',    placeholder: 'e.g. Wallet, Cash on Hand'  },
+  { label: 'Bank', icon: '🏦', category: 'cash', assetType: 'savings', placeholder: 'e.g. BDO Savings Account'   },
 ];
 
 type Props = StackScreenProps<WealthStackParamList, 'AssetsDetail'>;
@@ -78,7 +92,7 @@ function AccountFormModal({
   onClose,
 }: {
   visible: boolean;
-  onSave:  (name: string, balance: number) => Promise<void>;
+  onSave:  (name: string, balance: number, option: AddAssetOption) => Promise<void>;
   onClose: () => void;
 }) {
   const theme  = useTheme();
@@ -86,26 +100,30 @@ function AccountFormModal({
   const { colors, spacing, fontSize, fontFamily, borderRadius } = theme;
   const { symbol } = useCurrency();
 
-  const [name,    setName]    = useState('');
-  const [balance, setBalance] = useState('');
-  const [saving,  setSaving]  = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const [name,              setName]              = useState('');
+  const [balance,           setBalance]           = useState('');
+  const [saving,            setSaving]            = useState(false);
+  const [error,             setError]             = useState<string | null>(null);
+  const [selectedAssetType, setSelectedAssetType] = useState<AssetDbType>('savings');
 
   React.useEffect(() => {
     if (!visible) {
       setName(''); setBalance(''); setError(null); setSaving(false);
+      setSelectedAssetType('savings');
     }
   }, [visible]);
 
-  const parsed  = parseFloat(balance.replace(/[^0-9.]/g, '')) || 0;
-  const canSave = name.trim().length > 0 && parsed > 0;
+  const selected = ADD_ASSET_OPTIONS.find(o => o.assetType === selectedAssetType)!;
+  const parsed   = parseFloat(balance.replace(/[^0-9.]/g, '')) || 0;
+  const canSave  = name.trim().length > 0 && parsed > 0;
+  const balanceLabel = (selectedAssetType === 'cash' || selectedAssetType === 'savings') ? 'CURRENT BALANCE' : 'CURRENT VALUE';
 
   async function handleSave() {
     if (!canSave || saving) return;
     setSaving(true);
     setError(null);
     try {
-      await onSave(name.trim(), parsed);
+      await onSave(name.trim(), parsed, selected);
       onClose();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
@@ -123,15 +141,44 @@ function AccountFormModal({
           contentContainerStyle={{ padding: spacing[5], paddingBottom: Math.max(insets.bottom, spacing[5]) }}
         >
           <Text style={{ fontSize: fontSize.headingSm, fontFamily: fontFamily.bold, color: colors.text.primary, marginBottom: spacing[4] }}>
-            Add Bank Account
+            Add {selected.label}
           </Text>
+
+          {/* ── Type picker chips ── */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing[4] }} contentContainerStyle={{ gap: spacing[2] }}>
+            {ADD_ASSET_OPTIONS.map(opt => {
+              const active = opt.assetType === selectedAssetType;
+              return (
+                <Pressable
+                  key={opt.assetType}
+                  onPress={() => setSelectedAssetType(opt.assetType)}
+                  style={{
+                    flexDirection:   'row',
+                    alignItems:      'center',
+                    paddingVertical: spacing[2],
+                    paddingHorizontal: spacing[3],
+                    borderRadius:    borderRadius.full,
+                    borderWidth:     1.5,
+                    borderColor:     active ? colors.accent.primary : colors.border.subtle,
+                    backgroundColor: active ? colors.accent.primary + '15' : colors.bg.base,
+                    gap:             4,
+                  }}
+                >
+                  <Text style={{ fontSize: 14 }}>{opt.icon}</Text>
+                  <Text style={{ fontSize: fontSize.bodySm, fontFamily: active ? fontFamily.semiBold : fontFamily.regular, color: active ? colors.accent.primary : colors.text.secondary }}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
 
           <Text style={{ fontSize: 11, letterSpacing: 1, marginBottom: 8, fontWeight: '600', color: colors.text.muted }}>NAME</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: name ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[4] }}>
             <TextInput
               value={name}
               onChangeText={setName}
-              placeholder="e.g. BDO Savings Account"
+              placeholder={selected.placeholder}
               placeholderTextColor={colors.text.muted}
               returnKeyType="next"
               autoFocus
@@ -139,7 +186,7 @@ function AccountFormModal({
             />
           </View>
 
-          <Text style={{ fontSize: 11, letterSpacing: 1, marginBottom: 8, fontWeight: '600', color: colors.text.muted }}>CURRENT BALANCE</Text>
+          <Text style={{ fontSize: 11, letterSpacing: 1, marginBottom: 8, fontWeight: '600', color: colors.text.muted }}>{balanceLabel}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: parsed > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[4] }}>
             <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
@@ -174,7 +221,7 @@ function AccountFormModal({
               style={({ pressed }) => [{ flex: 1, height: 48, borderRadius: borderRadius.button, backgroundColor: canSave && !saving ? (pressed ? colors.accent.pressed : colors.accent.primary) : colors.bg.surfaceMuted, alignItems: 'center', justifyContent: 'center' }]}
             >
               <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.semiBold, color: canSave && !saving ? '#FFFFFF' : colors.text.muted }}>
-                {saving ? 'Saving…' : 'Add Account'}
+                {saving ? 'Saving…' : `Add ${selected.label}`}
               </Text>
             </Pressable>
           </View>
@@ -238,8 +285,8 @@ export function AssetsDetailScreen({ navigation }: Props) {
     return CATEGORY_ORDER.filter(c => !!map[c] && c !== 'investment').map(c => ({ category: c, items: map[c]! }));
   }, [assets]);
 
-  async function handleAdd(name: string, balance: number) {
-    await createAsset({ name, category: 'cash', balance });
+  async function handleAdd(name: string, balance: number, option: AddAssetOption) {
+    await createAsset({ name, category: option.category, balance, assetType: option.assetType });
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ASSETS_KEY }),
       queryClient.invalidateQueries({ queryKey: DEBTS_KEY }),
@@ -348,7 +395,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
                 No assets yet
               </Text>
               <Text style={{ fontSize: fontSize.bodyMd, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center' }}>
-                {'Tap "+ Add" to add your first bank account.'}
+                {'Tap "+ Add" to add your first asset.'}
               </Text>
             </View>
           )}
@@ -560,7 +607,7 @@ export function AssetsDetailScreen({ navigation }: Props) {
           )}
 
           <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.muted, textAlign: 'center', marginTop: spacing[5], paddingHorizontal: spacing[5] }}>
-            Tap a holding to view trade history · Long-press a bank account to delete
+            Tap an item to view details · Long-press to delete
           </Text>
         </ScrollView>
       )}
