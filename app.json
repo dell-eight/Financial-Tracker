@@ -86,7 +86,13 @@
       "@react-native-community/datetimepicker",
       "./plugins/withAndroidNetworkSecurity",
       "./plugins/withGradleWrapper",
-      "@sentry/react-native"
+      [
+        "@sentry/react-native/expo",
+        {
+          "organization": "networthy",
+          "project": "networthy"
+        }
+      ]
     ],
     "extra": {
       "privacyPolicyUrl": "https://networthy.app/privacy",
