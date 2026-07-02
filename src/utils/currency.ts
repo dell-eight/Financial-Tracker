@@ -62,6 +62,17 @@ export function formatCompact(n: number, code: string): string {
   return `${sign}${sym}${Math.round(abs)}`;
 }
 
+// ── Money input formatting ─────────────────────────────────────────────────────
+
+// Formats a raw numeric string (no commas) for display inside a TextInput.
+// "20000" → "20,000"  |  "1234.56" → "1,234.56"  |  "" → ""
+export function formatMoneyInput(raw: string): string {
+  if (!raw) return '';
+  const [integer, decimal] = raw.split('.');
+  const withCommas = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return decimal !== undefined ? `${withCommas}.${decimal}` : withCommas;
+}
+
 // ── Hook ───────────────────────────────────────────────────────────────────────
 
 export function useCurrency() {

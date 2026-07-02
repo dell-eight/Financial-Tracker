@@ -23,7 +23,7 @@ import { addContribution } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
 import type { SavingsGoal, Account } from '../../../types/models';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
-import { useCurrency } from '../../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../../utils/currency';
 import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
 type Props = StackScreenProps<WealthStackParamList, 'AddContribution'>;
@@ -163,7 +163,7 @@ export function AddContributionScreen({ navigation, route }: Props) {
               {symbol}
             </Text>
             <TextInput
-              value={amountStr}
+              value={formatMoneyInput(amountStr)}
               onChangeText={v => {
                 const c = v.replace(/[^0-9.]/g, '');
                 if (c.split('.').length <= 2) setAmountStr(c);

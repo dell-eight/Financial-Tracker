@@ -34,7 +34,7 @@ import type { TransactionsStackParamList } from '../../navigation/types';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import { checkBudgetThresholds } from '../../services/notifications.service';
 import { useAppStore } from '../../store/app.store';
-import { useCurrency } from '../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../utils/currency';
 import type { CategoryKey } from '../../theme';
 import type { Account } from '../../types/models';
 import { EXPENSE_CATEGORIES } from '../../constants/categories';
@@ -239,7 +239,7 @@ export function AddExpenseScreen({ navigation }: Props) {
               {symbol}
             </Text>
             <TextInput
-              value={amountStr}
+              value={formatMoneyInput(amountStr)}
               onChangeText={handleAmountChange}
               placeholder="0.00"
               placeholderTextColor={colors.text.muted}

@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import type { StackScreenProps } from '@react-navigation/stack';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTheme } from '../../hooks/ui/useTheme';
-import { useCurrency } from '../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../utils/currency';
 import type { TransactionsStackParamList, FilterState } from '../../navigation/types';
 
 type Props = StackScreenProps<TransactionsStackParamList, 'Filter'>;
@@ -123,7 +123,7 @@ function AmountInput({
       <View style={[amtStyles.wrap, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: spacing[3], height: 44 }]}>
         <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
         <TextInput
-          value={value}
+          value={formatMoneyInput(value)}
           onChangeText={handleChange}
           placeholder="0"
           placeholderTextColor={colors.text.muted}

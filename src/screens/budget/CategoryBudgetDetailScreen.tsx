@@ -26,7 +26,7 @@ import { ExpenseItem } from '../../components';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import type { BudgetStackParamList } from '../../navigation/types';
 import type { Budget, Transaction } from '../../types/models';
-import { useCurrency } from '../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../utils/currency';
 
 type Props = StackScreenProps<BudgetStackParamList, 'CategoryBudgetDetail'>;
 
@@ -90,7 +90,7 @@ function EditLimitModal({
         <View style={[modalStyles.inputRow, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.input, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: spacing[4], height: 52 }]}>
           <Text style={{ fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
           <TextInput
-            value={value}
+            value={formatMoneyInput(value)}
             onChangeText={v => {
               const c = v.replace(/[^0-9.]/g, '');
               if (c.split('.').length <= 2) setValue(c);

@@ -23,7 +23,7 @@ import { useTheme } from '../../hooks/ui/useTheme';
 import { useNetworkStatus } from '../../hooks/ui/useNetworkStatus';
 import { TRANSACTIONS_KEY } from '../../hooks/queries/useTransactions';
 import { DASHBOARD_KEY } from '../../hooks/queries/useDashboard';
-import { useCurrency } from '../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../utils/currency';
 import { useAccounts } from '../../hooks/queries/useAccounts';
 import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { addIncome, RECURRING_FREQUENCY_LABELS, type RecurringFrequency } from '../../services/finance.service';
@@ -196,7 +196,7 @@ export function AddIncomeScreen({ navigation }: Props) {
               {symbol}
             </Text>
             <TextInput
-              value={amountStr}
+              value={formatMoneyInput(amountStr)}
               onChangeText={handleAmountChange}
               placeholder="0.00"
               placeholderTextColor={colors.text.muted}

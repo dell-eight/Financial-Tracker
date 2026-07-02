@@ -20,7 +20,7 @@ import { useInvestments, HOLDINGS_KEY } from '../../../hooks/queries/useInvestme
 import { INVESTMENT_TX_KEY } from '../../../hooks/queries/useInvestmentTransactions';
 import { logTrade } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
-import { useCurrency } from '../../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../../utils/currency';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import type { InvestmentHolding } from '../../../types/models';
 import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
@@ -184,7 +184,7 @@ export function LogTransactionScreen({ navigation, route }: Props) {
           <View style={[styles.inputRow, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: price > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 50 }]}>
             <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
-              value={priceStr}
+              value={formatMoneyInput(priceStr)}
               onChangeText={handleAmountChange(setPriceStr)}
               placeholder={holding ? String(holding.currentPrice) : '0'}
               placeholderTextColor={colors.text.muted}

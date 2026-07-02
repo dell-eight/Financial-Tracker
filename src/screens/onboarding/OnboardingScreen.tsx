@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useAppStore } from '../../store/app.store';
 import { useTheme } from '../../hooks/ui/useTheme';
-import { useCurrency } from '../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../utils/currency';
 import { createAsset, updateBudgetLimit } from '../../services/finance.service';
 import { syncDailyReminder, requestPermissionsAndGetToken } from '../../services/notifications.service';
 import {
@@ -39,14 +39,11 @@ type AccountEntry = {
   category: string;
 };
 
-type AccountType = { key: string; label: string; icon: string; category: string };
+type AccountType = { key: string; label: string; icon: string; category: string; assetType: 'cash' | 'savings' };
 
 const ACCOUNT_TYPES: AccountType[] = [
-  { key: 'cash',    label: 'Cash',       icon: '💵', category: 'cash'       },
-  { key: 'bank',    label: 'Bank',       icon: '🏦', category: 'cash'       },
-  { key: 'savings', label: 'Savings',    icon: '💰', category: 'cash'       },
-  { key: 'invest',  label: 'Investment', icon: '📈', category: 'investment' },
-  { key: 'property',label: 'Property',   icon: '🏠', category: 'real_estate'},
+  { key: 'cash', label: 'Cash', icon: '💵', category: 'cash', assetType: 'cash'    },
+  { key: 'bank', label: 'Bank', icon: '🏦', category: 'cash', assetType: 'savings' },
 ];
 
 type BudgetCat = { label: string; icon: string; color: string };
@@ -148,9 +145,10 @@ export function OnboardingScreen() {
     setFormError(null);
     try {
       await createAsset({
-        name:     acctName.trim(),
-        category: selectedType.category,
-        balance:  parsedBalance,
+        name:      acctName.trim(),
+        category:  selectedType.category,
+        balance:   parsedBalance,
+        assetType: selectedType.assetType,
       });
       setAccounts(prev => [...prev, {
         id:       Math.random().toString(),
@@ -301,7 +299,7 @@ export function OnboardingScreen() {
                 <View style={{ backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: parsedBalance > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[3], height: 56, flexDirection: 'row', alignItems: 'center', marginBottom: spacing[3] }}>
                   <Text style={{ fontSize: fontSize.headingSm, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
                   <TextInput
-                    value={acctBalance}
+                    value={formatMoneyInput(acctBalance)}
                     onChangeText={v => {
                       const c = v.replace(/[^0-9.]/g, '');
                       if (c.split('.').length <= 2) setAcctBalance(c);
@@ -469,7 +467,7 @@ export function OnboardingScreen() {
             <View style={{ backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: parsedLimit > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 64, flexDirection: 'row', alignItems: 'center', marginBottom: spacing[5] }}>
               <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 6 }}>{symbol}</Text>
               <TextInput
-                value={budgetLimit}
+                value={formatMoneyInput(budgetLimit)}
                 onChangeText={v => {
                   const c = v.replace(/[^0-9.]/g, '');
                   if (c.split('.').length <= 2) setBudgetLimit(c);

@@ -25,7 +25,7 @@ import type { CategoryKey } from '../../theme';
 import { EXPENSE_CATEGORIES } from '../../constants/categories';
 import type { BudgetStackParamList } from '../../navigation/types';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
-import { useCurrency, formatFull } from '../../utils/currency';
+import { useCurrency, formatFull, formatMoneyInput } from '../../utils/currency';
 import { useAppStore } from '../../store/app.store';
 import { SuccessToast } from '../../components/tutorial';
 import { WIN } from '../../constants/tutorials';
@@ -114,7 +114,7 @@ function CategoryRow({
       <View style={[catRowStyles.inputWrap, { backgroundColor: colors.bg.surfaceMuted, borderRadius: borderRadius.input, borderWidth: 1, borderColor: value ? catColor : colors.border.subtle, paddingHorizontal: spacing[2], height: 40, width: 110 }]}>
         <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted }}>{symbol}</Text>
         <TextInput
-          value={value}
+          value={formatMoneyInput(value)}
           onChangeText={handleChange}
           placeholder="0"
           placeholderTextColor={colors.text.muted}
@@ -254,7 +254,7 @@ export function BudgetSetupWizard({ navigation }: Props) {
             {symbol}
           </Text>
           <TextInput
-            value={income}
+            value={formatMoneyInput(income)}
             onChangeText={v => {
               const c = v.replace(/[^0-9.]/g, '');
               if (c.split('.').length <= 2) setIncome(c);

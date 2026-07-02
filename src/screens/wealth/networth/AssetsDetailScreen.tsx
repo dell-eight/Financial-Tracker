@@ -24,7 +24,7 @@ import { useSavingsGoals } from '../../../hooks/queries/useSavingsGoals';
 import { useInvestments } from '../../../hooks/queries/useInvestments';
 import { DASHBOARD_KEY } from '../../../hooks/queries/useDashboard';
 import type { WealthStackParamList } from '../../../navigation/types';
-import { useCurrency } from '../../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../../utils/currency';
 import { createAsset, deleteAsset, hasTransactionsForAccount } from '../../../services/finance.service';
 import type { AssetDbType } from '../../../services/finance.service';
 import type { AssetCategory, AssetItem, AssetType } from '../../../types/models';
@@ -191,7 +191,7 @@ function AccountFormModal({
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: parsed > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[4] }}>
             <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
-              value={balance}
+              value={formatMoneyInput(balance)}
               onChangeText={v => {
                 const c = v.replace(/[^0-9.]/g, '');
                 if (c.split('.').length <= 2) setBalance(c);

@@ -27,7 +27,7 @@ import Animated, {
 import type { StackScreenProps } from '@react-navigation/stack';
 import { useTheme } from '../../hooks/ui/useTheme';
 import { useTransactions } from '../../hooks/queries/useTransactions';
-import { useCurrency } from '../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../utils/currency';
 import { ExpenseItem } from '../../components';
 import { updateAsset, updateDebt } from '../../services/finance.service';
 import { ASSETS_KEY, DEBTS_KEY } from '../../hooks/queries/useNetWorth';
@@ -521,7 +521,7 @@ export function AccountTransactionsScreen({ navigation, route }: Props) {
             <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: parseFloat(editBalance) > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[5] }}>
               <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
               <TextInput
-                value={editBalance}
+                value={formatMoneyInput(editBalance)}
                 onChangeText={v => {
                   const c = v.replace(/[^0-9.]/g, '');
                   if (c.split('.').length <= 2) setEditBalance(c);

@@ -20,7 +20,7 @@ import { HOLDINGS_KEY } from '../../../hooks/queries/useInvestments';
 import { addHolding } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
-import { useCurrency } from '../../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../../utils/currency';
 import type { AssetType } from '../../../types/models';
 import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
@@ -193,7 +193,7 @@ export function AddHoldingScreen({ navigation, route }: Props) {
             <View style={[styles.inputRow, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: cost > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[3], height: 50 }]}>
               <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, marginRight: 2 }}>{currencySymbol}</Text>
               <TextInput
-                value={costStr}
+                value={formatMoneyInput(costStr)}
                 onChangeText={handleAmountChange(setCostStr)}
                 placeholder="0"
                 placeholderTextColor={colors.text.muted}
@@ -209,7 +209,7 @@ export function AddHoldingScreen({ navigation, route }: Props) {
         <View style={[styles.inputRow, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: price > 0 && price !== cost ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[5] }]}>
           <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, marginRight: 2 }}>{currencySymbol}</Text>
           <TextInput
-            value={priceStr}
+            value={formatMoneyInput(priceStr)}
             onChangeText={handleAmountChange(setPriceStr)}
             placeholder={costStr || '0'}
             placeholderTextColor={colors.text.muted}

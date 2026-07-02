@@ -20,7 +20,7 @@ import { SAVINGS_GOALS_KEY } from '../../../hooks/queries/useSavingsGoals';
 import { createSavingsGoal } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
-import { useCurrency, formatFull } from '../../../utils/currency';
+import { useCurrency, formatFull, formatMoneyInput } from '../../../utils/currency';
 import { useAppStore } from '../../../store/app.store';
 import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
 
@@ -153,7 +153,7 @@ export function CreateGoalScreen({ navigation }: Props) {
           <View style={[styles.inputWrap, { backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: parsed > 0 ? colors.accent.primary : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[5] }]}>
             <Text style={{ fontSize: fontSize.bodyMd, color: colors.text.muted, fontFamily: fontFamily.medium, marginRight: 4 }}>{symbol}</Text>
             <TextInput
-              value={amountStr}
+              value={formatMoneyInput(amountStr)}
               onChangeText={v => {
                 const c = v.replace(/[^0-9.]/g, '');
                 if (c.split('.').length <= 2) setAmountStr(c);

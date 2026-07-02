@@ -25,7 +25,7 @@ import { ASSETS_KEY } from '../../hooks/queries/useNetWorth';
 import { getCategoryBgColor } from '../../theme';
 import { deleteTransaction, updateExpense, updateIncome, getTransferById, deleteTransfer, calcNextDue, RECURRING_FREQUENCY_LABELS, type RecurringFrequency } from '../../services/finance.service';
 import type { TransactionsStackParamList } from '../../navigation/types';
-import { useCurrency } from '../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../utils/currency';
 import { LoadingOverlay } from '../../components/common/LoadingOverlay';
 import type { Transaction } from '../../types/models';
 
@@ -285,7 +285,7 @@ export function TransactionDetailScreen({ navigation, route }: Props) {
           <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.bg.surface, borderRadius: borderRadius.input, borderWidth: 1, borderColor: editedAmount > 0 ? amtColor : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[4] }}>
             <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
-              value={editAmountStr}
+              value={formatMoneyInput(editAmountStr)}
               onChangeText={v => {
                 const c = v.replace(/[^0-9.]/g, '');
                 if (c.split('.').length <= 2) setEditAmountStr(c);

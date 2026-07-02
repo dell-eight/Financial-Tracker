@@ -629,10 +629,10 @@ export function BudgetScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* Budget tutorial — only shown when user has no budgets yet */}
+      {/* Budget tutorial */}
       <CoachmarkOverlay
         steps={BUDGET_STEPS}
-        visible={tour.visible && !budgetsLoading && budgetItems.length === 0}
+        visible={tour.visible && !budgetsLoading}
         stepIndex={tour.stepIndex}
         total={tour.total}
         stepRefs={[null, null, null, null]}

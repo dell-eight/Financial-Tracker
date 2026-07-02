@@ -25,7 +25,7 @@ import { useAccounts, ACCOUNTS_KEY } from '../../../hooks/queries/useAccounts';
 import { TRANSACTIONS_KEY } from '../../../hooks/queries/useTransactions';
 import { createDebt, updateDebtBalance, addDebtCharge, deleteDebt, makeDebtPayment } from '../../../services/finance.service';
 import type { WealthStackParamList } from '../../../navigation/types';
-import { useCurrency } from '../../../utils/currency';
+import { useCurrency, formatMoneyInput } from '../../../utils/currency';
 import type { DebtCategory, DebtItem } from '../../../types/models';
 import { LoadingOverlay } from '../../../components/common/LoadingOverlay';
 import { useScreenAnimation } from '../../../hooks/ui/useScreenAnimation';
@@ -171,14 +171,14 @@ function AddDebtModal({
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>CURRENT BALANCE</Text>
           <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: balance > 0 ? colors.expense : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[4] }]}>
             <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
-            <TextInput value={balanceStr} onChangeText={v => numField(v, setBalanceStr)} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.expense, padding: 0 }} />
+            <TextInput value={formatMoneyInput(balanceStr)} onChangeText={v => numField(v, setBalanceStr)} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.headingMd, fontFamily: fontFamily.bold, color: colors.expense, padding: 0 }} />
           </View>
 
           {/* Original Amount */}
           <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>ORIGINAL AMOUNT <Text style={{ fontFamily: fontFamily.regular, color: colors.text.muted }}>(optional)</Text></Text>
           <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: originalStr ? colors.border.subtle : colors.border.subtle, paddingHorizontal: spacing[4], height: 50, marginBottom: spacing[4] }]}>
             <Text style={{ fontSize: fontSize.bodyLg, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
-            <TextInput value={originalStr} onChangeText={v => numField(v, setOriginalStr)} keyboardType="decimal-pad" placeholder={balanceStr || '0'} placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.bodyLg, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }} />
+            <TextInput value={formatMoneyInput(originalStr)} onChangeText={v => numField(v, setOriginalStr)} keyboardType="decimal-pad" placeholder={balanceStr || '0'} placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.bodyLg, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }} />
           </View>
 
           {/* Interest Rate & Monthly Payment side by side */}
@@ -194,7 +194,7 @@ function AddDebtModal({
               <Text style={{ fontSize: 11, fontFamily: fontFamily.semiBold, color: colors.text.muted, letterSpacing: 1, marginBottom: spacing[2] }}>MONTHLY PAYMENT</Text>
               <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: colors.border.subtle, paddingHorizontal: spacing[3], height: 50 }]}>
                 <Text style={{ fontSize: fontSize.bodySm, color: colors.text.muted, marginRight: 2 }}>{symbol}</Text>
-                <TextInput value={monthlyStr} onChangeText={v => numField(v, setMonthlyStr)} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }} />
+                <TextInput value={formatMoneyInput(monthlyStr)} onChangeText={v => numField(v, setMonthlyStr)} keyboardType="decimal-pad" placeholder="0" placeholderTextColor={colors.text.muted} style={{ flex: 1, fontSize: fontSize.bodyMd, fontFamily: fontFamily.medium, color: colors.text.primary, padding: 0 }} />
               </View>
             </View>
           </View>
@@ -271,7 +271,7 @@ function AddChargeModal({
           <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: amount > 0 ? colors.expense : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[2] }]}>
             <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
-              value={amountStr}
+              value={formatMoneyInput(amountStr)}
               onChangeText={v => {
                 const c = v.replace(/[^0-9.]/g, '');
                 if (c.split('.').length <= 2) setAmountStr(c);
@@ -399,7 +399,7 @@ function PayDebtModal({
           <View style={[s.inputRow, { backgroundColor: colors.bg.base, borderRadius: borderRadius.input, borderWidth: 1, borderColor: amount > 0 ? colors.income : colors.border.subtle, paddingHorizontal: spacing[4], height: 56, marginBottom: spacing[2] }]}>
             <Text style={{ fontSize: fontSize.headingMd, color: colors.text.muted, marginRight: 4 }}>{symbol}</Text>
             <TextInput
-              value={amountStr}
+              value={formatMoneyInput(amountStr)}
               onChangeText={numField}
               keyboardType="decimal-pad"
               autoFocus
@@ -768,15 +768,13 @@ export function DebtsDetailScreen({ navigation }: Props) {
 
         {/* ── Avalanche strategy tip ── */}
         {(debts ?? []).length > 1 && (
-          <View style={{ marginHorizontal: spacing[5], marginTop: spacing[3], marginBottom: spacing[5] }}>
-            <View style={[shadows.sm, { backgroundColor: colors.accent.primary + '15', borderRadius: borderRadius.card, padding: spacing[5], borderWidth: 1, borderColor: colors.accent.primary + '30' }]}>
-              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.accent.primary, marginBottom: spacing[2] }}>
-                💡 Debt Avalanche Strategy
-              </Text>
-              <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary, lineHeight: 20 }}>
-                Pay minimums on all debts, then put extra money on the highest-rate debt first. This saves the most in interest over time.
-              </Text>
-            </View>
+          <View style={{ marginHorizontal: spacing[5], marginTop: spacing[3], marginBottom: spacing[5], backgroundColor: colors.accent.primary + '15', borderRadius: borderRadius.card, padding: spacing[5], borderWidth: 1, borderColor: colors.accent.primary + '30' }}>
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.semiBold, color: colors.accent.primary, marginBottom: spacing[2] }}>
+              💡 Debt Avalanche Strategy
+            </Text>
+            <Text style={{ fontSize: fontSize.bodySm, fontFamily: fontFamily.regular, color: colors.text.secondary, lineHeight: 20 }}>
+              Pay minimums on all debts, then put extra money on the highest-rate debt first. This saves the most in interest over time.
+            </Text>
           </View>
         )}
 
